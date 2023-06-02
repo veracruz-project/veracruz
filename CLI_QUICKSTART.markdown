@@ -57,8 +57,10 @@ which can be found in the `sdk/rust-examples/shamir-secret-sharing`
 directory.
 
 The rust-examples are a part of the `applications` workspace in the workspaces
-directory, so we need to use the `workspaces/applications` Cargo.toml. Note we
-are compiling to WebAssembly here, which Rust makes very easy for us:
+directory, so we need to use the `workspaces/applications` Cargo.toml. Note that
+Veracruz supports the direct execution of non-WebAssembly native code via the
+[Native Module Manager](COMPONENTS.markdown#native-modules). Here, we will
+compile the example to WebAssembly, which Rust makes very easy for us:
 
 ``` bash
 $ cargo build \

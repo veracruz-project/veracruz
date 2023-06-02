@@ -26,6 +26,9 @@ runtime which drives the other components.
 - platform_services: provides an abstraction layer over important services that
 each isolate implementation provides.  At the moment, this consists of a single
 service: random number generation.
+- Native Module Manager: manages the secure execution of native modules, i.e.
+non-WASM programs that can be invoked by a WASM program via the VFS, or by a
+participant directly. See `Native modules` below for more details.
 - veracruz-utils: miscellaneous or common code that either does not fit
 elsewhere or is used by many different Veracruz components.  The most important
 concept exposed by this library is the Global Policy, which describes the
@@ -56,6 +59,22 @@ Token.  This is the attestation protocol that the Veracruz attestation
 service exposes to client code.
 - Proxy Attestation Server: this is the attestation service proper, which
   can be contacted by clients to authenticate an isolate enrolled in the service.
+
+## Native modules
+In addition to WebAssembly, Veracruz can execute native code, which has the
+benefit of increasing performance (native [VOD](https://github.com/veracruz-project/video-object-detection)
+executes ~35% faster than WebAssembly) and simplifying the build of
+complex software packages, at the cost of reducing portability.
+Native code execution is achieved by the Native Module Manager described above.
+Here is a summary of the several ways to execute native code in Veracruz:
+
+| | Provisioning | Invocation | Execution | Requirements |
+|-|-|-|-|-|
+| Static native module | None (part of the runtime) | Invoked by a WebAssembly program. The execution configuration is written to the module's special file on the VFS | Executed as part of the runtime | Must be specified in the policy to be invokable |
+| Dynamic native module | Not supported yet: artifacts must be manually injected into the execution environment before invocation | Invoked by a WebAssembly program. The execution configuration is written to the module's special file on the VFS | Executed in a [sandbox](https://github.com/veracruz-project/native-module-sandboxer) to control its side effects (file system and syscalls) | Must be specified in the policy to be invokable
+| Provisioned native module | Before execution just like a WebAssembly program | Upon request just like a WebAssembly program. Execution configuration is not supported | Executed in a [sandbox](https://github.com/veracruz-project/native-module-sandboxer) to control its side effects (file system and syscalls) | Must have an extension different from `.wasm` or it will be considered WebAssembly. The program principal must have read access to the binary to be copied to the kernel's filesystem before invocation |
+
+See `NativeModuleType` and the code documentation for more details.
 
 ## The Software Development Kit
 
