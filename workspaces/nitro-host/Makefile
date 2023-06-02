@@ -18,7 +18,7 @@ WORKSPACE_DIR = $(abspath ..)
 OUT_DIR ?= $(abspath test-collateral)
 MEASUREMENT_FILE = $(abspath ../nitro-runtime/PCR0)
 MEASUREMENT_PARAMETER = --pcr-file $(MEASUREMENT_FILE)
-EIF_PATH = $(abspath $(WORKSPACE_DIR)/nitro-runtime/runtime_manager.eif)
+EIF_PATH = $(abspath $(WORKSPACE_DIR)/nitro-runtime/nitro_runtime_manager.eif)
 
 include $(WORKSPACE_DIR)/common.mk
 include $(WORKSPACE_DIR)/shared.mk
