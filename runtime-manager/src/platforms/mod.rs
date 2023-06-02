@@ -11,5 +11,3 @@
 
 #[cfg(feature = "icecap")]
 pub mod icecap;
-#[cfg(feature = "linux")]
-pub mod linux;

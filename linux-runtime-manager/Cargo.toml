@@ -1,0 +1,19 @@
+[package]
+name = "linux-runtime-manager"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1"
+clap = { version = "2.33" }
+env_logger = { version = "0.9.0" }
+hex = { version = "0.4.2" }
+io-utils = { path = "../io-utils" }
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+log = "0.4.13"
+psa-attestation = { path = "../psa-attestation" }
+raw-fd = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.1" }
+runtime_manager_enclave = { path = "../runtime-manager", features = ["linux"] }
+veracruz-utils = { path = "../veracruz-utils" }

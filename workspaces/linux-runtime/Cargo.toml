@@ -19,7 +19,7 @@ exclude = [
   "crates/runtime-manager",
 ]
 members = [
-  "src/linux-runtime",
+  "crates/linux-runtime-manager",
 ]
 resolver = "2"
 
