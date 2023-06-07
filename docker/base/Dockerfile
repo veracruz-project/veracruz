@@ -79,6 +79,8 @@ RUN apt-get update && \
         jq \
         less \
         libc6-dev-arm64-cross \
+        libnuma1 \
+        libnuma-dev \
         libsqlite3-dev \
         libssl-dev \
         libxml2-utils \
