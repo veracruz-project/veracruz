@@ -21,7 +21,7 @@ RUN set -eux; \
     echo "iteration 0"; \
     git clone https://github.com/veracruz-project/proxy_attestation_server.git --branch main --tags ; \
     cd proxy_attestation_server; \
-    git checkout v0.2; \
+    git checkout v0.2.1; \
     go build -o ./vts/vts -ldflags "-X 'github.com/veraison/services/config.SchemeLoader=builtin'" github.com/veraison/services/vts/cmd/vts-service; \
     go build -o ./provisioning/provisioning -ldflags "-X 'github.com/veraison/services/config.SchemeLoader=builtin'" github.com/veraison/services/provisioning/cmd/provisioning-service; \
     go build .; \
@@ -76,13 +76,13 @@ RUN apt-get update && \
         ghc \
         git \
         gnupg \
-        haskell-stack \
         jq \
         less \
         libc6-dev-arm64-cross \
         libsqlite3-dev \
         libssl-dev \
         libxml2-utils \
+        make \
         netbase \
         ninja-build \
         openssh-client \
@@ -106,6 +106,7 @@ RUN apt-get update && \
         wabt \
         wget \
         xxd \
+        xz-utils \
         zlib1g-dev \
         && \
     apt-get autoremove -y && apt-get clean && \
