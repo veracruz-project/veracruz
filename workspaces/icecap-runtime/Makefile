@@ -120,40 +120,27 @@ $(now):
 # seL4
 ###########################################################################
 
-.PHONY: sel4-configure
-sel4-configure: $(sel4_build_dir) $(sel4_dts_path)
-		cmake -G Ninja \
-				-DCMAKE_TOOLCHAIN_FILE=$(abspath $(sel4_src)/gcc.cmake) \
-				-DCROSS_COMPILER_PREFIX=aarch64-linux-gnu- \
-				-DCMAKE_INSTALL_PREFIX=$(abspath $(sel4_build_dir)/install) \
-				-DHACK_SEL4_SRC=$(abspath $(sel4_src)) \
-				-DHACK_SEL4_KERNEL_PLATFORM=$(sel4_kernel_platform) \
-				-C $(abspath $(src)/cmake-config/seL4.cmake) \
-				-S $(abspath $(sel4_src)) \
-				-B $(abspath $(sel4_build_dir)/build)
-
-.PHONY: sel4-build
-sel4-build: sel4-configure
-		ninja -C $(abspath $(sel4_build_dir)/build) all kernel.elf sel4
-
-$(sel4_build_dir)/build/libsel4/libsel4.a: sel4-build
-
-$(sel4_build_dir)/install/libsel4/lib/%: $(sel4_build_dir)/build/libsel4/%
-		install -D -T $< $@
-
-.PHONY: sel4-install
-sel4-install: sel4-build $(sel4_build_dir)/install/libsel4/lib/libsel4.a
-		ninja -C $(abspath $(sel4_build_dir)/build) install
-
-.PHONY: sel4
-sel4: sel4-install
+t/sel4: $(sel4_dts_path) | $(sel4_build_dir)
+	cmake -G Ninja \
+		-DCMAKE_TOOLCHAIN_FILE=$(abspath $(sel4_src)/gcc.cmake) \
+		-DCROSS_COMPILER_PREFIX=aarch64-linux-gnu- \
+		-DCMAKE_INSTALL_PREFIX=$(abspath $(sel4_build_dir)/install) \
+		-DHACK_SEL4_SRC=$(abspath $(sel4_src)) \
+		-DHACK_SEL4_KERNEL_PLATFORM=$(sel4_kernel_platform) \
+		-C $(abspath $(src)/cmake-config/seL4.cmake) \
+		-S $(abspath $(sel4_src)) \
+		-B $(abspath $(sel4_build_dir)/build)
+	ninja -C $(abspath $(sel4_build_dir)/build) all kernel.elf sel4
+	ninja -C $(abspath $(sel4_build_dir)/build) install
+	install -D -T $(sel4_build_dir)/build/libsel4/libsel4.a \
+		$(sel4_build_dir)/install/libsel4/lib/libsel4.a
+	mkdir -p t && touch $@
 
 ###########################################################################
 # IceCap user space
 ###########################################################################
 
-.PHONY: userspace_c
-userspace_c: sel4
+t/userspace_c: t/sel4
 	$(MAKE) -f $(c_src)/Makefile CROSS_COMPILE=aarch64-linux-gnu- \
 		BUILD=$(c_build_dir)/for-userspace/build OUT=$(c_build_dir)/for-userspace/install \
 		CFLAGS="-I$(sel4_include_dir) -I$(compiler_some_libc_include)" \
@@ -166,13 +153,13 @@ userspace_c: sel4
 			$(c_src)/icecap-utils/icecap.mk \
 		" \
 		install
+	mkdir -p t && touch $@
 
 ###########################################################################
 # IceCap sysroot
 ###########################################################################
 
-.PHONY: sysroot-install
-sysroot-install: sysroot
+t/sysroot-install: t/sysroot
 	: # "tidy_dest $src $dst" removes files from $dst/ that are not
 	: # found in $src/. It does not matter if the glob fails to match.
 	tidy_dest() { \
@@ -192,6 +179,7 @@ sysroot-install: sysroot
 	mkdir -p $$dst ; \
 	cp -u $$src/*.so $$dst/ ; \
 	tidy_dest $$src $$dst
+	mkdir -p t && touch $@
 
 sysroot_rustflags := \
 	--cfg=icecap_plat=\"$(icecap_plat)\" \
@@ -200,8 +188,7 @@ sysroot_rustflags := \
 	-Z force-unstable-if-unmarked \
 	--sysroot /dev/null
 
-.PHONY: sysroot
-sysroot: userspace_c sel4
+t/sysroot: t/userspace_c t/sel4
 	RUSTC_BOOTSTRAP=1 \
 	RUST_TARGET_PATH=$(abspath icecap/src/rust/support/targets) \
 	$(call cargo_target_config_prefix,$(rust_target))RUSTFLAGS="$(sysroot_rustflags)" \
@@ -216,6 +203,7 @@ sysroot: userspace_c sel4
 		--target $(rust_target) \
 		-j$$(nproc) \
 		--target-dir $(sysroot_target_dir)
+	mkdir -p t && touch $@
 
 ###########################################################################
 # Veracruz part
@@ -230,8 +218,7 @@ icecap_rustflags := \
 	$(icecap_c_lib_flags) \
 	--sysroot=$(abspath $(sysroot_dir))
 
-.PHONY: rust-project
-rust-project: $(now) sysroot-install userspace_c sel4
+t/rust-project: $(now) t/sysroot-install t/userspace_c t/sel4
 	RUST_TARGET_PATH=$(abspath icecap/src/rust/support/targets) \
 		cargo tree \
 			--manifest-path $(manifest_path) --target $(rust_target) \
@@ -255,12 +242,13 @@ rust-project: $(now) sysroot-install userspace_c sel4
 			-j$$(nproc) \
 			--target-dir $(target_dir) \
 			--out-dir $(bin_dir)
+	mkdir -p t && touch $@
 
 ###########################################################################
 # IceCap CDL
 ###########################################################################
 
-$(object_sizes_yaml): sel4 | $(misc_build_dir)
+$(object_sizes_yaml): t/sel4 | $(misc_build_dir)
 		aarch64-linux-gnu-gcc -E -P - -I$(sel4_include_dir) < $(capdl_src)/object_sizes/object_sizes.yaml > $@
 
 ${rust_dev_bins}/icecap-serialize-runtime-config:
@@ -275,7 +263,7 @@ icedl_components_prepared := \
         )
 
 $(foreach x,$(icedl_components), \
-        $(patsubst %,$(rust_icecap_bins)/%.elf,$(x))): rust-project
+        $(patsubst %,$(rust_icecap_bins)/%.elf,$(x))): t/rust-project
 
 $(icedl_component_dir)/%.full.elf: $(rust_icecap_bins)/%.elf
 		install -D -T $< $@
@@ -316,7 +304,7 @@ $(icedl_firmware_dir)/capdl.o: $(icedl_firmware_dir)/capdl.cpio
 	aarch64-linux-gnu-gcc -c $(c_src)/support/embedded-file.S -o $@ \
 		-DSYMBOL=_capdl_archive -DFILE=$< -DSECTION=_archive_cpio
 
-$(platform_info_h): sel4 | $(misc_build_dir)
+$(platform_info_h): t/sel4 | $(misc_build_dir)
 	python3 $(sel4_tools_src)/cmake-tool/helpers/platform_sift.py --emit-c-syntax \
 		$(sel4_build_dir)/build/gen_headers/plat/machine/platform_gen.yaml > $@
 
@@ -351,7 +339,7 @@ $(app_elf): $(capdl_loader)
 
 sel4_cmake_config_prefixes := Kernel LibSel4 HardwareDebugAPI
 
-$(misc_build_dir)/kernel-config.txt: sel4 | $(misc_build_dir)
+$(misc_build_dir)/kernel-config.txt: t/sel4 | $(misc_build_dir)
 	sed -n 's,^\([A-Za-z0-9][^:]*\):\([^=]*\)=\(.*\)$$,\1:\2=\3,p' $(sel4_build_dir)/build/CMakeCache.txt \
 		| grep -e '$$.^' $(addprefix -e ^,$(sel4_cmake_config_prefixes)) \
 		| sort \
@@ -361,7 +349,7 @@ $(misc_build_dir)/kernel-config.cmake: $(misc_build_dir)/kernel-config.txt
 	sed 's/^\([^:]*\):\([^=]*\)=\(.*\)$$/set(\1 "\3" CACHE \2 "")/' $< \
 		> $@
 
-$(misc_build_dir)/boot.cpio: sel4 $(app_elf)
+$(misc_build_dir)/boot.cpio: t/sel4 $(app_elf)
 	mkdir -p $@.links
 	cp -rL $(sel4_build_dir)/install/bin/kernel.elf $(sel4_build_dir)/build/kernel.dtb $(app_elf) $@.links
 	printf "kernel.elf\nkernel.dtb\napp.elf\n" | cpio -o -D $@.links --reproducible -H newc > $(abspath $@)
@@ -370,11 +358,12 @@ $(misc_build_dir)/boot.o: $(misc_build_dir)/boot.cpio
 	aarch64-linux-gnu-gcc -c -x assembler-with-cpp $(c_src)/support/embedded-file.S -o $@ \
 		-DSYMBOL=_archive_start -DFILE=$< -DSECTION=_archive_cpio
 
-elfloader_c:
+t/elfloader_c:
 	$(MAKE) -f $(c_src)/Makefile CROSS_COMPILE=aarch64-linux-gnu- \
 		BUILD=$(c_build_dir)/for-elfloader/build OUT=$(c_build_dir)/for-elfloader/install \
 		ROOTS=$(c_src)/boot/cpio/icecap.mk \
 		install
+	mkdir -p t && touch $@
 
 elfloader_extra_cpp_flags := \
 	-I$(abspath $(sel4_include_dir)) \
@@ -384,8 +373,7 @@ elfloader_extra_c_flags_link := \
 	-L$(abspath $(sel4_lib_dir)) \
 	-L$(abspath $(c_build_dir)/for-elfloader/install/lib)
 
-.PHONY: elfloader-configure
-elfloader-configure: $(misc_build_dir)/boot.o $(misc_build_dir)/kernel-config.cmake elfloader_c | $(elfloader_build_dir)
+t/elfloader-configure: $(misc_build_dir)/boot.o $(misc_build_dir)/kernel-config.cmake t/elfloader_c | $(elfloader_build_dir)
 	cmake -G Ninja \
 		-DCMAKE_TOOLCHAIN_FILE=$(abspath $(sel4_src)/gcc.cmake) \
 		-DCROSS_COMPILER_PREFIX=aarch64-linux-gnu- \
@@ -404,12 +392,13 @@ elfloader-configure: $(misc_build_dir)/boot.o $(misc_build_dir)/kernel-config.cm
 		-DICECAP_HACK_KERNEL_DTB=$(abspath $(sel4_build_dir)/build/kernel.dtb) \
 		-DICECAP_HACK_ARCHIVE_O=$(abspath $(misc_build_dir)/boot.o) \
 		-Dplatform_yaml=$(abspath $(sel4_build_dir)/build/gen_headers/plat/machine/platform_gen.yaml)
+	mkdir -p t && touch $@
 
-.PHONY: elfloader-build
-elfloader-build: elfloader-configure
+t/elfloader-build: t/elfloader-configure
 	ninja -C $(abspath $(elfloader_build_dir)/build) elfloader
+	mkdir -p t && touch $@
 
-$(elfloader_build_dir)/build/elfloader: elfloader-build
+$(elfloader_build_dir)/build/elfloader: t/elfloader-build
 
 .PHONY: elfloader
 elfloader: $(elfloader_build_dir)/build/elfloader css-icecap.bin
@@ -421,4 +410,5 @@ css-icecap.bin: $(elfloader_build_dir)/build/elfloader
 build: elfloader
 
 .PHONY: clean
-	rm -rf css-icecap.bin $(build_dir)
+clean:
+	rm -rf css-icecap.bin $(build_dir) t
