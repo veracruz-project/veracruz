@@ -14,20 +14,19 @@ WIDTH = 1024
 HEIGHT = 1024
 TARGET_PREFIX = image-processing
 TARGET_DAT = $(addprefix $(TARGET_PREFIX), .png)
-TARGET_DIR = ../../datasets/
-TARGET_DIR_DAT = $(addprefix $(TARGET_DIR),$(TARGET_DAT))
+TARGET_DIR = ../../datasets
+TARGET_DIR_DAT = $(addprefix $(TARGET_DIR)/,$(TARGET_DAT))
 RUN_COMMAND ?= cargo run --
 
 .PHONY: all clean quick-clean fmt fmt-check
 
 all: $(TARGET_DIR_DAT)
 
-.SECONDEXPANSION:
-$(TARGET_DIR_DAT): %.png : $$(notdir $$@) $(TARGET_DIR)
-	cp $< $@ 
+$(TARGET_DIR)/%.png: %.png | $(TARGET_DIR)
+	cp $< $@
 
 $(TARGET_DIR):
-	mkdir -p $(TARGET_DIR)
+	mkdir -p $@
 
 $(TARGET_DAT):
 	$(RUN_COMMAND) --file_prefix $(TARGET_PREFIX) --image_path $(IMAGE_PATH) --width $(WIDTH) --height $(HEIGHT);
@@ -37,10 +36,7 @@ clean:
 	rm -f *.png
 	rm -f $(TARGET_DIR_DAT)
 
-quick-clean:
-	cargo clean
-	rm -f *.png
-	rm -f $(TARGET_DIR_DAT)
+quick-clean: clean
 
 fmt:
 	cargo fmt
