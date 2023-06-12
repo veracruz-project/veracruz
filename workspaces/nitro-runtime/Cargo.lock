@@ -1741,7 +1741,6 @@ dependencies = [
  "libc",
  "log",
  "nix",
- "nsm-lib",
  "policy-utils",
  "protobuf",
  "raw-fd",
