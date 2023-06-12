@@ -17,7 +17,7 @@ icecap-start-generic = { path = "../icecap/crates/framework/base/icecap-start/ge
 icecap-std-external = { path = "../icecap/crates/framework/std-support/icecap-std-external" }
 libm = { version = "0.2" }
 psa-attestation = { path = "../psa-attestation" }
-runtime_manager_enclave = { path = "../runtime-manager", features = ["icecap"] }
+runtime-manager = { path = "../runtime-manager", features = ["icecap"] }
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }
 serde_json = "1.0"
 #uuid = { version = "1.1.2", features = ["serde"] }

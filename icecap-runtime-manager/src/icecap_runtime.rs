@@ -10,7 +10,7 @@
 //! information on licensing and copyright.
 
 use anyhow::Result;
-use runtime_manager_enclave::{
+use runtime_manager::{
     managers::session_manager::{
         generate_csr,
         init_session_manager,

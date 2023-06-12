@@ -24,7 +24,7 @@ use icecap_core::{
 };
 use icecap_start_generic::declare_generic_main;
 use icecap_std_external;
-use runtime_manager_enclave::{
+use runtime_manager::{
     common_runtime::CommonRuntime,
 };
 use serde::{Deserialize, Serialize};
