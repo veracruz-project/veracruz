@@ -23,9 +23,9 @@ include $(WORKSPACE_DIR)/shared.mk
 all: nitro
 
 nitro: nitro-runtime-manager
-	$(MAKE) runtime_manager.eif PCR0
+	$(MAKE) nitro_runtime_manager.eif PCR0
 
-runtime_manager.eif PCR0 &: target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/nitro_runtime_manager crates/nitro-runtime-manager/dockerdir/Dockerfile
+nitro_runtime_manager.eif PCR0 &: target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/nitro_runtime_manager crates/nitro-runtime-manager/dockerdir/Dockerfile
 	rm -rf docker
 	mkdir -p docker
 	cp target/$(ARCH)-unknown-linux-musl/$(PROFILE_PATH)/nitro_runtime_manager docker
