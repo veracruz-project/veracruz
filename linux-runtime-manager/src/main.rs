@@ -14,7 +14,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use runtime_manager_enclave::managers::RuntimeManagerError;
+use runtime_manager::managers::RuntimeManagerError;
 use anyhow::{anyhow, Result};
 use clap::{App, Arg};
 use hex::decode_to_slice;
@@ -22,7 +22,7 @@ use hex::decode_to_slice;
 use raw_fd::{ receive_buffer, send_buffer };
 use lazy_static::lazy_static;
 use log::{ error, info };
-use runtime_manager_enclave::{
+use runtime_manager::{
     common_runtime::CommonRuntime,
     managers::session_manager::init_session_manager,
 };
@@ -106,7 +106,7 @@ pub fn linux_main() -> Result<()> {
         *rmm = measurement_bytes;
     }
 
-    
+
     let linux_runtime = linux_runtime::LinuxRuntime{};
 
     println!("linux_runtime_manager::linux_main accept succeeded. looping");
@@ -118,7 +118,7 @@ pub fn linux_main() -> Result<()> {
             anyhow!(e)
         })?;
         info!("Connected to Veracruz Server on {}.", address);
-    
+
         // Configure TCP to flush outgoing buffers immediately. This reduces latency
         // when dealing with small packets
         let _ = stream.set_nodelay(true);

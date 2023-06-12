@@ -11,10 +11,11 @@
 
 use anyhow::{anyhow, Result};
 use log::error;
+use nix::libc::c_char;
 use psa_attestation::{
     psa_initial_attest_get_token, psa_initial_attest_load_key, psa_initial_attest_remove_key,
 };
-use runtime_manager_enclave::{
+use runtime_manager::{
     managers::{
         RuntimeManagerError,
         session_manager::generate_csr,
@@ -72,7 +73,7 @@ impl PlatformRuntime for LinuxRuntime {
 
             e
         })?;
-    
+
         let csr_hash = sha256(&csr);
 
         let mut root_key_handle: u32 = 0;
@@ -117,7 +118,7 @@ impl PlatformRuntime for LinuxRuntime {
                 runtime_manager_hash.len() as u64,
                 csr_hash.as_ptr() as *const u8,
                 csr_hash.len() as u64,
-                enclave_name.as_ptr() as *const i8,
+                enclave_name.as_ptr() as *const c_char,
                 enclave_name.len() as u64,
                 challenge.as_ptr() as *const u8,
                 challenge.len() as u64,

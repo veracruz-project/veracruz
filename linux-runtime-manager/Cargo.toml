@@ -13,7 +13,8 @@ hex = { version = "0.4.2" }
 io-utils = { path = "../io-utils" }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 log = "0.4.13"
+nix = "0.20.2"
 psa-attestation = { path = "../psa-attestation" }
 raw-fd = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.1" }
-runtime_manager_enclave = { path = "../runtime-manager", features = ["linux"] }
+runtime-manager = { path = "../runtime-manager", features = ["linux"] }
 veracruz-utils = { path = "../veracruz-utils" }
