@@ -22,12 +22,16 @@ impl<'a> CommonRuntime<'a> {
         let received_message: RuntimeManagerRequest = bincode::deserialize(&received_buffer)?;
         let return_message = match received_message {
             RuntimeManagerRequest::Attestation(challenge, _challenge_id) => {
-                self.platform_runtime.attestation(&challenge)?
+                println!("common_runtime::decode_dispatch Attestation");
+                let ret = self.platform_runtime.attestation(&challenge)?;
+                println!("common_runtime::decode_dispatch Attestation complete with ret:{:?}\n", ret);
+                ret
             }
             RuntimeManagerRequest::Initialize(policy_json, certificate_chain) => {
                 initialize(&policy_json, &certificate_chain)?
             }
             RuntimeManagerRequest::NewTlsSession => {
+                println!("common_runtime::decode_dispatch NewTlsSession");
                 let ns_result = managers::session_manager::new_session();
                 let return_message: RuntimeManagerResponse = match ns_result {
                     Ok(session_id) => RuntimeManagerResponse::TlsSession(session_id),
@@ -36,6 +40,7 @@ impl<'a> CommonRuntime<'a> {
                 return_message
             }
             RuntimeManagerRequest::CloseTlsSession(session_id) => {
+                println!("common_runtime::decode_dispatch CloseTlsSession");
                 let cs_result = managers::session_manager::close_session(session_id);
                 let return_message: RuntimeManagerResponse = match cs_result {
                     Ok(_) => RuntimeManagerResponse::Status(Status::Success),
@@ -44,7 +49,7 @@ impl<'a> CommonRuntime<'a> {
                 return_message
             }
             RuntimeManagerRequest::SendTlsData(session_id, tls_data) => {
-                println!("runtime_manager_nitro::main SendTlsData");
+                println!("common_runtime::decode_dispatch SendTlsData");
                 let return_message =
                     match managers::session_manager::send_data(session_id, &tls_data) {
                         Ok(_) => RuntimeManagerResponse::Status(Status::Success),
@@ -53,7 +58,7 @@ impl<'a> CommonRuntime<'a> {
                 return_message
             }
             RuntimeManagerRequest::GetTlsData(session_id) => {
-                println!("runtime_manager_nitro::main GetTlsData");
+                println!("common_runtime::decode_dispatch GetTlsData");
                 let return_message = match managers::session_manager::get_data(session_id) {
                     Ok((active, output_data)) => {
                         RuntimeManagerResponse::TlsData(output_data, active)
@@ -65,7 +70,7 @@ impl<'a> CommonRuntime<'a> {
         };
         let return_buffer = bincode::serialize(&return_message)?;
         println!(
-            "runtime_manager_nitro::main calling send buffer with buffer_len:{:?}",
+            "common_runtime::decode_dispatch calling send buffer with buffer_len:{:?}",
             return_buffer.len()
         );
         return Ok(return_buffer);

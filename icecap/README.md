@@ -135,7 +135,7 @@ apparently unnecessary.)
 * `icecap_main` is defined by `declare_generic_main`, a macro that is
   defined in
   `icecap/icecap/src/rust/crates/framework/base/icecap-start/generic/src/lib.rs`
-  and invoked in `runtime-manager/src/platforms/icecap.rs` or
+  and invoked in `icecap-runtime-manager/src/main.rs` or
   `workspaces/icecap-runtime/src/virtio-console-server/src/main.rs`:
   `icecap_main` calls `run_generic_main` with `main` as an argument,
   but both of those functions are only used in one place and therefore

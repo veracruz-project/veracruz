@@ -42,7 +42,7 @@ rust_build_dir := $(sticky_dir)/target
 c_build_dir := $(disposable_dir)/c
 icedl_build_dir := $(disposable_dir)/icedl
 misc_build_dir := $(disposable_dir)/misc
-now := crates/runtime-manager/NOW
+now := crates/icecap-runtime-manager/NOW
 
 rust_icecap_bins := $(target_dir)/aarch64-icecap/$(PROFILE_PATH)
 rust_dev_bins := $(rust_build_dir)/$(PROFILE_PATH)

@@ -52,22 +52,22 @@ jobs:
         run: |
           cd /work/veracruz
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - name: Check modification to Cargo.lock 
+      - name: Check modification to Cargo.lock
         id: check-diff
         run: |
           # Find if any Cargo.lock changed, pad them into a line and trim leading and trailing whitespace.
           file_changed=$(git diff --diff-filter=ACMUXTRD --name-only -- '**Cargo.lock' | tr '\n' ' ' | xargs)
           echo "cargo-lock=$file_changed" >> $GITHUB_OUTPUT
-          if [ -n "$file_changed" ] ; then 
-              echo "::warning::Cargo.lock files modified"; 
-              echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}";  
+          if [ -n "$file_changed" ] ; then
+              echo "::warning::Cargo.lock files modified";
+              echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}";
           fi
       - name: Upload Cargo.lock files
         id: upload-changed-cargo-lock
         if: steps.check-diff.outputs.cargo-lock != ''
         uses: actions/upload-artifact@v3
-        with: 
-          name: linux 
+        with:
+          name: linux
           path: workspaces/**/Cargo.lock
       - name: Prepare deployment artifacts
         run: |
@@ -77,7 +77,7 @@ jobs:
           workspaces/host/target/debug/generate-policy \
           workspaces/linux-host/target/debug/veracruz-client \
           workspaces/linux-host/target/debug/veracruz-server \
-          workspaces/linux-runtime/target/debug/runtime-manager-enclave
+          workspaces/linux/runtime/target/debug/linux-runtime-manager
           # Copy artifacts to new directory
           mkdir -p artifacts
           cp -a \
@@ -88,12 +88,12 @@ jobs:
           workspaces/host/target/debug/generate-policy \
           workspaces/linux-host/target/debug/veracruz-client \
           workspaces/linux-host/target/debug/veracruz-server \
-          workspaces/linux-runtime/target/debug/runtime-manager-enclave \
+          workspaces/linux-runtime/target/debug/linux-runtime-manager \
           artifacts/
       - name: Upload deployment artifacts
         id: upload-deployment-artifacts
         uses: actions/upload-artifact@v3
-        with: 
+        with:
           name: linux_deployment_artifacts
           path: |
             artifacts/*
@@ -131,7 +131,7 @@ jobs:
         with:
           name: linux_deployment_artifacts
           path: artifacts
-      - name: Post-process artifacts 
+      - name: Post-process artifacts
         run: |
           chmod -R 755 artifacts
           # Add artifacts to $GITHUB_PATH
@@ -199,7 +199,7 @@ jobs:
           rm -rf output
       - name: Run VOD in Veracruz-Linux
         run: |
-          POLICY_GENERATOR_PATH="artifacts/generate-policy" CLIENT_PATH="artifacts/veracruz-client" SERVER_PATH="artifacts/veracruz-server" RUNTIME_MANAGER_PATH="artifacts/runtime-manager-enclave" CA_CERT_CONF_PATH="artifacts/ca-cert.conf" CERT_CONF_PATH="artifacts/cert.conf" PROXY_CLEANUP_SCRIPT_PATH="artifacts/proxy_cleanup.sh" ./deploy_linux.sh
+          POLICY_GENERATOR_PATH="artifacts/generate-policy" CLIENT_PATH="artifacts/veracruz-client" SERVER_PATH="artifacts/veracruz-server" RUNTIME_MANAGER_PATH="artifacts/linux-runtime-manager" CA_CERT_CONF_PATH="artifacts/ca-cert.conf" CERT_CONF_PATH="artifacts/cert.conf" PROXY_CLEANUP_SCRIPT_PATH="artifacts/proxy_cleanup.sh" ./deploy_linux.sh
           # Check results
           file prediction.0.jpg | grep "JPEG image data"
 
@@ -224,21 +224,21 @@ jobs:
         id: nitro-build
         run: |
             make -C /work/veracruz/workspaces nitro
-      - name: Check modification to Cargo.lock 
+      - name: Check modification to Cargo.lock
         id: check-diff
         run: |
           file_changed=$(git diff --diff-filter=ACMUXTRD --name-only -- '**Cargo.lock' | tr '\n' ' ' | xargs)
           echo "cargo-lock=$file_changed" >> $GITHUB_OUTPUT
-          if [ -n "$file_changed" ] ; then 
-              echo "::warning::Cargo.lock files modified"; 
-              echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}";  
+          if [ -n "$file_changed" ] ; then
+              echo "::warning::Cargo.lock files modified";
+              echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}";
           fi
       - name: Upload Cargo.lock files
         id: upload-changed-cargo-lock
         if: steps.check-diff.outputs.cargo-lock != ''
         uses: actions/upload-artifact@v3
-        with: 
-          name: nitro 
+        with:
+          name: nitro
           path: workspaces/**/Cargo.lock
 
   icecap:
@@ -262,21 +262,21 @@ jobs:
         id: icecap-build
         run: |
             VERACRUZ_TEST_TIMEOUT=2400 make -C /work/veracruz/workspaces icecap-tests PROFILE=release
-      - name: Check modification to Cargo.lock 
+      - name: Check modification to Cargo.lock
         id: check-diff
         run: |
           file_changed=$(git diff --diff-filter=ACMUXTRD --name-only -- '**Cargo.lock' | tr '\n' ' ' | xargs)
           echo "cargo-lock=$file_changed" >> $GITHUB_OUTPUT
-          if [ -n "$file_changed" ] ; then 
-              echo "::warning::Cargo.lock files modified"; 
-              echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}";  
+          if [ -n "$file_changed" ] ; then
+              echo "::warning::Cargo.lock files modified";
+              echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}";
           fi
       - name: Upload Cargo.lock files
         id: upload-changed-cargo-lock
         if: steps.check-diff.outputs.cargo-lock != ''
         uses: actions/upload-artifact@v3
-        with: 
-          name: icecap 
+        with:
+          name: icecap
           path: workspaces/**/Cargo.lock
 
   # tests that the CLI_QUICKSTART.markdown is still up to date
@@ -315,21 +315,21 @@ jobs:
           cd tests/tlstest && \
           sed -n '/``` bash/,/```/{/```/d; p}' README.md > README.md.sh && \
           bash -euxo pipefail README.md.sh
-      - name: Check modification to Cargo.lock 
+      - name: Check modification to Cargo.lock
         id: check-diff
         run: |
           file_changed=$(git diff --diff-filter=ACMUXTRD --name-only -- '**Cargo.lock' | tr '\n' ' ' | xargs)
           echo "cargo-lock=$file_changed" >> $GITHUB_OUTPUT
-          if [ -n "$file_changed" ] ; then 
-              echo "::warning::Cargo.lock files modified"; 
-              echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}";  
+          if [ -n "$file_changed" ] ; then
+              echo "::warning::Cargo.lock files modified";
+              echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}";
           fi
       - name: Upload Cargo.lock files
         id: upload-changed-cargo-lock
         if: steps.check-diff.outputs.cargo-lock != ''
         uses: actions/upload-artifact@v3
-        with: 
-          name: quickstart 
+        with:
+          name: quickstart
           path: workspaces/**/Cargo.lock
 
   cargo-lock-check:
