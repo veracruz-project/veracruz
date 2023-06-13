@@ -1,9 +1,7 @@
 [package]
 name = "linux-runtime-manager"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+version = "0.3.0"
+edition = "2018"
 
 [dependencies]
 anyhow = "1"
@@ -17,4 +15,4 @@ nix = "0.20.2"
 psa-attestation = { path = "../psa-attestation" }
 raw-fd = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.1" }
 runtime-manager = { path = "../runtime-manager", features = ["linux"] }
-veracruz-utils = { path = "../veracruz-utils" }
+veracruz-utils = { path = "../veracruz-utils", features = ["linux"] }

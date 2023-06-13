@@ -153,13 +153,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcb6dd1c2376d2e096796e234a70e17e94cc2d5d54ff8ce42b28cef1d0d359a4"
 
 [[package]]
-name = "biterate"
-version = "0.1.0"
-dependencies = [
- "num",
-]
-
-[[package]]
 name = "bitfield"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -464,23 +457,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "finite-set"
-version = "0.1.0"
-dependencies = [
- "finite-set-derive",
-]
-
-[[package]]
-name = "finite-set-derive"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
- "synstructure",
-]
-
-[[package]]
 name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -589,15 +565,6 @@ name = "humantime"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
-
-[[package]]
-name = "hypervisor-event-server-types"
-version = "0.1.0"
-dependencies = [
- "biterate",
- "finite-set",
- "serde",
-]
 
 [[package]]
 name = "icecap-backtrace"
@@ -1461,17 +1428,9 @@ dependencies = [
  "bincode",
  "err-derive",
  "execution-engine",
- "finite-set",
  "half",
  "hex",
- "hypervisor-event-server-types",
- "icecap-core",
- "icecap-ring-buffer",
- "icecap-rpc",
- "icecap-start-generic",
- "icecap-std-external",
  "lazy_static",
- "libc",
  "libm",
  "log",
  "policy-utils",

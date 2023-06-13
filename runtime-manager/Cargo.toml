@@ -11,15 +11,6 @@ default = []
 icecap = [
   "bincode",
   "execution-engine/icecap",
-  "finite-set",
-  "hypervisor-event-server-types",
-  "icecap-core",
-  "icecap-rpc",
-  "icecap-ring-buffer",
-  "icecap-start-generic",
-  "icecap-std-external",
-  "libc",
-  "libm",
   "policy-utils/icecap",
   "psa-attestation",
   "serde",
@@ -31,8 +22,6 @@ icecap-lkvm = []
 icecap-qemu = []
 linux = [
   "bincode",
-  "clap",
-  "env_logger",
   "execution-engine/std",
   "io-utils/linux",
   "nix",
@@ -46,37 +35,27 @@ nitro = [
   "execution-engine/std",
   "execution-engine/nitro",
   "io-utils/nitro",
-  "libc",
   "policy-utils/std",
-  "nsm_api",
   "nix",
-  "raw-fd",
+  "nsm_api",
   "session-manager/nitro",
   "veracruz-utils/nitro",
 ]
 
 [dependencies]
 anyhow = "1"
-base64 = "0.13.0"
 bincode = { version = "1.2.1", default-features = false, optional = true }
-clap = { version = "2.33", optional = true }
-env_logger = { version = "0.9.0", optional = true }
 err-derive = "0.2"
 execution-engine = { path = "../execution-engine" }
-finite-set = { path = "../icecap/crates/framework/helpers/finite-set", optional = true }
-half = "=1.7.1"
 hex = { version = "0.4.2" }
 io-utils = { path = "../io-utils", optional = true }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-libc = { version = "0.2.124", optional = true }
-libm = { version = "0.2", optional = true }
 log = "0.4.13"
 nix = { version = "0.20.2", optional = true }
 nsm_api = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", tag = "v0.2.0", package = "aws-nitro-enclaves-nsm-api", optional = true }
 policy-utils = { path = "../policy-utils" }
 protobuf = "=2.8.1"
 psa-attestation = { path = "../psa-attestation", optional = true }
-raw-fd = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.1", optional = true}
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"], optional = true }
 serde_json = "1.0"
 session-manager = { path = "../session-manager" }
@@ -85,11 +64,3 @@ uuid = { version = "1.1.2", features = ["serde"] }
 veracruz-utils = { path = "../veracruz-utils" }
 wasi-types = { path = "../third-party/wasi-types" }
 wasmi = { path = "../third-party/wasmi", optional = true }
-
-[target.aarch64-icecap.dependencies]
-hypervisor-event-server-types = { path = "../icecap/crates/hypervisor/components/event-server/types", optional = true }
-icecap-core = { path = "../icecap/crates/framework/base/icecap-core", optional = true }
-icecap-rpc = { path = "../icecap/crates/framework/base/icecap-rpc", optional = true }
-icecap-ring-buffer = { path = "../icecap/crates/framework/base/icecap-ring-buffer", optional = true }
-icecap-start-generic = { path = "../icecap/crates/framework/base/icecap-start/generic", optional = true }
-icecap-std-external = { path = "../icecap/crates/framework/std-support/icecap-std-external", optional = true }
