@@ -11,8 +11,8 @@
 
 ROW = 10000
 TARGET_DAT = linear-regression.dat
-TARGET_DIR = ../../datasets/
-TARGET_DIR_DAT = $(addprefix $(TARGET_DIR),$(TARGET_DAT))
+TARGET_DIR = ../../datasets
+TARGET_DIR_DAT = $(addprefix $(TARGET_DIR)/,$(TARGET_DAT))
 SEED = 0
 RUN_COMMAND ?= cargo run --
 
@@ -20,12 +20,11 @@ RUN_COMMAND ?= cargo run --
 
 all: $(TARGET_DIR_DAT)
 
-.SECONDEXPANSION:
-$(TARGET_DIR_DAT): %.dat : $$(notdir $$@) $(TARGET_DIR)
-	cp $< $@ 
+$(TARGET_DIR)/%.dat: %.dat | $(TARGET_DIR)
+	cp $< $@
 
 $(TARGET_DIR):
-	mkdir -p $(TARGET_DIR)
+	mkdir -p $@
 
 $(TARGET_DAT):
 	$(RUN_COMMAND) --file_name $(basename $@) --size $(ROW) --seed $(SEED)
@@ -36,11 +35,7 @@ clean:
 	rm -f *.txt
 	rm -f $(TARGET_DIR_DAT)
 
-quick-clean:
-	cargo clean
-	rm -f *.dat
-	rm -f *.txt
-	rm -f $(TARGET_DIR_DAT)
+quick-clean: clean
 
 fmt:
 	cargo fmt
