@@ -34,8 +34,6 @@ include $(WORKSPACE_DIR)/shared.mk
 #   - rustup-plat
 include mk/$(icecap_plat).mk
 
-COMPILERS ?= CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
-
 VERACRUZ_ICECAP_QEMU_IMAGE = $(WORKSPACE_DIR)/icecap-runtime/build/$(icecap_plat)/disposable/cmake/elfloader/build/elfloader
 
 BUILD_PARAMETERS = VERACRUZ_ICECAP_QEMU_IMAGE=$(VERACRUZ_ICECAP_QEMU_IMAGE)
@@ -51,26 +49,16 @@ all: build test-collateral
 
 build: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
 	$(COMPILERS) $(BUILD_PARAMETERS) \
-		cargo build $(PROFILE_FLAG) \
-		-p veracruz-client -p veracruz-server \
-		--features veracruz-client/icecap \
-		--features veracruz-server/icecap \
-		--features cli \
-		$(host_feature_flags) \
-		$(V_FLAG)
+		cargo build $(PROFILE_FLAG) $(host_feature_flags) $(V_FLAG)
 
 build-veracruz-server-test: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
 	$(COMPILERS) $(BUILD_PARAMETERS) \
 		cargo test --no-run $(PROFILE_FLAG) \
-		-p veracruz-server-test \
-		--features icecap \
 		$(host_feature_flags) \
 		$(V_FLAG)
 	cp $$( \
 		$(COMPILERS) $(BUILD_PARAMETERS) \
 			cargo test --no-run $(PROFILE_FLAG) \
-			-p veracruz-server-test \
-			--features icecap \
 			$(host_feature_flags) \
 			$(V_FLAG) \
 			--message-format=json | jq -r '.executable | select(.)' \
@@ -82,17 +70,16 @@ $(MEASUREMENT_FILE):
 
 test-dependencies: test-collateral $(VERACRUZ_ICECAP_QEMU_IMAGE)
 
-CARGO_TEST = $(COMPILERS) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) \
-	--features icecap
+CARGO_TEST = $(COMPILERS) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG)
 
 test-server: test-dependencies
-	$(CARGO_TEST) -p tests --test server_test -- --test-threads=1 --nocapture
+	$(CARGO_TEST) --test server_test -- --test-threads=1 --nocapture
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
 
 veracruz-test: test-dependencies
-	$(CARGO_TEST) -p tests --test integration_test -- --test-threads=1
+	$(CARGO_TEST) --test integration_test -- --test-threads=1
 
 $(VERACRUZ_ICECAP_QEMU_IMAGE):
 	$(MAKE) -C ../icecap-runtime elfloader ICECAP_PLAT=$(ICECAP_PLAT)

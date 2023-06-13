@@ -20,7 +20,7 @@ use libc::c_int;
 use serde::Serialize;
 use std::{
     fs::{read, write},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 /// The interface with the TensorFlow Lite inference service. This structure

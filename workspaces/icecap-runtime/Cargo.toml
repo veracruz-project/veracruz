@@ -17,9 +17,10 @@ exclude = [
   "crates/icecap/sysroot/libc",
   "crates/third-party/rust-mbedtls",
   "crates/third-party/wasmi",
+  "crates/runtime-manager",
 ]
 members = [
-  "crates/runtime-manager",
+  "src/icecap-runtime",
   "src/virtio-console-server",
 ]
 resolver = "2"

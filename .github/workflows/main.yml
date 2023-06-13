@@ -77,7 +77,7 @@ jobs:
           workspaces/host/target/debug/generate-policy \
           workspaces/linux-host/target/debug/veracruz-client \
           workspaces/linux-host/target/debug/veracruz-server \
-          workspaces/linux-runtime/target/debug/runtime_manager_enclave
+          workspaces/linux-runtime/target/debug/runtime-manager-enclave
           # Copy artifacts to new directory
           mkdir -p artifacts
           cp -a \
@@ -88,7 +88,7 @@ jobs:
           workspaces/host/target/debug/generate-policy \
           workspaces/linux-host/target/debug/veracruz-client \
           workspaces/linux-host/target/debug/veracruz-server \
-          workspaces/linux-runtime/target/debug/runtime_manager_enclave \
+          workspaces/linux-runtime/target/debug/runtime-manager-enclave \
           artifacts/
       - name: Upload deployment artifacts
         id: upload-deployment-artifacts
@@ -199,7 +199,7 @@ jobs:
           rm -rf output
       - name: Run VOD in Veracruz-Linux
         run: |
-          POLICY_GENERATOR_PATH="artifacts/generate-policy" CLIENT_PATH="artifacts/veracruz-client" SERVER_PATH="artifacts/veracruz-server" RUNTIME_MANAGER_PATH="artifacts/runtime_manager_enclave" CA_CERT_CONF_PATH="artifacts/ca-cert.conf" CERT_CONF_PATH="artifacts/cert.conf" PROXY_CLEANUP_SCRIPT_PATH="artifacts/proxy_cleanup.sh" ./deploy_linux.sh
+          POLICY_GENERATOR_PATH="artifacts/generate-policy" CLIENT_PATH="artifacts/veracruz-client" SERVER_PATH="artifacts/veracruz-server" RUNTIME_MANAGER_PATH="artifacts/runtime-manager-enclave" CA_CERT_CONF_PATH="artifacts/ca-cert.conf" CERT_CONF_PATH="artifacts/cert.conf" PROXY_CLEANUP_SCRIPT_PATH="artifacts/proxy_cleanup.sh" ./deploy_linux.sh
           # Check results
           file prediction.0.jpg | grep "JPEG image data"
 

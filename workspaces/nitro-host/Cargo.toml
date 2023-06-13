@@ -21,6 +21,7 @@ members = [
   "crates/veracruz-client",
   "crates/veracruz-server",
   "crates/tests",
+  "src/nitro-host",
 ]
 resolver = "2"
 

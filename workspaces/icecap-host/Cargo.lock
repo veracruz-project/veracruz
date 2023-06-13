@@ -883,6 +883,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "linux-host"
+version = "0.3.0"
+dependencies = [
+ "policy-utils",
+ "tests",
+ "veracruz-client",
+ "veracruz-server",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

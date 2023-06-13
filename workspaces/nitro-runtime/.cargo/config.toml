@@ -1,0 +1,12 @@
+[build]
+rustflags = [
+    "-C", "link-args=-Wl,--build-id=none"
+]
+
+[env]
+CC_aarch64_unknown_linux_musl = "aarch64-linux-musl-gcc"
+CXX_aarch64_unknown_linux_musl= "aarch64-linux-musl-g++"
+LD_aarch64_unknown_linux_musl = "aarch64-linux-musl-ld"
+CC_x86_64_unknown_linux_musl = "x86_64-linux-musl-gcc"
+CXX_x86_64_unknown_linux_musl= "x86_64-linux-musl-g++"
+LD_x86_64_unknown_linux_musl = "x86_64-linux-musl-ld"

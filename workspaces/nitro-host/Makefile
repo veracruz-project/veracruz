@@ -23,7 +23,6 @@ EIF_PATH = $(abspath $(WORKSPACE_DIR)/nitro-runtime/runtime_manager.eif)
 include $(WORKSPACE_DIR)/common.mk
 include $(WORKSPACE_DIR)/shared.mk
 
-CC = CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
 TEST_PARAMETERS = VERACRUZ_POLICY_DIR=$(OUT_DIR) \
 	VERACRUZ_TRUST_DIR=$(OUT_DIR) \
 	VERACRUZ_PROGRAM_DIR=$(OUT_DIR) \
@@ -34,13 +33,7 @@ CLIPPY_OPTIONS = --no-deps -A clippy::type_complexity -A clippy::module_inceptio
 all: build test-collateral
 
 build:
-	RUSTFLAGS="-C link-args=-Wl,--build-id=none" \
-	$(CC) \
-		cargo build $(PROFILE_FLAG) $(V_FLAG) \
-		-p veracruz-client -p veracruz-server \
-		--features veracruz-client/nitro \
-		--features veracruz-server/nitro \
-		--features cli
+	cargo build $(PROFILE_FLAG) $(V_FLAG)
 	strip -p target/$(PROFILE_PATH)/veracruz-client target/$(PROFILE_PATH)/veracruz-server
 
 .PHONY: $(MEASUREMENT_FILE)
@@ -49,7 +42,7 @@ $(MEASUREMENT_FILE):
 
 test-dependencies: test-collateral
 
-CARGO_TEST = $(CC) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) --features nitro
+CARGO_TEST = $(CC) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG)
 
 test-server: test-dependencies
 	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p tests --test server_test -- --test-threads=1
@@ -68,22 +61,16 @@ doc:
 fmt:
 	cargo fmt
 
-clippy: 
+clippy:
 	# workspace members and relevant dependencies
 	$(CC) cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
 		-p veracruz-client \
 		-p veracruz-server -p io-utils -p transport-protocol \
-		-p psa-attestation -p veracruz-utils  \
-		--features veracruz-client/nitro \
-		--features veracruz-server/nitro \
-		--features io-utils/nitro \
-		--features psa-attestation/nitro \
-		--features veracruz-utils/nitro \
+		-p psa-attestation -p veracruz-utils \
 		-- $(CLIPPY_OPTIONS)
 	# workspace testing crates
 	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CC) $(TEST_PARAMETERS) cargo clippy --tests \
 		$(PROFILE_FLAG) -p tests  \
-		--features tests/nitro \
 		-- $(CLIPPY_OPTIONS)
 
 clean:

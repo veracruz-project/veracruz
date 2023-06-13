@@ -21,12 +21,11 @@ WORKSPACE_DIR = $(abspath ..)
 include $(WORKSPACE_DIR)/common.mk
 
 OUT_DIR ?= $(abspath test-collateral)
-RUNTIME_ENCLAVE_BINARY_PATH = $(WORKSPACE_DIR)/linux-runtime/target/$(PROFILE_PATH)/runtime_manager_enclave
+RUNTIME_ENCLAVE_BINARY_PATH = $(WORKSPACE_DIR)/linux-runtime/target/$(PROFILE_PATH)/runtime-manager-enclave
 MEASUREMENT_FILE = $(RUNTIME_ENCLAVE_BINARY_PATH)
 MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
 include $(WORKSPACE_DIR)/shared.mk
 
-CC = CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
 TEST_PARAMETERS = VERACRUZ_POLICY_DIR=$(OUT_DIR) \
 	VERACRUZ_TRUST_DIR=$(OUT_DIR) \
 	VERACRUZ_PROGRAM_DIR=$(OUT_DIR) \
@@ -39,15 +38,10 @@ unresolved_crates_path := $(shell pwd)/crates
 
 all: build test-collateral
 
-build:
+build: $(RUNTIME_ENCLAVE_BINARY_PATH)
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
 	RUSTFLAGS="--remap-path-prefix $(unresolved_crates_path)=$(shell readlink -f $(unresolved_crates_path))" \
-	$(CC) \
-		cargo build $(PROFILE_FLAG) $(V_FLAG) \
-		-p veracruz-client -p veracruz-server \
-		--features veracruz-client/linux \
-		--features veracruz-server/linux \
-		--features cli
+		cargo build $(PROFILE_FLAG) $(V_FLAG)
 
 install:
 	# create full names
@@ -60,20 +54,18 @@ install:
 test-dependencies: test-collateral $(RUNTIME_ENCLAVE_BINARY_PATH)
 
 CARGO_TEST = RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
-	$(CC) \
-	$(TEST_PARAMETERS) \
-	cargo test $(PROFILE_FLAG) --features linux
+	$(TEST_PARAMETERS) cargo test $(PROFILE_FLAG)
 
 test-server: test-dependencies
-	$(CARGO_TEST) -p tests --no-run -- --nocapture
-	RUST_LOG="server_test=info,error" $(CARGO_TEST) -p tests --test server_test -- --test-threads=1 --nocapture
+	$(CARGO_TEST) --no-run -- --nocapture
+	RUST_LOG="server_test=info,error" $(CARGO_TEST) --test server_test -- --test-threads=1 --nocapture
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
 
 veracruz-test: test-dependencies
-	$(CARGO_TEST) -p tests --no-run -- --nocapture
-	RUST_LOG="integration_test=info,error" $(CARGO_TEST) -p tests --test integration_test -- --test-threads=1 --nocapture
+	$(CARGO_TEST) --no-run -- --nocapture
+	RUST_LOG="integration_test=info,error" $(CARGO_TEST) --test integration_test -- --test-threads=1 --nocapture
 
 $(RUNTIME_ENCLAVE_BINARY_PATH):
 	$(MAKE) -C ../linux-runtime linux
@@ -81,22 +73,15 @@ $(RUNTIME_ENCLAVE_BINARY_PATH):
 clippy: $(RUNTIME_ENCLAVE_BINARY_PATH)
 	# workspace members and relevant dependencies
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
-	$(CC) \
 		cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
 		-p veracruz-client \
 		-p veracruz-server -p io-utils -p transport-protocol \
 		-p psa-attestation -p veracruz-utils  \
-		--features veracruz-client/linux \
-		--features veracruz-server/linux \
-		--features io-utils/linux \
-		--features psa-attestation/linux \
-		--features veracruz-utils/linux \
 		-- $(CLIPPY_OPTIONS)
 	# workspace testing crates
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) $(CC) $(TEST_PARAMETERS) \
 		cargo clippy --tests \
 		$(PROFILE_FLAG) -p tests \
-		--features tests/linux \
 		-- $(CLIPPY_OPTIONS)
 
 doc:

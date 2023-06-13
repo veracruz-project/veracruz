@@ -3,10 +3,6 @@
 version = 3
 
 [[package]]
-name = "absurdity"
-version = "0.1.0"
-
-[[package]]
 name = "addr2line"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -190,13 +186,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcb6dd1c2376d2e096796e234a70e17e94cc2d5d54ff8ce42b28cef1d0d359a4"
 
 [[package]]
-name = "biterate"
-version = "0.1.0"
-dependencies = [
- "num",
-]
-
-[[package]]
 name = "bitfield"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -316,15 +305,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eb6210b637171dfba4cda12e579ac6dc73f5165ad56133e5d72ef3131f320855"
 dependencies = [
  "cc",
-]
-
-[[package]]
-name = "compiler_builtins"
-version = "0.1.70"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80873f979f0a344a4ade87c2f70d9ccf5720b83b10c97ec7cd745895d021e85a"
-dependencies = [
- "rustc-std-workspace-core",
 ]
 
 [[package]]
@@ -751,23 +731,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "finite-set"
-version = "0.1.0"
-dependencies = [
- "finite-set-derive",
-]
-
-[[package]]
-name = "finite-set-derive"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
- "synstructure",
-]
-
-[[package]]
 name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -905,215 +868,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
-name = "hypervisor-event-server-types"
-version = "0.1.0"
-dependencies = [
- "biterate",
- "finite-set",
- "serde",
-]
-
-[[package]]
-name = "icecap-backtrace"
-version = "0.1.0"
-dependencies = [
- "icecap-backtrace-collect",
- "icecap-backtrace-types",
- "icecap-runtime",
-]
-
-[[package]]
-name = "icecap-backtrace-collect"
-version = "0.1.0"
-dependencies = [
- "cfg-if",
- "icecap-backtrace-types",
- "icecap-sel4",
- "log",
- "unwinding",
-]
-
-[[package]]
-name = "icecap-backtrace-types"
-version = "0.1.0"
-dependencies = [
- "hex",
- "postcard",
- "serde",
-]
-
-[[package]]
-name = "icecap-config"
-version = "0.1.0"
-dependencies = [
- "icecap-config-sys",
- "serde",
-]
-
-[[package]]
-name = "icecap-config-sys"
-version = "0.1.0"
-dependencies = [
- "icecap-runtime",
- "icecap-sel4",
- "serde",
-]
-
-[[package]]
-name = "icecap-core"
-version = "0.1.0"
-dependencies = [
- "icecap-backtrace",
- "icecap-config",
- "icecap-failure",
- "icecap-logger",
- "icecap-ring-buffer",
- "icecap-rpc",
- "icecap-runtime",
- "icecap-sel4",
- "icecap-start",
- "icecap-sync",
-]
-
-[[package]]
-name = "icecap-failure"
-version = "0.1.0"
-dependencies = [
- "cfg-if",
- "icecap-backtrace",
- "icecap-failure-derive",
- "icecap-sel4",
- "log",
-]
-
-[[package]]
-name = "icecap-failure-derive"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
- "synstructure",
-]
-
-[[package]]
-name = "icecap-logger"
-version = "0.1.0"
-dependencies = [
- "log",
-]
-
-[[package]]
-name = "icecap-ring-buffer"
-version = "0.1.0"
-dependencies = [
- "icecap-config",
- "icecap-sel4",
- "log",
- "tock-registers",
-]
-
-[[package]]
-name = "icecap-rpc"
-version = "0.1.0"
-dependencies = [
- "icecap-rpc-types",
- "icecap-sel4",
-]
-
-[[package]]
-name = "icecap-rpc-types"
-version = "0.1.0"
-dependencies = [
- "postcard",
- "serde",
-]
-
-[[package]]
-name = "icecap-runtime"
-version = "0.1.0"
-dependencies = [
- "compiler_builtins",
- "icecap-sel4",
- "rustc-std-workspace-alloc",
- "rustc-std-workspace-core",
- "serde",
-]
-
-[[package]]
-name = "icecap-sel4"
-version = "0.1.0"
-dependencies = [
- "compiler_builtins",
- "icecap-sel4-derive",
- "icecap-sel4-sys",
- "rustc-std-workspace-alloc",
- "rustc-std-workspace-core",
- "serde",
-]
-
-[[package]]
-name = "icecap-sel4-derive"
-version = "0.1.0"
-dependencies = [
- "quote",
- "syn",
-]
-
-[[package]]
-name = "icecap-sel4-sys"
-version = "0.1.0"
-dependencies = [
- "absurdity",
- "bindgen",
- "compiler_builtins",
- "rustc-std-workspace-core",
-]
-
-[[package]]
-name = "icecap-start"
-version = "0.1.0"
-dependencies = [
- "icecap-failure",
- "icecap-runtime",
- "icecap-sel4",
- "postcard",
- "serde",
-]
-
-[[package]]
-name = "icecap-start-generic"
-version = "0.1.0"
-dependencies = [
- "icecap-failure",
- "icecap-runtime",
- "icecap-sel4",
- "icecap-start",
- "log",
- "postcard",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "icecap-std-external"
-version = "0.1.0"
-dependencies = [
- "icecap-core",
- "log",
-]
-
-[[package]]
-name = "icecap-sync"
-version = "0.1.0"
-dependencies = [
- "compiler_builtins",
- "icecap-sel4",
- "rustc-std-workspace-alloc",
- "rustc-std-workspace-core",
-]
-
-[[package]]
 name = "indexmap"
 version = "1.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1177,7 +931,6 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "base64",
- "bincode",
  "byteorder",
  "err-derive",
  "log",
@@ -1452,6 +1205,13 @@ name = "new_debug_unreachable"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
+
+[[package]]
+name = "nitro-runtime"
+version = "0.3.0"
+dependencies = [
+ "runtime-manager",
+]
 
 [[package]]
 name = "nix"
@@ -1773,16 +1533,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "psa-attestation"
-version = "0.3.0"
-dependencies = [
- "bindgen",
- "cfg-if",
- "libc",
- "mbedtls-sys-auto",
-]
-
-[[package]]
 name = "psm"
 version = "0.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1944,45 +1694,32 @@ dependencies = [
 ]
 
 [[package]]
-name = "runtime_manager_enclave"
+name = "runtime-manager"
 version = "0.3.0"
 dependencies = [
  "anyhow",
  "aws-nitro-enclaves-nsm-api",
  "base64",
  "bincode",
- "clap",
- "env_logger",
  "err-derive",
  "execution-engine",
- "finite-set",
  "half",
  "hex",
- "hypervisor-event-server-types",
- "icecap-core",
- "icecap-ring-buffer",
- "icecap-rpc",
- "icecap-start-generic",
- "icecap-std-external",
  "io-utils",
  "lazy_static",
  "libc",
- "libm",
  "log",
  "nix",
  "nsm-lib",
  "policy-utils",
  "protobuf",
- "psa-attestation",
  "raw-fd",
- "serde",
  "serde_json",
  "session-manager",
  "transport-protocol",
  "uuid",
  "veracruz-utils",
  "wasi-types",
- "wasmi",
 ]
 
 [[package]]
@@ -1996,18 +1733,6 @@ name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
-
-[[package]]
-name = "rustc-std-workspace-alloc"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff66d57013a5686e1917ed6a025d54dd591fcda71a41fe07edf4d16726aefa86"
-
-[[package]]
-name = "rustc-std-workspace-core"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1956f5517128a2b6f23ab2dadf1a976f4f5b27962e7724c2bf3d45e539ec098c"
 
 [[package]]
 name = "rustc_version"
@@ -2347,12 +2072,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tock-registers"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ee8fba06c1f4d0b396ef61a54530bb6b28f0dc61c38bc8bc5a5a48161e6282e"
-
-[[package]]
 name = "toml"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2421,15 +2140,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
 
 [[package]]
-name = "unwinding"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76b094d871608c32cdc2cc06ade39d8dc8c99ce95cbc528c1dcf7434319a1faf"
-dependencies = [
- "gimli",
-]
-
-[[package]]
 name = "uuid"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2455,7 +2165,6 @@ name = "veracruz-utils"
 version = "0.3.0"
 dependencies = [
  "anyhow",
- "bincode",
  "chrono",
  "err-derive",
  "mbedtls",
