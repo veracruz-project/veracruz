@@ -297,8 +297,8 @@ fn main() {
         let results = match veracruz_client.read_file(output_name) {
             Ok(results) => results,
             Err(err) => {
-                eprintln!("{}", err);
-                process::exit(1);
+                eprintln!("[warn] {}", err);
+                continue;
             }
         };
 
