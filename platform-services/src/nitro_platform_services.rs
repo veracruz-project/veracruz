@@ -20,17 +20,30 @@ use nsm_lib;
 /// Fills a buffer, `buffer`, with random bytes sampled from the thread-local
 /// random number source.  Uses the AWS Nitro RNG
 pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result<()> {
-    let nsm_fd = nsm_lib::nsm_lib_init();
+    let nsm_fd = nsm_api::driver::nsm_init();
     if nsm_fd < 0 {
         return result::Result::UnknownError;
     }
-    let mut buffer_len = buffer.len();
 
-    let status = unsafe { nsm_lib::nsm_get_random(nsm_fd, buffer.as_mut_ptr(), &mut buffer_len) };
-    return match status {
-        nsm_api::api::ErrorCode::Success => result::Result::Success(()),
-        _ => result::Result::UnknownError,
-    };
+    let mut written = 0;
+
+    while written < buffer.len {
+        let response = nsm_api::driver::nsm_process_request(nsm_fd, nsm_api::api::Request::GetRandom);
+        match response {
+            nsm_api::api::Response::GetRandom { random } => {
+                let to_copy = std::cmp::min(buffer.len - written, random.len());
+                std::ptr::copy_nonoverlapping(random.as_ptr().offset(written), buffer, to_copy);
+                written += to_copy;
+            },
+            _ => {
+                nsm_api::driver::nsm_exit(nsm_fd);
+                return result::Result::UnknownError;
+            }
+        };
+    }
+
+    nsm_api::driver::nsm_exit(nsm_fd);
+    result::Result::Success(());
 }
 
 /// Returns the clock resolution in nanoseconds.

@@ -11,7 +11,6 @@
 
 use anyhow::{anyhow, Result};
 use nsm_api;
-use nsm_lib;
 use runtime_manager::{
     managers::{
         RuntimeManagerError,
@@ -22,12 +21,11 @@ use runtime_manager::{
     },
     platform_runtime::PlatformRuntime,
 };
+use serde_bytes;
 use veracruz_utils::{
     runtime_manager_message::RuntimeManagerResponse,
     sha256::sha256,
 };
-
-const NSM_MAX_ATTESTATION_DOC_SIZE: usize = 16 * 1024;
 
 pub struct NitroRuntime {
 
@@ -39,39 +37,36 @@ impl PlatformRuntime for NitroRuntime {
         init_session_manager()?;
         // generate the csr
         let csr: Vec<u8> = generate_csr()?;
-        // generate the attestation document
-        let mut att_doc: Vec<u8> = {
-            let mut buffer: Vec<u8> = vec![0; NSM_MAX_ATTESTATION_DOC_SIZE];
-            let mut buffer_len: u32 = buffer.len() as u32;
-            let nsm_fd = nsm_lib::nsm_lib_init();
-            if nsm_fd < 0 {
-                return Err(anyhow!(RuntimeManagerError::NsmLibError(nsm_fd)));
-            }
-            let csr_hash = sha256(&csr);
-            let status = unsafe {
-                nsm_lib::nsm_get_attestation_doc(
-                    nsm_fd,                         // fd
-                    csr_hash.as_ptr() as *const u8, // user_data
-                    csr_hash.len() as u32,          // user_data_len
-                    challenge.as_ptr(),             // nonce_data
-                    challenge.len() as u32,         // nonce_len
-                    std::ptr::null() as *const u8,  // pub_key_data
-                    0 as u32,                       // pub_key_len
-                    buffer.as_mut_ptr(),            // att_doc_data
-                    &mut buffer_len,                // att_doc_len
-                )
-            };
-            match status {
-                nsm_api::api::ErrorCode::Success => (),
-                _ => return Err(anyhow!(RuntimeManagerError::NsmErrorCode(status))),
-            }
-            unsafe {
-                buffer.set_len(buffer_len as usize);
-            }
-            buffer.clone()
-        };
-        att_doc.insert(0, 0xd2); // the golang implementation of cose needs this. Still need to investigate why
 
-        return Ok(RuntimeManagerResponse::AttestationData(att_doc, csr));
+        let csr_hash = sha256(&csr);
+        let nsm_fd = nsm_api::driver::nsm_init();
+        if nsm_fd < 0 {
+            let e = nsm_api::api::ErrorCode::InternalError;
+            return Err(anyhow!(RuntimeManagerError::NsmErrorCode(e)));
+        }
+
+        let request = nsm_api::api::Request::Attestation{
+            user_data: Some(serde_bytes::ByteBuf::from(csr_hash)),
+            nonce: Some(serde_bytes::ByteBuf::from(challenge.clone())),
+            public_key: None
+        };
+        // generate the attestation document
+        let response = nsm_api::driver::nsm_process_request(nsm_fd, request);
+        nsm_api::driver::nsm_exit(nsm_fd);
+
+        match response {
+            nsm_api::api::Response::Attestation { document } => {
+                let mut att_doc = document.clone();
+                att_doc.insert(0, 0xd2); // the golang implementation of cose needs this. Still need to investigate why
+                Ok(RuntimeManagerResponse::AttestationData(att_doc, csr))
+            },
+            nsm_api::api::Response::Error(e) => {
+                Err(anyhow!(RuntimeManagerError::NsmErrorCode(e)))
+            },
+            _ => {
+                let e = nsm_api::api::ErrorCode::InvalidResponse;
+                Err(anyhow!(RuntimeManagerError::NsmErrorCode(e)))
+            },
+        }
     }
 }
