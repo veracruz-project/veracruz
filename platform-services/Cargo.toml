@@ -11,12 +11,7 @@ icecap = []
 nitro = ["nix", "nsm_api", "nsm_lib"]
 std = ["getrandom", "nix"]
 
-[lib]
-name = "platform_services"
-path = "./src/lib.rs"
-
 [dependencies]
-cfg-if = "1"
 getrandom = { version = "0.2", optional = true }
 nix = { version = "0.20.2", optional = true }
 nsm_api = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", tag = "v0.2.0", package = "aws-nitro-enclaves-nsm-api", optional = true }

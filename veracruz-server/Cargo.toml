@@ -20,11 +20,11 @@ cli = [
 ]
 debug = []
 icecap = [
+  "io-utils/icecap",
   "policy-utils/icecap",
   "psa-attestation",
-  "io-utils/icecap",
-  "tempfile",
   "signal-hook",
+  "tempfile",
   "veracruz-utils/icecap",
 ]
 icecap-lkvm = []
