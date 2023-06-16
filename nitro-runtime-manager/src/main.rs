@@ -56,13 +56,13 @@ fn encap() -> Result<()> {
     let runtime = CommonRuntime::new(&nitro_runtime);
 
     loop {
-        println!("AMD SEV Runtime Manager::main calling accept");
+        println!("Nitro Runtime Manager::main calling accept");
         let fd = accept(socket_fd)?;
-        println!("AMD SEV Runtime Manager::main accept succeeded. Looping");
+        println!("Nitro Runtime Manager::main accept succeeded. Looping");
         loop {
             let received_buffer = receive_buffer(fd)?;
             let response_buffer = runtime.decode_dispatch(&received_buffer)?;
-            println!("AMD SEV Runtime Manager::main_loop received:{:02x?}", response_buffer);
+            println!("Nitro Runtime Manager::main_loop received:{:02x?}", response_buffer);
             send_buffer(fd, &response_buffer)?;
         }
     }
