@@ -10,9 +10,11 @@
 # licensing and copyright information.
 
 .PHONY: all build clean clean-cargo-lock clippy default doc fmt \
-	test-client test-dependencies test-server veracruz-test
+	test-client test-dependencies test-server veracruz-test build-tests
 
 default: build
+
+tests: test-server test-client veracruz-test
 
 WORKSPACE_DIR = $(abspath ..)
 OUT_DIR ?= $(abspath test-collateral)
@@ -44,16 +46,17 @@ test-dependencies: test-collateral
 
 CARGO_TEST = $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG)
 
-test-server: test-dependencies
-	$(CARGO_TEST) --no-run -- --nocapture
+build-tests:
+	$(CARGO_TEST) --no-run
+
+test-server: test-dependencies build-tests
 	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) --test server_test -- --test-threads=1
 	./nitro-terminate.sh
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
 
-veracruz-test: test-dependencies
-	$(CARGO_TEST) --no-run -- --nocapture
+veracruz-test: test-dependencies build-tests
 	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) --test integration_test -- --test-threads=1
 	./nitro-terminate.sh
 

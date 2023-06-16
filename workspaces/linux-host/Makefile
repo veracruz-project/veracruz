@@ -11,7 +11,7 @@
 
 .PHONY: all build install clean clean-cargo-lock default doc fmt clippy \
 	test-dependencies test-collateral test-server test-client veracruz-test \
-	tests
+	tests build-tests
 
 default: build
 
@@ -56,15 +56,16 @@ test-dependencies: test-collateral $(RUNTIME_ENCLAVE_BINARY_PATH)
 CARGO_TEST = RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
 	$(TEST_PARAMETERS) cargo test $(PROFILE_FLAG)
 
-test-server: test-dependencies
-	$(CARGO_TEST) --no-run -- --nocapture
+build-tests:
+	$(CARGO_TEST) --no-run
+
+test-server: test-dependencies build-tests
 	RUST_LOG="server_test=info,error" $(CARGO_TEST) --test server_test -- --test-threads=1 --nocapture
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
 
-veracruz-test: test-dependencies
-	$(CARGO_TEST) --no-run -- --nocapture
+veracruz-test: test-dependencies build-tests
 	RUST_LOG="integration_test=info,error" $(CARGO_TEST) --test integration_test -- --test-threads=1 --nocapture
 
 $(RUNTIME_ENCLAVE_BINARY_PATH):

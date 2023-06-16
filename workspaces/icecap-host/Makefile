@@ -11,7 +11,7 @@
 
 .PHONY: all build clean clean-cargo-lock default doc fmt clippy \
 	test-dependencies test-collateral test-server test-client veracruz-test \
-	tests
+	tests build-tests
 
 default: build
 
@@ -72,13 +72,16 @@ test-dependencies: test-collateral $(VERACRUZ_ICECAP_QEMU_IMAGE)
 
 CARGO_TEST = $(COMPILERS) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG)
 
-test-server: test-dependencies
+build-tests:
+	$(CARGO_TEST) --no-run
+
+test-server: test-dependencies build-tests
 	$(CARGO_TEST) --test server_test -- --test-threads=1 --nocapture
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
 
-veracruz-test: test-dependencies
+veracruz-test: test-dependencies build-tests
 	$(CARGO_TEST) --test integration_test -- --test-threads=1
 
 $(VERACRUZ_ICECAP_QEMU_IMAGE):
