@@ -1,3 +1,14 @@
+//! The PlatformRuntime interface that platform-specific code must implement
+//!
+//! ## Authors
+//!
+//! The Veracruz Development Team.
+//!
+//! ## Licensing and copyright notice
+//!
+//! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
+//! information on licensing and copyright.
+//!
 use anyhow::Result;
 use veracruz_utils::{
     runtime_manager_message::RuntimeManagerResponse,
