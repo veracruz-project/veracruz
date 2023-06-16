@@ -77,7 +77,7 @@ jobs:
           workspaces/host/target/debug/generate-policy \
           workspaces/linux-host/target/debug/veracruz-client \
           workspaces/linux-host/target/debug/veracruz-server \
-          workspaces/linux/runtime/target/debug/linux-runtime-manager
+          workspaces/linux-runtime/target/debug/linux-runtime-manager
           # Copy artifacts to new directory
           mkdir -p artifacts
           cp -a \
