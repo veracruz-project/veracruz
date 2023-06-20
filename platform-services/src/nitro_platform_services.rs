@@ -14,13 +14,15 @@
 
 use super::result;
 use nix::{errno::Errno, sys::time::TimeValLike, time};
-use nsm_api;
-use nsm_lib;
+use nsm_api::{
+    api::{Request, Response},
+    driver::{nsm_init, nsm_process_request, nsm_exit}
+};
 
 /// Fills a buffer, `buffer`, with random bytes sampled from the thread-local
 /// random number source.  Uses the AWS Nitro RNG
 pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result<()> {
-    let nsm_fd = nsm_api::driver::nsm_init();
+    let nsm_fd = nsm_init();
     if nsm_fd < 0 {
         return result::Result::UnknownError;
     }
@@ -28,21 +30,21 @@ pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result<()> {
     let mut written = 0;
 
     while written < buffer.len {
-        let response = nsm_api::driver::nsm_process_request(nsm_fd, nsm_api::api::Request::GetRandom);
+        let response = nsm_process_request(nsm_fd, Request::GetRandom);
         match response {
-            nsm_api::api::Response::GetRandom { random } => {
+            Response::GetRandom { random } => {
                 let to_copy = std::cmp::min(buffer.len - written, random.len());
                 std::ptr::copy_nonoverlapping(random.as_ptr().offset(written), buffer, to_copy);
                 written += to_copy;
             },
             _ => {
-                nsm_api::driver::nsm_exit(nsm_fd);
+                nsm_exit(nsm_fd);
                 return result::Result::UnknownError;
             }
         };
     }
 
-    nsm_api::driver::nsm_exit(nsm_fd);
+    nsm_exit(nsm_fd);
     result::Result::Success(());
 }
 

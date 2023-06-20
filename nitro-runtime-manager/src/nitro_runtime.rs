@@ -10,7 +10,10 @@
 //! information on licensing and copyright.
 
 use anyhow::{anyhow, Result};
-use nsm_api;
+use nsm_api::{
+    api::{ErrorCode, Request, Response},
+    driver::{nsm_init, nsm_process_request, nsm_exit}
+};
 use runtime_manager::{
     managers::{
         RuntimeManagerError,
@@ -28,7 +31,6 @@ use veracruz_utils::{
 };
 
 pub struct NitroRuntime {
-
 }
 
 impl PlatformRuntime for NitroRuntime {
@@ -39,32 +41,32 @@ impl PlatformRuntime for NitroRuntime {
         let csr: Vec<u8> = generate_csr()?;
 
         let csr_hash = sha256(&csr);
-        let nsm_fd = nsm_api::driver::nsm_init();
+        let nsm_fd = nsm_init();
         if nsm_fd < 0 {
             let e = nsm_api::api::ErrorCode::InternalError;
             return Err(anyhow!(RuntimeManagerError::NsmErrorCode(e)));
         }
 
-        let request = nsm_api::api::Request::Attestation{
+        let request = Request::Attestation{
             user_data: Some(serde_bytes::ByteBuf::from(csr_hash)),
             nonce: Some(serde_bytes::ByteBuf::from(challenge.clone())),
             public_key: None
         };
         // generate the attestation document
-        let response = nsm_api::driver::nsm_process_request(nsm_fd, request);
-        nsm_api::driver::nsm_exit(nsm_fd);
+        let response = nsm_process_request(nsm_fd, request);
+        nsm_exit(nsm_fd);
 
         match response {
-            nsm_api::api::Response::Attestation { document } => {
+            Response::Attestation { document } => {
                 let mut att_doc = document.clone();
                 att_doc.insert(0, 0xd2); // the golang implementation of cose needs this. Still need to investigate why
                 Ok(RuntimeManagerResponse::AttestationData(att_doc, csr))
             },
-            nsm_api::api::Response::Error(e) => {
+            Response::Error(e) => {
                 Err(anyhow!(RuntimeManagerError::NsmErrorCode(e)))
             },
             _ => {
-                let e = nsm_api::api::ErrorCode::InvalidResponse;
+                let e = ErrorCode::InvalidResponse;
                 Err(anyhow!(RuntimeManagerError::NsmErrorCode(e)))
             },
         }
