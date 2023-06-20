@@ -38,6 +38,7 @@ use std::{
     error::Error,
     fs::{create_dir_all, File},
     io::{Read, Write},
+    os::unix::fs::FileTypeExt,
     path::{Path, PathBuf},
     time::Instant,
     vec::Vec,
@@ -343,6 +344,9 @@ fn load_input_source<T: AsRef<Path>>(
         for dir in file_path.read_dir()? {
             load_input_source(&dir?.path(), vfs)?;
         }
+    } else if std::fs::metadata(file_path)?.file_type().is_socket() {
+        info!("Loaded socket at {:?}", file_path);
+        vfs.install_socket(file_path, file_path)?;
     } else {
         return Err(format!("Error on load {:?}", file_path).into());
     }

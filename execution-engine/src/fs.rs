@@ -27,6 +27,8 @@ use std::{
     collections::HashMap,
     convert::{AsRef, TryFrom},
     fmt::Debug,
+    io::{ErrorKind, Read, Write},
+    os::unix::net::UnixStream,
     path::{Component, Path, PathBuf},
     string::String,
     sync::{Arc, Mutex, MutexGuard},
@@ -65,7 +67,7 @@ type SharedInodeTable = Arc<Mutex<InodeTable>>;
 
 /// INodes wrap the actual raw file data, and associate meta-data with that raw
 /// data buffer.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct InodeEntry {
     /// The status of this file.
     file_stat: FileStat,
@@ -87,7 +89,7 @@ impl InodeEntry {
     /// Read maximum `max` bytes from the offset `offset`.
     /// Return ErrNo::IsDir if it is not a file.
     #[inline]
-    pub(self) fn read_file(&self, buf: &mut [u8], offset: FileSize) -> FileSystemResult<usize> {
+    pub(self) fn read_file(&mut self, buf: &mut [u8], offset: FileSize) -> FileSystemResult<usize> {
         self.data.read_file(buf, offset)
     }
 
@@ -163,7 +165,7 @@ impl InodeEntry {
 }
 
 /// The actual data of an inode, either a file or a directory.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 enum InodeImpl {
     /// A special file that is bound to a native service.
     /// Writing to the file triggers the execution of the service.
@@ -180,6 +182,8 @@ enum InodeImpl {
     File(Vec<u8>),
     /// A directory. The `PathBuf` key is the relative path and must match the name inside the `Inode`.
     Directory(HashMap<PathBuf, Inode>),
+    /// A Socket and its backing stream
+    Socket(UnixStream),
 }
 
 impl InodeImpl {
@@ -204,18 +208,25 @@ impl InodeImpl {
                 Ok(())
             }
             Self::Directory(_) => Err(ErrNo::IsDir),
+            Self::Socket(_) => {
+                // No semantic meaning, allow it so that std::fs::write works.
+                Ok(())
+            }
         }
     }
 
     /// Read maximum `max` bytes from the offset `offset`.
     /// Otherwise, return ErrNo::IsDir if it is a dir
     /// or ErrNo::Again if it is a service and no output is available.
-    pub(self) fn read_file(&self, buf: &mut [u8], offset: FileSize) -> FileSystemResult<usize> {
+    pub(self) fn read_file(&mut self, buf: &mut [u8], offset: FileSize) -> FileSystemResult<usize> {
         match self {
             Self::File(b) | Self::NativeModule(.., b) => {
                 Self::read_bytes_from_offset(b, buf, offset)
             }
             Self::Directory(_) => Err(ErrNo::IsDir),
+            Self::Socket(sock) => {
+                return sock.read(buf).map_err(|_| ErrNo::ConnAborted);
+            }
         }
     }
 
@@ -247,6 +258,31 @@ impl InodeImpl {
         let bytes = match self {
             Self::File(b) | Self::NativeModule(.., b) => b,
             Self::Directory(_) => return Err(ErrNo::IsDir),
+            Self::Socket(sock) => match sock.write_all(buf) {
+                Ok(_) => return Ok(buf.len()),
+                Err(e) => {
+                    if e.kind() == ErrorKind::BrokenPipe {
+                        // Retry connecting the socket
+                        let path = sock
+                            .peer_addr()
+                            .map_err(|_| ())
+                            .and_then(|addr| addr.as_pathname().map(|p| p.to_owned()).ok_or(()))
+                            .map_err(|_| ErrNo::ConnReset)?;
+                        *self = Self::Socket(UnixStream::connect(path).unwrap());
+                        match self {
+                            Self::Socket(sock) => {
+                                return sock
+                                    .write_all(buf)
+                                    .map(|_| buf.len())
+                                    .map_err(|_| ErrNo::ConnReset)
+                            }
+                            _ => unreachable!(),
+                        }
+                    } else {
+                        return Err(ErrNo::ConnReset);
+                    }
+                }
+            },
         };
         // NOTE: It should be safe to convert a u64 to usize.
         let offset = <_>::try_from_or_errno(offset)?;
@@ -277,6 +313,11 @@ impl InodeImpl {
                 Ok(())
             }
             Self::Directory(_) => Err(ErrNo::IsDir),
+            Self::Socket(_) => {
+                // No semantic meaning to truncating a socket so ignore it so that
+                // std::fs::write works.
+                Ok(())
+            }
         }
     }
 
@@ -312,6 +353,7 @@ impl InodeImpl {
         let rst = match self {
             Self::NativeModule(.., f) | Self::File(f) => f.len(),
             Self::Directory(f) => f.len(),
+            Self::Socket(_) => 0,
         };
         Ok(rst as FileSize)
     }
@@ -411,6 +453,7 @@ impl Debug for InodeTable {
                         .map_or_else(|_| "(failed to lock)".to_string(), |o| format!("{:?}", o))
                 )?,
                 InodeImpl::Directory(d) => write!(f, "\t{:?} -> {:?}\n", k, d)?,
+                InodeImpl::Socket(sock) => write!(f, "\t{:?} -> socket {:?}", k, sock)?,
             }
         }
         Ok(())
@@ -448,10 +491,7 @@ impl InodeTable {
     /// Assume `path` is an absolute path to a (special) file.
     /// NOTE: this function is intended to be called after the root filesystem (handler) is
     /// created.
-    fn install_services(
-        &mut self,
-        native_modules: Vec<NativeModule>,
-    ) -> FileSystemResult<()> {
+    fn install_services(&mut self, native_modules: Vec<NativeModule>) -> FileSystemResult<()> {
         for native_module in native_modules {
             let path = match native_module.r#type() {
                 NativeModuleType::Static { special_file } => Some(special_file),
@@ -470,6 +510,28 @@ impl InodeTable {
                     InodeImpl::NativeModule(service, Vec::new());
             }
         }
+        Ok(())
+    }
+
+    /// Install a socket.
+    fn install_socket<T: AsRef<Path>>(
+        &mut self,
+        socket_path: T,
+        backing_socket_path: T,
+    ) -> FileSystemResult<()> {
+        let new_inode = self.new_inode()?;
+        let socket_path = strip_root_slash_path(socket_path.as_ref());
+        // Call the existing function to create general files.
+        self.add_file(
+            Self::ROOT_DIRECTORY_INODE,
+            socket_path,
+            new_inode,
+            Vec::new(),
+        )?;
+        // Manually uplift the general file to special socket file.
+        self.table.get_mut(&new_inode).ok_or(ErrNo::Inval)?.data = InodeImpl::Socket(
+            UnixStream::connect(backing_socket_path.as_ref()).map_err(|_| ErrNo::ConnRefused)?,
+        );
         Ok(())
     }
 
@@ -550,7 +612,7 @@ impl InodeTable {
         let inode = self.get(inode);
         match inode.map(|i| i.is_dir()).unwrap_or(false) {
             true => Ok(inode?.read_dir(&self)?.iter().count() <= 2),
-            false => Ok(false)
+            false => Ok(false),
         }
     }
 
@@ -792,7 +854,10 @@ impl FileSystem {
     /// and similar with respect to the parameter `std_streams_table`.  Userspace
     /// Wasm programs are going to expect that this is true, so we need to
     /// preallocate some files corresponding to those, here.
-    pub fn new(rights_table: RightsTable, native_modules: Vec<NativeModule>) -> FileSystemResult<Self> {
+    pub fn new(
+        rights_table: RightsTable,
+        native_modules: Vec<NativeModule>,
+    ) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
             next_fd_candidate: Self::FIRST_FD,
@@ -964,11 +1029,18 @@ impl FileSystem {
         Ok(())
     }
 
-    fn install_services(
-        &mut self,
-        native_modules: Vec<NativeModule>,
-    ) -> FileSystemResult<()> {
+    fn install_services(&mut self, native_modules: Vec<NativeModule>) -> FileSystemResult<()> {
         self.lock_inode_table()?.install_services(native_modules)
+    }
+
+    pub fn install_socket<T: AsRef<Path>>(
+        &mut self,
+        socket_path: T,
+        backing_socket: T,
+    ) -> FileSystemResult<()> {
+        self.lock_inode_table()?
+            .install_socket(socket_path, backing_socket)?;
+        Ok(())
     }
 
     /// Install a `fd` to the file system. The fd will be of type RegularFile.
@@ -1190,7 +1262,7 @@ impl FileSystem {
     /// That is, different engines provide different API to interact the linear memory
     /// space of WASM. Hence, the method here return the read bytes as `Vec<u8>`.
     pub(crate) fn fd_pread<B: AsMut<[u8]>>(
-        &self,
+        &mut self,
         fd: Fd,
         bufs: &mut [B],
         offset: FileSize,
@@ -1208,15 +1280,15 @@ impl FileSystem {
     /// That is, different engines provide different API to interact the linear memory
     /// space of WASM. Hence, the method here return the read bytes as `Vec<u8>`.
     fn fd_pread_internal<B: AsMut<[u8]>>(
-        &self,
+        &mut self,
         fd: Fd,
         bufs: &mut [B],
         offset: FileSize,
     ) -> FileSystemResult<usize> {
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
 
-        let f = self.lock_inode_table()?;
-        let f = f.get(&inode)?;
+        let mut f = self.lock_inode_table()?;
+        let f = f.get_mut(&inode)?;
 
         let mut offset = offset;
         let mut len = 0;
@@ -1280,18 +1352,16 @@ impl FileSystem {
         // If it is a service, call it.
         // Warning: There is no input validity check performed here. It is the
         // native module's responsibility to implement that.
-        if is_service
-        {
+        if is_service {
             let (service, exec_config) = self
                 .lock_inode_table()?
                 .get_mut(&inode)?
                 .service_handler()?;
-            let native_module = service
-                .lock()
-                .map_err(|_| ErrNo::Busy)?;
+            let native_module = service.lock().map_err(|_| ErrNo::Busy)?;
 
             // Invoke native module manager
-            let mut native_module_manager = NativeModuleManager::new(*native_module.clone(), self.service_fs()?);
+            let mut native_module_manager =
+                NativeModuleManager::new(*native_module.clone(), self.service_fs()?);
             // Invoke native module with execution configuration
             native_module_manager.execute(exec_config)?;
         }
@@ -1918,7 +1988,10 @@ impl FileSystem {
         // Convert the absolute path to relative path and then find the inode
         let inode = self
             .lock_inode_table()?
-            .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash_path(path))?
+            .get_inode_by_inode_path(
+                &InodeTable::ROOT_DIRECTORY_INODE,
+                strip_root_slash_path(path),
+            )?
             .0;
         let mut rst = Vec::new();
         if self.lock_inode_table()?.is_dir(&inode) {
@@ -1979,7 +2052,10 @@ impl FileSystem {
         // Convert the absolute path to relative path and then find the inode
         let inode = self
             .lock_inode_table()?
-            .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash_path(path))?
+            .get_inode_by_inode_path(
+                &InodeTable::ROOT_DIRECTORY_INODE,
+                strip_root_slash_path(path),
+            )?
             .0;
         let mut rst = Vec::new();
         let mut top_level_files = Vec::new();
@@ -1988,7 +2064,10 @@ impl FileSystem {
             let (all_dir, is_dir_empty) = {
                 let inode_table = self.lock_inode_table()?;
                 let inode_entry = inode_table.get(&inode)?;
-                (inode_entry.read_dir(&inode_table)?, inode_table.is_dir_empty(&inode))
+                (
+                    inode_entry.read_dir(&inode_table)?,
+                    inode_table.is_dir_empty(&inode),
+                )
             };
             if is_dir_empty? {
                 // Directory is empty (current and parent directories don't
@@ -2010,7 +2089,8 @@ impl FileSystem {
                     {
                         let mut sub_absolute_path = path.to_path_buf();
                         sub_absolute_path.push(sub_relative_path);
-                        let (mut list, _) = self.read_all_files_and_dirs_by_absolute_path(&sub_absolute_path)?;
+                        let (mut list, _) =
+                            self.read_all_files_and_dirs_by_absolute_path(&sub_absolute_path)?;
                         rst.append(&mut list);
                         if path == Path::new("/") {
                             top_level_files.push(sub_absolute_path);
