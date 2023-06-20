@@ -18,7 +18,7 @@ WORKSPACE_DIR = $(abspath ..)
 OUT_DIR ?= $(abspath test-collateral)
 MEASUREMENT_FILE = $(abspath ../nitro-runtime/PCR0)
 MEASUREMENT_PARAMETER = --pcr-file $(MEASUREMENT_FILE)
-EIF_PATH = $(abspath $(WORKSPACE_DIR)/nitro-runtime/runtime_manager.eif)
+EIF_PATH = $(abspath $(WORKSPACE_DIR)/nitro-runtime/nitro_runtime_manager.eif)
 
 include $(WORKSPACE_DIR)/common.mk
 include $(WORKSPACE_DIR)/shared.mk
@@ -42,17 +42,19 @@ $(MEASUREMENT_FILE):
 
 test-dependencies: test-collateral
 
-CARGO_TEST = $(CC) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG)
+CARGO_TEST = $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG)
 
 test-server: test-dependencies
-	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p tests --test server_test -- --test-threads=1
+	$(CARGO_TEST) --no-run -- --nocapture
+	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) --test server_test -- --test-threads=1
 	./nitro-terminate.sh
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
 
 veracruz-test: test-dependencies
-	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) -p tests --test integration_test -- --test-threads=1
+	$(CARGO_TEST) --no-run -- --nocapture
+	RUNTIME_MANAGER_EIF_PATH=$(EIF_PATH) $(CARGO_TEST) --test integration_test -- --test-threads=1
 	./nitro-terminate.sh
 
 doc:

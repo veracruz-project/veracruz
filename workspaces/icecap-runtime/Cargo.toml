@@ -20,7 +20,7 @@ exclude = [
   "crates/runtime-manager",
 ]
 members = [
-  "src/icecap-runtime",
+  "crates/icecap-runtime-manager",
   "src/virtio-console-server",
 ]
 resolver = "2"

@@ -19,7 +19,7 @@ exclude = [
   "crates/runtime-manager",
 ]
 members = [
-  "src/nitro-runtime",
+  "crates/nitro-runtime-manager",
 ]
 resolver = "2"
 

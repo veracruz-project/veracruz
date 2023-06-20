@@ -21,7 +21,7 @@ WORKSPACE_DIR = $(abspath ..)
 include $(WORKSPACE_DIR)/common.mk
 
 OUT_DIR ?= $(abspath test-collateral)
-RUNTIME_ENCLAVE_BINARY_PATH = $(WORKSPACE_DIR)/linux-runtime/target/$(PROFILE_PATH)/runtime-manager-enclave
+RUNTIME_ENCLAVE_BINARY_PATH = $(WORKSPACE_DIR)/linux-runtime/target/$(PROFILE_PATH)/linux-runtime-manager
 MEASUREMENT_FILE = $(RUNTIME_ENCLAVE_BINARY_PATH)
 MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
 include $(WORKSPACE_DIR)/shared.mk

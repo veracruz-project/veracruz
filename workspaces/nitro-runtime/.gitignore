@@ -1,4 +1,4 @@
 Dockerfile
 measurements.json
 PCR0
-runtime_manager.eif
+nitro_runtime_manager.eif

@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
 # and copyright information.
 
-.PHONY: all clean clean-cargo-lock doc fmt clippy linux runtime-manager-enclave
+.PHONY: all clean clean-cargo-lock doc fmt clippy linux linux-runtime-manager
 
 default: all
 
@@ -21,9 +21,9 @@ unresolved_crates_path := $(shell pwd)/crates
 
 all: linux
 
-linux: runtime-manager-enclave
+linux: linux-runtime-manager
 
-runtime-manager-enclave:
+linux-runtime-manager:
 	RUSTFLAGS="--remap-path-prefix $(unresolved_crates_path)=$(shell readlink -f $(unresolved_crates_path))" \
 	cargo build $(PROFILE_FLAG) $(V_FLAG)
 
@@ -32,7 +32,7 @@ doc:
 
 clippy:
 	cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
-		-p linux-runtime -p runtime-manager -p execution-engine \
+		-p linux-runtime-manager -p execution-engine \
 		-p session-manager -p policy-utils -p platform-services
 		-- --no-deps
 
