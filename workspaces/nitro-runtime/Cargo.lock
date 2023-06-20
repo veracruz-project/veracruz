@@ -1196,6 +1196,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "aws-nitro-enclaves-nsm-api",
+ "log",
  "nix",
  "nsm-lib",
  "raw-fd",
