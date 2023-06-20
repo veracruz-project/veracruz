@@ -10,12 +10,11 @@
 //! information on licensing and copyright.
 
 use anyhow::Result;
-
+use log::debug;
 use nix::sys::socket::{
     accept, bind, listen as listen_vsock, socket, AddressFamily, SockAddr, SockFlag, SockType,
 };
 use raw_fd::{receive_buffer, send_buffer};
-
 use runtime_manager::common_runtime::CommonRuntime;
 
 mod nitro_runtime;
@@ -39,30 +38,30 @@ fn encap() -> Result<()> {
         SockFlag::empty(),
         None,
     )?;
-    println!(
+    debug!(
         "runtime_manager_nitro::nitro_main creating SockAddr, CID:{:?}, PORT:{:?}",
         CID, PORT
     );
     let sockaddr = SockAddr::new_vsock(CID, PORT);
 
     bind(socket_fd, &sockaddr)?;
-    println!("runtime_manager_nitro::nitro_main calling accept");
+    debug!("runtime_manager_nitro::nitro_main calling accept");
 
     listen_vsock(socket_fd, BACKLOG)?;
 
     let nitro_runtime = nitro_runtime::NitroRuntime{};
 
-    println!("runtime_manager_nitro::nitro_main accept succeeded. looping");
+    debug!("runtime_manager_nitro::nitro_main accept succeeded. looping");
     let runtime = CommonRuntime::new(&nitro_runtime);
 
     loop {
-        println!("Nitro Runtime Manager::main calling accept");
+        debug!("Nitro Runtime Manager::main calling accept");
         let fd = accept(socket_fd)?;
-        println!("Nitro Runtime Manager::main accept succeeded. Looping");
+        debug!("Nitro Runtime Manager::main accept succeeded. Looping");
         loop {
             let received_buffer = receive_buffer(fd)?;
             let response_buffer = runtime.decode_dispatch(&received_buffer)?;
-            println!("Nitro Runtime Manager::main_loop received:{:02x?}", response_buffer);
+            debug!("Nitro Runtime Manager::main_loop received:{:02x?}", response_buffer);
             send_buffer(fd, &response_buffer)?;
         }
     }

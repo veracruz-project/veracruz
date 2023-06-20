@@ -7,6 +7,7 @@ version = "0.3.0"
 
 [dependencies]
 anyhow = "1"
+log = "0.4.13"
 nix = { version = "0.20.2" }
 nsm_api = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", tag = "v0.2.0", package = "aws-nitro-enclaves-nsm-api"}
 nsm_lib = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", tag = "v0.2.0", package = "nsm-lib"}

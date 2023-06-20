@@ -91,7 +91,7 @@ impl RuntimeManager {
     fn run(&mut self) -> Fallible<()> {
         let icecap_runtime = icecap_runtime::IcecapRuntime{};
 
-        println!("icecap_runtime_manager::linux_main accept run looping");
+        debug_println!("icecap_runtime_manager::run looping");
         let mut runtime = CommonRuntime::new(&icecap_runtime);
         loop {
             let badge = self.event.wait();

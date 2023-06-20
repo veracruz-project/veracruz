@@ -18,7 +18,7 @@ use runtime_manager::managers::RuntimeManagerError;
 use anyhow::{anyhow, Result};
 use clap::{App, Arg};
 use hex::decode_to_slice;
-//use io_utils::fd::{receive_buffer, send_buffer};
+use log::debug;
 use raw_fd::{ receive_buffer, send_buffer };
 use lazy_static::lazy_static;
 use log::{ error, info };
@@ -109,10 +109,9 @@ pub fn linux_main() -> Result<()> {
 
     let linux_runtime = linux_runtime::LinuxRuntime{};
 
-    println!("linux_runtime_manager::linux_main accept succeeded. looping");
+    debug!("linux_runtime_manager::linux_main accept succeeded. looping");
     let runtime = CommonRuntime::new(&linux_runtime);
     loop {
-        //println!("Linux Runtime Manager::main calling accept");
         let stream = TcpStream::connect(&address).map_err(|e| {
             error!("Could not connect to Veracruz Server on {}: {}", address, e);
             anyhow!(e)
@@ -125,11 +124,11 @@ pub fn linux_main() -> Result<()> {
 
         let fd: RawFd = stream.as_raw_fd();
 
-        println!("Linux Runtime Manager::main accept succeeded. Looping");
+        debug!("Linux Runtime Manager::main accept succeeded. Looping");
         loop {
             let received_buffer = receive_buffer(fd)?;
             let response_buffer = runtime.decode_dispatch(&received_buffer)?;
-            println!("Linux Runtime Manager::main_loop received:{:02x?}", response_buffer);
+            debug!("Linux Runtime Manager::main_loop received:{:02x?}", response_buffer);
             send_buffer(fd, &response_buffer)?;
         }
     }
