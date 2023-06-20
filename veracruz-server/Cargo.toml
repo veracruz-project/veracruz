@@ -5,10 +5,14 @@ edition = "2018"
 name = "veracruz-server"
 version = "0.3.0"
 
-[[bin]]
-name = "veracruz-server"
-path = "src/cli.rs"
-required-features = ["cli"]
+#[[bin]]
+#name = "veracruz-server"
+#path = "src/cli.rs"
+#required-features = ["cli"]
+
+[lib]
+name = "veracruz_server"
+path = "src/lib.rs"
 
 [features]
 # a feature to enable CLI-only dependencies

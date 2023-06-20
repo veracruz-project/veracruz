@@ -41,7 +41,7 @@ use veracruz_server::common::*;
 #[cfg(feature = "icecap")]
 use veracruz_server::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
 #[cfg(feature = "linux")]
-use veracruz_server::linux::veracruz_server_linux::VeracruzServerLinux as VeracruzServerEnclave;
+use linux_veracruz_server::server::VeracruzServerLinux as VeracruzServerEnclave;
 #[cfg(feature = "nitro")]
 use veracruz_server::nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
@@ -683,12 +683,15 @@ impl TestExecutor {
 
         info!("Initialise Veracruz runtime.");
         // Create the server
-        let mut veracruz_server =
-            VeracruzServerEnclave::new(&policy_json).map_err(|e| anyhow!("{:?}", e))?;
+        let mut platform_veracruz_server =
+            VeracruzServerEnclave::new(&policy_json).map_err(|e| anyhow!("{:?}", e))
+                .map_err(|e| {
+                    println!("VeracruzServerEnclave::new failed:{:?}", e);
+                    anyhow!("{:?}", e)
+                })?;
 
         // Create the client tls session. Note that we need the session id.
-        let client_connection_id = veracruz_server
-            .new_tls_session()
+        let client_connection_id = veracruz_server::server::new_tls_session(&mut platform_veracruz_server)
             .map_err(|e| anyhow!("{:?}", e))?;
         if client_connection_id == 0 {
             return Err(anyhow!("client session id is zero"));
@@ -703,7 +706,7 @@ impl TestExecutor {
         let init_flag_clone = init_flag.clone();
         let server_thread = thread::spawn(move || {
             if let Err(e) = TestExecutor::simulated_server(
-                &mut veracruz_server,
+                &mut platform_veracruz_server,
                 server_tls_sender,
                 server_tls_receiver,
                 alive_flag_clone.clone(),
@@ -734,8 +737,8 @@ impl TestExecutor {
     }
 
     /// This function simulating a Veracruz server, it should run on a separate thread.
-    fn simulated_server(
-        veracruz_server: &mut dyn veracruz_server::VeracruzServer,
+    fn simulated_server<T: VeracruzServer + Send + Sync + ?Sized> (
+        platform_veracruz_server: &mut T,
         sender: Sender<Vec<u8>>,
         receiver: Receiver<(u32, Vec<u8>)>,
         test_alive_flag: Arc<AtomicBool>,
@@ -754,8 +757,7 @@ impl TestExecutor {
                 session_id
             );
 
-            let (veracruz_active_flag, output_data_option) = veracruz_server
-                .tls_data(session_id, received_buffer)
+            let (veracruz_active_flag, output_data_option) = veracruz_server::server::tls_data(session_id, received_buffer, platform_veracruz_server)
                 .map_err(|e| {
                     // This point has a high chance to fail.
                     error!("Veracruz Server: {:?}", e);
@@ -1052,14 +1054,13 @@ impl TestExecutor {
 fn init_veracruz_server_and_tls_session<T: AsRef<str>>(
     policy_json: T,
 ) -> Result<(VeracruzServerEnclave, u32)> {
-    let mut veracruz_server =
+    let mut platform_veracruz_server =
         VeracruzServerEnclave::new(policy_json.as_ref()).map_err(|e| anyhow!("{:?}", e))?;
 
-    let session_id = veracruz_server
-        .new_tls_session()
+    let session_id = veracruz_server::server::new_tls_session(&mut platform_veracruz_server)
         .map_err(|e| anyhow!("{:?}", e))?;
     if session_id != 0 {
-        Ok((veracruz_server, session_id))
+        Ok((platform_veracruz_server, session_id))
     } else {
         Err(anyhow!("Session ID cannot be zero").into())
     }

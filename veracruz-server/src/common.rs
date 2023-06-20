@@ -89,7 +89,6 @@ impl From<anyhow::Error> for VeracruzServerError {
     }
 }
 
-#[cfg(feature = "nitro")]
 impl From<std::boxed::Box<bincode::ErrorKind>> for VeracruzServerError {
     fn from(error: std::boxed::Box<bincode::ErrorKind>) -> Self {
         VeracruzServerError::BincodeError(*error)
@@ -103,12 +102,8 @@ pub trait VeracruzServer {
     where
         Self: Sized;
 
-    fn new_tls_session(&mut self) -> VeracruzServerResult<u32>;
+    fn send_buffer(&self, buffer: &[u8]) -> Result<(), VeracruzServerError>;
 
-    // The first bool indicates if the enclave is active, and the second vec contains the response
-    fn tls_data(
-        &mut self,
-        session_id: u32,
-        input: Vec<u8>,
-    ) -> VeracruzServerResult<(bool, Option<Vec<Vec<u8>>>)>;
+    /// receive a buffer of data from the enclave
+    fn receive_buffer(&self) -> Result<Vec<u8>, VeracruzServerError>;
 }
