@@ -43,7 +43,7 @@ lazy_static! {
 ////////////////////////////////////////////////////////////////////////////////
 
 fn main() -> Result<(), String> {
-    linux_main().map_err(|err| format!("AWS Nitro Enclave Runtime Manager::main encap returned error:{:?}", err))
+    linux_main().map_err(|err| format!("Linux Enclave Runtime Manager::main encap returned error:{:?}", err))
 }
 
 /// Main entry point for Linux: parses command line arguments to find the port
