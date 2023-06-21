@@ -25,6 +25,8 @@ use mbedtls::{
 };
 use platform_services::getrandom;
 use policy_utils::policy::Policy;
+#[cfg(feature = "debug")]
+use std::borrow::Cow;
 use std::{string::String, sync::Arc, vec::Vec};
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -151,6 +153,16 @@ impl SessionContext {
             config::Transport::Stream,
             config::Preset::Default,
         );
+        #[cfg(feature = "debug")]
+        {
+            let dbg_callback =
+                |level: i32, file: Cow<'_, str>, line: i32, message: Cow<'_, str>| {
+                    print!("{} {}:{} {}", level, file, line, message);
+                };
+            config.set_dbg_callback(dbg_callback);
+            // TODO: waiting for https://github.com/veracruz-project/rust-mbedtls/issues/1 to be fixed
+            //unsafe { mbedtls::set_global_debug_threshold(3); }
+        }
         config.set_ciphersuites(Arc::new(self.cipher_suites.clone()));
         let entropy = Arc::new(mbedtls::rng::OsEntropy::new());
         let rng = Arc::new(mbedtls::rng::CtrDrbg::new(entropy, None)?);

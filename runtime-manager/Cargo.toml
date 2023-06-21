@@ -7,6 +7,9 @@ version = "0.3.0"
 resolver = "2"
 
 [features]
+debug = [
+  "session-manager/debug",
+]
 default = []
 icecap = [
   "bincode",

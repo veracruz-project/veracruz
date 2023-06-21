@@ -15,6 +15,7 @@ use log::{error, info};
 use mbedtls::{alloc::List, pk::Pk, ssl::Context, x509::Certificate};
 use policy_utils::{parsers::enforce_leading_slash, policy::Policy, Platform};
 use std::{
+    borrow::Cow,
     io::{Read, Write},
     net::TcpStream,
     path::Path,
@@ -157,6 +158,12 @@ impl VeracruzClient {
 
         use mbedtls::ssl::config::{Config, Endpoint, Preset, Transport, Version};
         let mut config = Config::new(Endpoint::Client, Transport::Stream, Preset::Default);
+        let dbg_callback = |level: i32, file: Cow<'_, str>, line: i32, message: Cow<'_, str>| {
+            print!("{} {}:{} {}", level, file, line, message);
+        };
+        config.set_dbg_callback(dbg_callback);
+        // TODO: waiting for https://github.com/veracruz-project/rust-mbedtls/issues/1 to be fixed
+        //unsafe { mbedtls::set_global_debug_threshold(3); }
         config.set_min_version(Version::Tls1_3)?;
         config.set_max_version(Version::Tls1_3)?;
         let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(policy.ciphersuite().as_str())
