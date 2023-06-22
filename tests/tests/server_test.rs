@@ -814,13 +814,14 @@ impl TestExecutor {
                 self.alive_flag.store(false, Ordering::SeqCst);
                 e
             })?;
-            if response.get_status() != transport_protocol::ResponseStatus::SUCCESS {
+            let status = response.status.enum_value_or_default();
+            if status != transport_protocol::ResponseStatus::SUCCESS {
                 error_occurred = true;
             }
             info!(
                 "The event {:?} finished with response status {:?} in {:?}.",
                 event,
-                response.get_status(),
+                status,
                 time_init.elapsed()
             );
         }
@@ -870,12 +871,12 @@ impl TestExecutor {
 
         let response = self.client_send(&serialized_request_policy_hash[..])?;
         let parsed_response = transport_protocol::parse_runtime_manager_response(None, &response)?;
-        let status = parsed_response.get_status();
+        let status = parsed_response.status.enum_value_or_default();
 
         if status != transport_protocol::ResponseStatus::SUCCESS {
             return Err(anyhow!("Received non-Success status: {:?}.", status).into());
         }
-        let received_hash = std::str::from_utf8(&parsed_response.get_policy_hash().data)?;
+        let received_hash = std::str::from_utf8(&parsed_response.policy_hash().data)?;
         info!("Received {:?} as hash.", received_hash);
         if received_hash != self.policy_hash {
             return Err(anyhow!(

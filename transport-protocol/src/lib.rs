@@ -18,7 +18,6 @@
 // It would be better to do this for a specific file, but there
 // does not appear to be a way to do this
 pub mod custom;
-#[allow(warnings)]
-pub mod transport_protocol;
+include!(concat!(env!("OUT_DIR"), "/protos/mod.rs"));
 pub use crate::custom::*;
 pub use crate::transport_protocol::*;

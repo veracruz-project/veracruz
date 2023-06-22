@@ -196,7 +196,7 @@ impl VeracruzClient {
         let response = self.send(&serialized_data)?;
 
         let parsed_response = transport_protocol::parse_runtime_manager_response(None, &response)?;
-        let status = parsed_response.get_status();
+        let status = parsed_response.status.enum_value_or_default();
         match status {
             transport_protocol::ResponseStatus::SUCCESS => Ok(parsed_response),
             _ => Err(anyhow!(VeracruzClientError::ResponseStatus(status))),
@@ -224,7 +224,7 @@ impl VeracruzClient {
         if !parsed_response.has_result() {
             return Err(anyhow!(VeracruzClientError::ResponseNoResult));
         }
-        Ok(parsed_response.get_result().data.clone())
+        Ok(parsed_response.result().data.clone())
     }
 
     /// Request the veracruz to execute the program at the remote `path`.
@@ -236,7 +236,7 @@ impl VeracruzClient {
         if !parsed_response.has_result() {
             return Err(anyhow!(VeracruzClientError::ResponseNoResult));
         }
-        Ok(parsed_response.get_result().data.clone())
+        Ok(parsed_response.result().data.clone())
     }
 
     /// Check the policy and runtime hashes, and read the result at the remote `path`.
@@ -248,7 +248,7 @@ impl VeracruzClient {
         if !parsed_response.has_result() {
             return Err(anyhow!(VeracruzClientError::ResponseNoResult));
         }
-        Ok(parsed_response.get_result().data.clone())
+        Ok(parsed_response.result().data.clone())
     }
 
     /// Indicate the veracruz to shutdown.
@@ -265,7 +265,7 @@ impl VeracruzClient {
             transport_protocol::serialize_request_policy_hash()
         })?;
 
-        let received_hash = std::str::from_utf8(&parsed_response.get_policy_hash().data)?;
+        let received_hash = std::str::from_utf8(&parsed_response.policy_hash().data)?;
         if self.policy_hash != received_hash {
             Err(anyhow!(VeracruzClientError::UnexpectedPolicy))
         } else {
