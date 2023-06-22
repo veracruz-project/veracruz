@@ -18,7 +18,10 @@ use policy_utils::{
     expiry::Timepoint,
     parsers::{enforce_leading_slash, parse_renamable_paths},
     policy::Policy,
-    principal::{ExecutionStrategy, FileHash, FileRights, Identity, NativeModule, NativeModuleType, Pipeline, Program},
+    principal::{
+        ExecutionStrategy, FileHash, FileRights, Identity, NativeModule, NativeModuleType,
+        Pipeline, Program,
+    },
 };
 use regex::Regex;
 use serde_json::{json, to_string_pretty, Value};
@@ -121,6 +124,8 @@ struct Arguments {
     native_modules_entry_points: Vec<PathBuf>,
     /// A list of paths to native module special files.
     native_modules_special_files: Vec<PathBuf>,
+    /// A list of paths to native module sockets
+    native_modules_sockets: Vec<PathBuf>,
     /// The conditional pipeline of programs to execute.  We parse this eagerly
     /// to check for parsing issues before writing the string to the policy
     /// file.  However, this string is then re-parsed by the Veracruz runtime
@@ -272,6 +277,12 @@ impl Arguments {
                     .multiple(true),
             )
             .arg(
+                Arg::with_name("native-module-socket-path")
+                    .long("native-module-socket-path")
+                    .value_name("FILE")
+                    .help("Specifies the path to install a socket ")
+            )
+            .arg(
                 Arg::with_name("pipeline")
                     //.short("i")
                     .long("pipeline")
@@ -365,9 +376,7 @@ impl Arguments {
         // Read all native module names
         let native_modules_names = matches
             .values_of("native-module-name")
-            .map_or(Vec::new(), |p| {
-                p.map(|s| s.to_string()).collect::<Vec<_>>()
-            });
+            .map_or(Vec::new(), |p| p.map(|s| s.to_string()).collect::<Vec<_>>());
 
         // Read all native module entry points
         let native_modules_entry_points = matches
@@ -379,6 +388,12 @@ impl Arguments {
         // Read all native module special files
         let native_modules_special_files = matches
             .values_of_os("native-module-special-file")
+            .map_or(Vec::new(), |p| {
+                p.map(|s| PathBuf::from(s)).collect::<Vec<_>>()
+            });
+
+        let native_modules_sockets = matches
+            .values_of_os("native-module-socket-path")
             .map_or(Vec::new(), |p| {
                 p.map(|s| PathBuf::from(s)).collect::<Vec<_>>()
             });
@@ -484,6 +499,7 @@ impl Arguments {
             native_modules_names,
             native_modules_entry_points,
             native_modules_special_files,
+            native_modules_sockets,
             pipelines,
             hashes,
             enclave_debug_mode,
@@ -583,26 +599,46 @@ impl Arguments {
     fn serialize_native_modules(&self) -> Result<Vec<NativeModule>> {
         info!("Serializing native modules.");
 
-        assert_eq!(self.native_modules_names.len(), self.native_modules_entry_points.len());
-        assert_eq!(self.native_modules_entry_points.len(), self.native_modules_special_files.len());
+        assert_eq!(
+            self.native_modules_names.len(),
+            self.native_modules_entry_points.len()
+        );
+        assert_eq!(
+            self.native_modules_entry_points.len(),
+            self.native_modules_special_files.len()
+        );
+        assert_eq!(
+            self.native_modules_special_files.len(),
+            self.native_modules_sockets.len()
+        );
 
         let mut result = Vec::new();
-        for ((name, entry_point_path), special_file) in self
+        for (((name, entry_point_path), special_file), socket_path) in self
             .native_modules_names
             .iter()
             .zip(&self.native_modules_entry_points)
             .zip(&self.native_modules_special_files)
+            .zip(&self.native_modules_sockets)
         {
             // Add a backslash (VFS requirement)
-            let special_file = enforce_leading_slash(special_file.to_str()
-            .ok_or(
-                anyhow!("Fail to convert special_file to str."),
-            )?).into_owned();
+            let special_file = enforce_leading_slash(
+                special_file
+                    .to_str()
+                    .ok_or(anyhow!("Fail to convert special_file to str."))?,
+            )
+            .into_owned();
+            let socket_path = enforce_leading_slash(socket_path.to_str().unwrap()).into_owned();
 
             let nm_type = if entry_point_path == &PathBuf::from("") {
-                NativeModuleType::Static { special_file: PathBuf::from(special_file) }
+                NativeModuleType::Static {
+                    special_file: PathBuf::from(special_file),
+                }
             } else {
-                NativeModuleType::Dynamic { special_file: PathBuf::from(special_file), entry_point: entry_point_path.to_path_buf() }
+                NativeModuleType::Dynamic {
+                    special_file: PathBuf::from(special_file),
+                    entry_point: entry_point_path.to_path_buf(),
+                    socket: Some(PathBuf::from(socket_path)),
+                }
             };
             result.push(NativeModule::new(name.to_string(), nm_type));
         }

@@ -16,7 +16,7 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use crate::native_module_manager::NativeModuleManager;
+use crate::native_module_manager::{NativeModuleManager, NATIVE_MODULE_MANAGER_SYSROOT};
 use policy_utils::{
     principal::{FileRights, NativeModule, NativeModuleType, Principal, RightsTable},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
@@ -182,8 +182,8 @@ enum InodeImpl {
     File(Vec<u8>),
     /// A directory. The `PathBuf` key is the relative path and must match the name inside the `Inode`.
     Directory(HashMap<PathBuf, Inode>),
-    /// A Socket and its backing stream
-    Socket(UnixStream),
+    /// A Socket and its backing stream (if open) and the path to the backing socket.
+    Socket(Option<UnixStream>, PathBuf),
 }
 
 impl InodeImpl {
@@ -208,7 +208,7 @@ impl InodeImpl {
                 Ok(())
             }
             Self::Directory(_) => Err(ErrNo::IsDir),
-            Self::Socket(_) => {
+            Self::Socket(..) => {
                 // No semantic meaning, allow it so that std::fs::write works.
                 Ok(())
             }
@@ -224,7 +224,16 @@ impl InodeImpl {
                 Self::read_bytes_from_offset(b, buf, offset)
             }
             Self::Directory(_) => Err(ErrNo::IsDir),
-            Self::Socket(sock) => {
+            Self::Socket(sock, path) => {
+                if let None = sock {
+                    let stream = UnixStream::connect(&path).map_err(|_| ErrNo::ConnRefused)?;
+                    *self = Self::Socket(Some(stream), path.clone());
+                }
+                let sock = match self {
+                    Self::Socket(Some(s), ..) => s,
+                    _ => unreachable!(),
+                };
+
                 return sock.read(buf).map_err(|_| ErrNo::ConnAborted);
             }
         }
@@ -258,31 +267,21 @@ impl InodeImpl {
         let bytes = match self {
             Self::File(b) | Self::NativeModule(.., b) => b,
             Self::Directory(_) => return Err(ErrNo::IsDir),
-            Self::Socket(sock) => match sock.write_all(buf) {
-                Ok(_) => return Ok(buf.len()),
-                Err(e) => {
-                    if e.kind() == ErrorKind::BrokenPipe {
-                        // Retry connecting the socket
-                        let path = sock
-                            .peer_addr()
-                            .map_err(|_| ())
-                            .and_then(|addr| addr.as_pathname().map(|p| p.to_owned()).ok_or(()))
-                            .map_err(|_| ErrNo::ConnReset)?;
-                        *self = Self::Socket(UnixStream::connect(path).unwrap());
-                        match self {
-                            Self::Socket(sock) => {
-                                return sock
-                                    .write_all(buf)
-                                    .map(|_| buf.len())
-                                    .map_err(|_| ErrNo::ConnReset)
-                            }
-                            _ => unreachable!(),
-                        }
-                    } else {
-                        return Err(ErrNo::ConnReset);
-                    }
+            Self::Socket(sock, path) => {
+                if let None = sock {
+                    let stream = UnixStream::connect(&path).map_err(|_| ErrNo::ConnRefused)?;
+                    *self = Self::Socket(Some(stream), path.clone());
                 }
-            },
+                let sock = match self {
+                    Self::Socket(Some(s), ..) => s,
+                    _ => unreachable!(),
+                };
+
+                return sock
+                    .write_all(buf)
+                    .map(|_| buf.len())
+                    .map_err(|_| ErrNo::ConnAborted);
+            }
         };
         // NOTE: It should be safe to convert a u64 to usize.
         let offset = <_>::try_from_or_errno(offset)?;
@@ -313,7 +312,7 @@ impl InodeImpl {
                 Ok(())
             }
             Self::Directory(_) => Err(ErrNo::IsDir),
-            Self::Socket(_) => {
+            Self::Socket(..) => {
                 // No semantic meaning to truncating a socket so ignore it so that
                 // std::fs::write works.
                 Ok(())
@@ -353,7 +352,7 @@ impl InodeImpl {
         let rst = match self {
             Self::NativeModule(.., f) | Self::File(f) => f.len(),
             Self::Directory(f) => f.len(),
-            Self::Socket(_) => 0,
+            Self::Socket(..) => 0,
         };
         Ok(rst as FileSize)
     }
@@ -453,7 +452,9 @@ impl Debug for InodeTable {
                         .map_or_else(|_| "(failed to lock)".to_string(), |o| format!("{:?}", o))
                 )?,
                 InodeImpl::Directory(d) => write!(f, "\t{:?} -> {:?}\n", k, d)?,
-                InodeImpl::Socket(sock) => write!(f, "\t{:?} -> socket {:?}", k, sock)?,
+                InodeImpl::Socket(sock, path) => {
+                    write!(f, "\t{:?} -> socket {:?} {:?}", k, sock, path)?
+                }
             }
         }
         Ok(())
@@ -493,21 +494,44 @@ impl InodeTable {
     /// created.
     fn install_services(&mut self, native_modules: Vec<NativeModule>) -> FileSystemResult<()> {
         for native_module in native_modules {
-            let path = match native_module.r#type() {
-                NativeModuleType::Static { special_file } => Some(special_file),
-                NativeModuleType::Dynamic { special_file, .. } => Some(special_file),
-                _ => None,
+            let (special_file, socket) = match native_module.r#type() {
+                NativeModuleType::Static { special_file } => (Some(special_file), None),
+                NativeModuleType::Dynamic {
+                    special_file,
+                    socket,
+                    ..
+                } => (Some(special_file), socket.as_ref()),
+                _ => (None, None),
             };
-            if path.is_some() {
-                let path = path.unwrap();
+            if let Some(special_file) = special_file {
                 let service = Arc::new(Mutex::new(Box::new(native_module.clone())));
                 let new_inode = self.new_inode()?;
-                let path = strip_root_slash_path(path);
+                let special_file = strip_root_slash_path(special_file);
                 // Call the existing function to create general files.
-                self.add_file(Self::ROOT_DIRECTORY_INODE, path, new_inode, Vec::new())?;
+                self.add_file(
+                    Self::ROOT_DIRECTORY_INODE,
+                    special_file,
+                    new_inode,
+                    Vec::new(),
+                )?;
                 // Manually uplift the general file to special file bound with the service.
                 self.table.get_mut(&new_inode).ok_or(ErrNo::Inval)?.data =
                     InodeImpl::NativeModule(service, Vec::new());
+            }
+
+            if let Some(socket) = socket {
+                self.install_socket(
+                    socket,
+                    &PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT)
+                        .join(native_module.name())
+                        .join(socket.strip_prefix("/").unwrap())
+                )?;
+                info!(
+                    "Installed socket => {:?}",
+                    &PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT)
+                        .join(native_module.name())
+                        .join(socket.strip_prefix("/").unwrap())
+                );
             }
         }
         Ok(())
@@ -530,7 +554,8 @@ impl InodeTable {
         )?;
         // Manually uplift the general file to special socket file.
         self.table.get_mut(&new_inode).ok_or(ErrNo::Inval)?.data = InodeImpl::Socket(
-            UnixStream::connect(backing_socket_path.as_ref()).map_err(|_| ErrNo::ConnRefused)?,
+            UnixStream::connect(backing_socket_path.as_ref()).ok(),
+            backing_socket_path.as_ref().to_path_buf(),
         );
         Ok(())
     }
