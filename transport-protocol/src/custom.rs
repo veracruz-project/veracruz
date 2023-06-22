@@ -13,7 +13,7 @@ use crate::transport_protocol;
 use anyhow::{anyhow, Result};
 use err_derive::Error;
 use lazy_static::lazy_static;
-use protobuf::{error::ProtobufError, Message, ProtobufEnum};
+use protobuf::{Enum, EnumOrUnknown, Message};
 use std::{collections::HashMap, string::ToString, sync::Mutex, vec::Vec};
 
 pub const LENGTH_PREFIX_SIZE: usize = 8;
@@ -30,8 +30,8 @@ lazy_static! {
 #[derive(Debug, Error)]
 pub enum TransportProtocolError {
     // NOTE: Protobuf does not implement clone, hence derive(clone) is impossible.
-    #[error(display = "TransportProtocol: ProtobufError: {:?}.", _0)]
-    ProtobufError(#[error(source)] ProtobufError),
+    //#[error(display = "TransportProtocol: ProtobufError: {:?}.", _0)]
+    //ProtobufError(#[error(source)] ProtobufError),
     #[error(display = "TransportProtocol: Invalid response status: {:?}.", _0)]
     ResponseStatusError(i32),
     #[error(display = "TransportProtocol: TryIntoError: {}.", _0)]
@@ -142,9 +142,7 @@ pub fn parse_runtime_manager_request(
     buffer: &[u8],
 ) -> Result<transport_protocol::RuntimeManagerRequest> {
     let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
-    Ok(protobuf::parse_from_bytes::<
-        transport_protocol::RuntimeManagerRequest,
-    >(&full_unprefixed_buffer)?)
+    Ok(protobuf::Message::parse_from_bytes(&full_unprefixed_buffer)?)
 }
 
 /// Parse a response from the Runtime Manager.
@@ -153,9 +151,7 @@ pub fn parse_runtime_manager_response(
     buffer: &[u8],
 ) -> Result<transport_protocol::RuntimeManagerResponse> {
     let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
-    Ok(protobuf::parse_from_bytes::<
-        transport_protocol::RuntimeManagerResponse,
-    >(&full_unprefixed_buffer)?)
+    Ok(protobuf::Message::parse_from_bytes(&full_unprefixed_buffer)?)
 }
 
 pub fn parse_proxy_attestation_server_request(
@@ -163,9 +159,7 @@ pub fn parse_proxy_attestation_server_request(
     buffer: &[u8],
 ) -> Result<transport_protocol::ProxyAttestationServerRequest> {
     let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
-    Ok(protobuf::parse_from_bytes::<
-        transport_protocol::ProxyAttestationServerRequest,
-    >(&full_unprefixed_buffer)?)
+    Ok(protobuf::Message::parse_from_bytes(&full_unprefixed_buffer)?)
 }
 
 pub fn parse_proxy_attestation_server_response(
@@ -173,16 +167,14 @@ pub fn parse_proxy_attestation_server_response(
     buffer: &[u8],
 ) -> Result<transport_protocol::ProxyAttestationServerResponse> {
     let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
-    Ok(protobuf::parse_from_bytes::<
-        transport_protocol::ProxyAttestationServerResponse,
-    >(&full_unprefixed_buffer)?)
+    Ok(protobuf::Message::parse_from_bytes(&full_unprefixed_buffer)?)
 }
 
 /// Serialize a (static) data package and its package ID.
 pub fn serialize_write_file(data_buffer: &[u8], file_name: &str) -> TransportProtocolResult {
     let mut data = transport_protocol::Data::new();
-    data.set_data(data_buffer.to_vec());
-    data.set_file_name(file_name.to_string());
+    data.data = data_buffer.to_vec();
+    data.file_name = file_name.to_string();
     let mut transport_protocol = transport_protocol::RuntimeManagerRequest::new();
     transport_protocol.set_write_file(data);
 
@@ -194,7 +186,7 @@ pub fn serialize_write_file(data_buffer: &[u8], file_name: &str) -> TransportPro
 /// Serialize a (static) data package and its package ID.
 pub fn serialize_read_file(file_name: &str) -> TransportProtocolResult {
     let mut data = transport_protocol::Read::new();
-    data.set_file_name(file_name.to_string());
+    data.file_name = file_name.to_string();
     let mut transport_protocol = transport_protocol::RuntimeManagerRequest::new();
     transport_protocol.set_read_file(data);
 
@@ -205,8 +197,8 @@ pub fn serialize_read_file(file_name: &str) -> TransportProtocolResult {
 
 pub fn serialize_append_file(data_buffer: &[u8], file_name: &str) -> TransportProtocolResult {
     let mut data = transport_protocol::Data::new();
-    data.set_data(data_buffer.to_vec());
-    data.set_file_name(file_name.to_string());
+    data.data = data_buffer.to_vec();
+    data.file_name = file_name.to_string();
     let mut transport_protocol = transport_protocol::RuntimeManagerRequest::new();
     transport_protocol.set_append_file(data);
 
@@ -218,7 +210,7 @@ pub fn serialize_append_file(data_buffer: &[u8], file_name: &str) -> TransportPr
 /// Serialize the request for querying the result.
 pub fn serialize_request_result(file_name: &str) -> TransportProtocolResult {
     let mut command = transport_protocol::RequestResult::new();
-    command.set_file_name(file_name.to_string());
+    command.file_name = file_name.to_string();
     let mut request = transport_protocol::RuntimeManagerRequest::new();
     request.set_request_result(command);
 
@@ -230,7 +222,7 @@ pub fn serialize_request_result(file_name: &str) -> TransportProtocolResult {
 /// Serialize the request for .
 pub fn serialize_request_pipeline(pipeline_name: &str) -> TransportProtocolResult {
     let mut command = transport_protocol::RequestResult::new();
-    command.set_file_name(pipeline_name.to_string());
+    command.file_name = pipeline_name.to_string();
     let mut request = transport_protocol::RuntimeManagerRequest::new();
     request.set_request_pipeline(command);
 
@@ -252,7 +244,7 @@ pub fn serialize_request_shutdown() -> TransportProtocolResult {
 
 pub fn serialize_request_proxy_psa_attestation_token(challenge: &[u8]) -> TransportProtocolResult {
     let mut rpat = transport_protocol::RequestProxyPsaAttestationToken::new();
-    rpat.set_challenge(challenge.to_vec());
+    rpat.challenge = challenge.to_vec();
     let mut request = transport_protocol::RuntimeManagerRequest::new();
     request.set_request_proxy_psa_attestation_token(rpat);
 
@@ -264,15 +256,15 @@ pub fn serialize_request_proxy_psa_attestation_token(challenge: &[u8]) -> Transp
 pub fn parse_request_proxy_psa_attestation_token(
     proto: &transport_protocol::RequestProxyPsaAttestationToken,
 ) -> std::vec::Vec<u8> {
-    proto.get_challenge().to_vec()
+    proto.challenge.to_vec()
 }
 
 pub fn parse_cert_chain(
     chain: &transport_protocol::CertChain,
 ) -> (std::vec::Vec<u8>, std::vec::Vec<u8>) {
     return (
-        chain.get_root_cert().to_vec(),
-        chain.get_enclave_cert().to_vec(),
+        chain.root_cert.to_vec(),
+        chain.enclave_cert.to_vec(),
     );
 }
 
@@ -282,9 +274,9 @@ pub fn serialize_proxy_psa_attestation_token(
     device_id: i32,
 ) -> TransportProtocolResult {
     let mut pat_proto = transport_protocol::ProxyPsaAttestationToken::new();
-    pat_proto.set_token(token.to_vec());
-    pat_proto.set_pubkey(pubkey.to_vec());
-    pat_proto.set_device_id(device_id);
+    pat_proto.token = token.to_vec();
+    pat_proto.pubkey = pubkey.to_vec();
+    pat_proto.device_id = device_id;
     let mut proxy_attestation_server_request =
         transport_protocol::ProxyAttestationServerRequest::new();
     proxy_attestation_server_request.set_proxy_psa_attestation_token(pat_proto);
@@ -296,8 +288,8 @@ pub fn serialize_proxy_psa_attestation_token(
 
 pub fn serialize_nitro_attestation_doc(doc: &[u8], device_id: i32) -> TransportProtocolResult {
     let mut nad_proto = transport_protocol::NitroAttestationDoc::new();
-    nad_proto.set_doc(doc.to_vec());
-    nad_proto.set_device_id(device_id);
+    nad_proto.doc = doc.to_vec();
+    nad_proto.device_id = device_id;
     let mut proxy_attestation_server_request =
         transport_protocol::ProxyAttestationServerRequest::new();
     proxy_attestation_server_request.set_nitro_attestation_doc(nad_proto);
@@ -309,7 +301,7 @@ pub fn serialize_nitro_attestation_doc(doc: &[u8], device_id: i32) -> TransportP
 
 pub fn serialize_certificate(cert: &[u8]) -> TransportProtocolResult {
     let mut proto_cert = transport_protocol::Cert::new();
-    proto_cert.set_data(cert.to_vec());
+    proto_cert.data = cert.to_vec();
     let mut rmr = transport_protocol::RuntimeManagerResponse::new();
     rmr.set_cert(proto_cert);
 
@@ -322,9 +314,9 @@ pub fn parse_proxy_psa_attestation_token(
     proto: &transport_protocol::ProxyPsaAttestationToken,
 ) -> (std::vec::Vec<u8>, std::vec::Vec<u8>, i32) {
     (
-        proto.get_token().to_vec(),
-        proto.get_pubkey().to_vec(),
-        proto.get_device_id(),
+        proto.token.to_vec(),
+        proto.pubkey.to_vec(),
+        proto.device_id,
     )
 }
 
@@ -334,9 +326,9 @@ pub fn serialize_native_psa_attestation_token(
     device_id: i32,
 ) -> TransportProtocolResult {
     let mut pat_proto = transport_protocol::NativePsaAttestationToken::new();
-    pat_proto.set_token(token.to_vec());
-    pat_proto.set_csr(csr.to_vec());
-    pat_proto.set_device_id(device_id);
+    pat_proto.token = token.to_vec();
+    pat_proto.csr = csr.to_vec();
+    pat_proto.device_id = device_id;
     let mut proxy_attestation_server_request =
         transport_protocol::ProxyAttestationServerRequest::new();
     proxy_attestation_server_request.set_native_psa_attestation_token(pat_proto);
@@ -350,22 +342,22 @@ pub fn parse_native_psa_attestation_token(
     proto: &transport_protocol::NativePsaAttestationToken,
 ) -> (std::vec::Vec<u8>, std::vec::Vec<u8>, i32) {
     (
-        proto.get_token().to_vec(),
-        proto.get_csr().to_vec(),
-        proto.get_device_id(),
+        proto.token.to_vec(),
+        proto.csr.to_vec(),
+        proto.device_id,
     )
 }
 
 pub fn parse_nitro_attestation_doc(
     proto: &transport_protocol::NitroAttestationDoc,
 ) -> (std::vec::Vec<u8>, i32) {
-    (proto.get_doc().to_vec(), proto.get_device_id())
+    (proto.doc.to_vec(), proto.device_id)
 }
 
 pub fn serialize_cert_chain(enclave_cert: &[u8], root_cert: &[u8]) -> TransportProtocolResult {
     let mut cert_chain = transport_protocol::CertChain::new();
-    cert_chain.set_root_cert(root_cert.to_vec());
-    cert_chain.set_enclave_cert(enclave_cert.to_vec());
+    cert_chain.root_cert = root_cert.to_vec();
+    cert_chain.enclave_cert = enclave_cert.to_vec();
     let mut response = transport_protocol::ProxyAttestationServerResponse::new();
     response.set_cert_chain(cert_chain);
 
@@ -377,8 +369,8 @@ pub fn serialize_cert_chain(enclave_cert: &[u8], root_cert: &[u8]) -> TransportP
 pub fn serialize_psa_attestation_init(challenge: &[u8], device_id: i32) -> TransportProtocolResult {
     let mut request = transport_protocol::ProxyAttestationServerResponse::new();
     let mut pai = transport_protocol::PsaAttestationInit::new();
-    pai.set_challenge(challenge.to_vec());
-    pai.set_device_id(device_id);
+    pai.challenge = challenge.to_vec();
+    pai.device_id = device_id;
     request.set_psa_attestation_init(pai);
 
     // Prefix buffer with its length
@@ -389,7 +381,7 @@ pub fn serialize_psa_attestation_init(challenge: &[u8], device_id: i32) -> Trans
 pub fn parse_psa_attestation_init(
     pai: &transport_protocol::PsaAttestationInit,
 ) -> Result<(std::vec::Vec<u8>, i32)> {
-    Ok((pai.get_challenge().to_vec(), pai.get_device_id()))
+    Ok((pai.challenge.to_vec(), pai.device_id))
 }
 
 /// Serialize the request for querying the hash of the provisioned program.
@@ -397,7 +389,7 @@ pub fn parse_psa_attestation_init(
 pub fn serialize_request_pi_hash(file_name: &str) -> TransportProtocolResult {
     let mut request = transport_protocol::RuntimeManagerRequest::new();
     let mut rph = transport_protocol::RequestPiHash::new();
-    rph.set_file_name(file_name.to_string());
+    rph.file_name = file_name.to_string();
     request.set_request_pi_hash(rph);
 
     // Prefix buffer with its length
@@ -420,7 +412,7 @@ pub fn serialize_request_policy_hash() -> TransportProtocolResult {
 pub fn serialize_pi_hash(hash: &[u8]) -> TransportProtocolResult {
     let mut response = transport_protocol::RuntimeManagerResponse::new();
 
-    response.set_status(transport_protocol::ResponseStatus::SUCCESS);
+    response.status = EnumOrUnknown::new(transport_protocol::ResponseStatus::SUCCESS);
     let mut pi_hash = transport_protocol::PiHash::new();
     pi_hash.data.resize(hash.len(), 0);
     pi_hash.data.copy_from_slice(hash);
@@ -435,7 +427,7 @@ pub fn serialize_pi_hash(hash: &[u8]) -> TransportProtocolResult {
 pub fn serialize_policy_hash(hash: &[u8]) -> TransportProtocolResult {
     let mut response = transport_protocol::RuntimeManagerResponse::new();
 
-    response.set_status(transport_protocol::ResponseStatus::SUCCESS);
+    response.status = EnumOrUnknown::new(transport_protocol::ResponseStatus::SUCCESS);
     let mut policy_hash = transport_protocol::PolicyHash::new();
     policy_hash.data.resize(hash.len(), 0);
     policy_hash.data.copy_from_slice(hash);
@@ -451,7 +443,7 @@ pub fn serialize_empty_response(status: i32) -> TransportProtocolResult {
     let mut response = transport_protocol::RuntimeManagerResponse::new();
     let encoded_status = transport_protocol::ResponseStatus::from_i32(status)
         .ok_or(TransportProtocolError::ResponseStatusError(status))?;
-    response.set_status(encoded_status);
+    response.status = EnumOrUnknown::new(encoded_status);
 
     // Prefix buffer with its length
     let mut buffer = response.write_to_bytes()?;
@@ -468,7 +460,7 @@ pub fn serialize_result(
     let encoded_status = transport_protocol::ResponseStatus::from_i32(status)
         .ok_or(TransportProtocolError::ResponseStatusError(status))?;
 
-    response.set_status(encoded_status);
+    response.status = EnumOrUnknown::new(encoded_status);
 
     if let Some(ref data) = data_opt {
         let mut result = transport_protocol::Result::new();
@@ -485,8 +477,8 @@ pub fn serialize_result(
 pub fn parse_result(
     response: &transport_protocol::RuntimeManagerResponse,
 ) -> Result<Option<std::vec::Vec<u8>>> {
-    let status = response.get_status();
-    let decoded_status = match status {
+    let status = response.status;
+    let decoded_status = match status.enum_value_or_default() {
         transport_protocol::ResponseStatus::UNSET => -1,
         transport_protocol::ResponseStatus::SUCCESS => 0,
         transport_protocol::ResponseStatus::FAILED_INVALID_ROLE => 1,
@@ -496,7 +488,7 @@ pub fn parse_result(
         transport_protocol::ResponseStatus::FAILED_ERROR_CODE_RETURNED => 5,
         transport_protocol::ResponseStatus::FAILED_INVALID_REQUEST => 6,
     };
-    if status != transport_protocol::ResponseStatus::SUCCESS {
+    if decoded_status != 0 {
         return Err(anyhow!(TransportProtocolError::ResponseStatusError(
             decoded_status
         )));
@@ -504,10 +496,10 @@ pub fn parse_result(
 
     let data_opt = {
         if response.has_result() {
-            let result = response.get_result();
+            let result = response.result();
             let mut data = std::vec::Vec::new();
-            data.resize(result.get_data().len(), 0);
-            data.copy_from_slice(&response.get_result().data);
+            data.resize(result.data.len(), 0);
+            data.copy_from_slice(&result.data);
             Some(data)
         } else {
             None
@@ -520,14 +512,14 @@ pub fn parse_result(
 pub fn parse_start_msg(
     parsed: &transport_protocol::ProxyAttestationServerRequest,
 ) -> std::string::String {
-    let start_msg = parsed.get_start_msg();
+    let start_msg = parsed.start_msg();
     return start_msg.protocol.clone();
 }
 
 pub fn serialize_start_msg(protocol: &str) -> TransportProtocolResult {
     let mut transport_protocol = transport_protocol::ProxyAttestationServerRequest::new();
     let mut start_msg = transport_protocol::StartMsg::new();
-    start_msg.set_protocol(protocol.to_string());
+    start_msg.protocol = protocol.to_string();
     transport_protocol.set_start_msg(start_msg);
 
     // Prefix buffer with its length

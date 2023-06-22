@@ -16,7 +16,7 @@ use policy_utils::{pipeline::Expr, principal::Principal};
 use std::vec::Vec;
 use transport_protocol::{
     transport_protocol::{
-        RuntimeManagerRequest as REQUEST, RuntimeManagerRequest_oneof_message_oneof as MESSAGE,
+        runtime_manager_request::Message_oneof as MESSAGE, RuntimeManagerRequest as REQUEST,
     },
     TransportProtocolError,
 };
@@ -144,23 +144,23 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
         .ok_or(anyhow!(RuntimeManagerError::UninitializedProtocolState))?;
 
     match request {
-        MESSAGE::write_file(data) => dispatch_on_write(protocol_state, data, client_id),
-        MESSAGE::append_file(data) => dispatch_on_append(protocol_state, data, client_id),
-        MESSAGE::request_policy_hash(_) => dispatch_on_policy_hash(protocol_state),
-        MESSAGE::request_result(result_request) => {
+        MESSAGE::WriteFile(data) => dispatch_on_write(protocol_state, data, client_id),
+        MESSAGE::AppendFile(data) => dispatch_on_append(protocol_state, data, client_id),
+        MESSAGE::RequestPolicyHash(_) => dispatch_on_policy_hash(protocol_state),
+        MESSAGE::RequestResult(result_request) => {
             dispatch_on_result(result_request, protocol_state, client_id)
         }
-        MESSAGE::request_pipeline(result_request) => {
+        MESSAGE::RequestPipeline(result_request) => {
             dispatch_on_pipeline(result_request, protocol_state, client_id)
         }
-        MESSAGE::request_shutdown(_) => {
+        MESSAGE::RequestShutdown(_) => {
             let is_dead = protocol_state.request_and_check_shutdown(client_id)?;
             if is_dead {
                 *protocol_state_guard = None;
             }
             Ok(Some(response_success(None)))
         }
-        MESSAGE::read_file(read) => dispatch_on_read(protocol_state, read, client_id),
+        MESSAGE::ReadFile(read) => dispatch_on_read(protocol_state, read, client_id),
         _otherwise => response_invalid_request(),
     }
 }
