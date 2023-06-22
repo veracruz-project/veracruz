@@ -12,7 +12,7 @@ clap = "2.33.3"
 env_logger = "0.9.0"
 execution-engine = { path = "../../execution-engine", features = ["std"] }
 log = "0.4.13"
-postcard = "0.7.2"
+postcard = "1.0.0"
 policy-utils = { path = "../../policy-utils", features = ["std"] }
 wasi-types = { path = "../../third-party/wasi-types" }
 

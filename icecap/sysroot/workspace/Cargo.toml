@@ -9,7 +9,7 @@ description = "Crate that depends on Rust libraries for Icecap"
 std = { path = "../rust/library/std" }
 
 # Hacks to get std to depend on our patches.
-libc = "=0.2.133"
+libc = "=0.2.144"
 # compiler_builtins = "=0.1.69"
 
 [lib]

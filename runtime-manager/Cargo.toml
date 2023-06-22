@@ -52,7 +52,7 @@ io-utils = { path = "../io-utils", optional = true }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 log = "0.4.13"
 nix = { version = "0.20.2", optional = true }
-nsm_api = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api.git/", tag = "v0.2.0", package = "aws-nitro-enclaves-nsm-api", optional = true }
+nsm_api = { package = "aws-nitro-enclaves-nsm-api", version = "0.2.1", optional = true }
 policy-utils = { path = "../policy-utils" }
 protobuf = "=2.8.1"
 psa-attestation = { path = "../psa-attestation", optional = true }

@@ -22,25 +22,23 @@
 #![no_std]
 
 use crate::result::Result;
-use cfg_if::cfg_if;
 
 pub mod result;
 
-cfg_if! {
-    if #[cfg(feature = "nitro")] {
-        #[path="nitro_platform_services.rs"]
-        mod imp;
-    } else if #[cfg(feature = "icecap")] {
-        #[path="icecap_platform_services.rs"]
-        mod imp;
-    } else if #[cfg(feature = "std")] {
-        #[path="std_platform_services.rs"]
-        mod imp;
-    } else {
-        compile_error!(
-            "Unrecognised feature: platforms supported are Icecap, Nitro and std.");
-    }
-}
+#[cfg(all(feature = "icecap", not(feature = "std")))]
+#[path = "icecap_platform_services.rs"]
+mod imp;
+
+#[cfg(all(feature = "nitro", not(feature = "std")))]
+#[path = "nitro_platform_services.rs"]
+mod imp;
+
+#[cfg(feature = "std")]
+#[path = "std_platform_services.rs"]
+mod imp;
+
+#[cfg(not(any(feature = "icecap", feature = "nitro", feature = "std")))]
+compile_error!("Unrecognised feature: platforms supported are Icecap, Nitro and std.");
 
 ////////////////////////////////////////////////////////////////////////////////
 // Platform services

@@ -11,7 +11,7 @@
 
 .PHONY: all build install clean clean-cargo-lock default doc fmt clippy \
 	test-dependencies test-collateral test-server test-client veracruz-test \
-	tests
+	tests build-tests
 
 default: build
 
@@ -26,11 +26,13 @@ MEASUREMENT_FILE = $(RUNTIME_ENCLAVE_BINARY_PATH)
 MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
 include $(WORKSPACE_DIR)/shared.mk
 
+BUILD_ENV = RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
+	RUSTFLAGS="--remap-path-prefix $(unresolved_crates_path)=$(shell readlink -f $(unresolved_crates_path))"
+
 TEST_PARAMETERS = VERACRUZ_POLICY_DIR=$(OUT_DIR) \
 	VERACRUZ_TRUST_DIR=$(OUT_DIR) \
 	VERACRUZ_PROGRAM_DIR=$(OUT_DIR) \
-	VERACRUZ_DATA_DIR=$(OUT_DIR) \
-	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH)
+	VERACRUZ_DATA_DIR=$(OUT_DIR)
 
 CLIPPY_OPTIONS = --no-deps -A clippy::type_complexity -A clippy::module_inception -D warnings
 
@@ -39,8 +41,7 @@ unresolved_crates_path := $(shell pwd)/crates
 all: build test-collateral
 
 build: $(RUNTIME_ENCLAVE_BINARY_PATH)
-	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
-	RUSTFLAGS="--remap-path-prefix $(unresolved_crates_path)=$(shell readlink -f $(unresolved_crates_path))" \
+	$(BUILD_ENV) \
 		cargo build $(PROFILE_FLAG) $(V_FLAG)
 
 install:
@@ -53,18 +54,19 @@ install:
 
 test-dependencies: test-collateral $(RUNTIME_ENCLAVE_BINARY_PATH)
 
-CARGO_TEST = RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
-	$(TEST_PARAMETERS) cargo test $(PROFILE_FLAG)
+CARGO_TEST = $(BUILD_ENV) $(TEST_PARAMETERS) \
+	cargo test $(PROFILE_FLAG)
 
-test-server: test-dependencies
-	$(CARGO_TEST) --no-run -- --nocapture
+build-tests:
+	$(CARGO_TEST) --no-run
+
+test-server: test-dependencies build-tests
 	RUST_LOG="server_test=info,error" $(CARGO_TEST) --test server_test -- --test-threads=1 --nocapture
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
 
-veracruz-test: test-dependencies
-	$(CARGO_TEST) --no-run -- --nocapture
+veracruz-test: test-dependencies build-tests
 	RUST_LOG="integration_test=info,error" $(CARGO_TEST) --test integration_test -- --test-threads=1 --nocapture
 
 $(RUNTIME_ENCLAVE_BINARY_PATH):

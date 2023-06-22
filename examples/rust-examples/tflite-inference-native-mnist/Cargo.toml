@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.14"
-image = "=0.24.4"
+image = "0.24.4"
 libc = "0.2.137"
-postcard = { version = "0.7.2", features = [ "alloc", "use-std" ] }
+postcard = { version = "1.0.0", features = [ "alloc", "use-std" ] }
 serde = { version = "1.0.3", features = ["derive"] }

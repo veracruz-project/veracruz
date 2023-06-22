@@ -7,5 +7,5 @@ version = "0.3.0"
 
 [dependencies]
 anyhow = "1.0.14"
-postcard = { version = "0.7.2", features = [ "alloc", "use-std" ] }
+postcard = { version = "1.0.0", features = [ "alloc", "use-std" ] }
 strsim = "0.10.0"
