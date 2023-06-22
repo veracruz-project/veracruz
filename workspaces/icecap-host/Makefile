@@ -61,15 +61,11 @@ build: rustup-plat icecap-runtime
 	$(COMPILERS) $(BUILD_PARAMETERS) \
 		cargo build $(PROFILE_FLAG) $(host_feature_flags) $(V_FLAG)
 
-build-cca: rustup-plat
-	$(COMPILERS) \
+build-cca: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
+	$(COMPILERS)  $(BUILD_PARAMETERS) \
 		cargo build $(PROFILE_FLAG) \
-		-p proxy-attestation-server \
-		-p veracruz-client -p veracruz-server \
-		--features proxy-attestation-server/icecap \
 		--features veracruz-client/icecap \
 		--features veracruz-server/icecap-cca \
-		--features cli \
 		$(host_feature_flags) \
 		$(V_FLAG)
 

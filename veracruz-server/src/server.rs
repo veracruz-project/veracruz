@@ -10,7 +10,7 @@
 //! information on licensing and copyright.
 
 use crate::common::*;
-#[cfg(feature = "icecap")]
+#[cfg(all(feature = "icecap", not(feature = "icecap-cca")))]
 use crate::platforms::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
 #[cfg(feature = "icecap-cca")]
 use crate::platforms::icecap_cca::VeracruzServerIceCapCCA as VeracruzServerEnclave;

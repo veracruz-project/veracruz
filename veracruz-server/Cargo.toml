@@ -29,7 +29,6 @@ icecap = [
 icecap-lkvm = []
 icecap-cca = [
   "io-utils/icecap",
-  "openssl/vendored",
   "policy-utils/icecap",
   "psa-attestation",
   "signal-hook",

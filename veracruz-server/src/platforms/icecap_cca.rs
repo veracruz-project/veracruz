@@ -11,7 +11,7 @@
 
 use crate::common::{VeracruzServer, VeracruzServerError};
 use err_derive::Error;
-use io_utils::http::{post_buffer, send_proxy_attestation_server_start};
+use proxy_attestation_client;
 use policy_utils::policy::Policy;
 use signal_hook::{
     consts::SIGINT,
@@ -41,7 +41,7 @@ const VERACRUZ_ICECAP_LKVM_FLAGS_DEFAULT: &'static [&'static str] = &[
     "run",
     "--realm",
     "--irqchip=gicv3",
-    "--console=serial", 
+    "--console=serial",
     "--network",
     "mode=none",
     "--tty",
@@ -212,10 +212,13 @@ impl VeracruzServerIceCapCCA {
         Ok(response)
     }
 
-    fn tls_data_needed(&mut self, session_id: u32) -> Result<bool, VeracruzServerError> {
-        match self.communicate(&RuntimeManagerRequest::GetTlsDataNeeded(session_id))? {
-            RuntimeManagerResponse::TlsDataNeeded(needed) => Ok(needed),
-            resp => Err(IceCapError::UnexpectedRuntimeManagerResponse(resp).into()),
+    fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
+        match self.0.take() {
+            Some(realm) => {
+                realm.shutdown()?;
+                Ok(())
+            }
+            None => Ok(()),
         }
     }
 }
@@ -226,10 +229,8 @@ impl VeracruzServer for VeracruzServerIceCapCCA {
 
         let mut self_ = Self(Some(IceCapRealm::spawn()?));
 
-        let (device_id, challenge) = send_proxy_attestation_server_start(
+        let (device_id, challenge) = proxy_attestation_client::start_proxy_attestation(
             policy.proxy_attestation_server_url(),
-            "psa",
-            FIRMWARE_VERSION,
         )?;
 
         let (token, csr) =
@@ -242,27 +243,20 @@ impl VeracruzServer for VeracruzServerIceCapCCA {
                 }
             };
 
-        let (root_cert, compute_cert) = {
-            let req = transport_protocol::serialize_native_psa_attestation_token(
-                &token, &csr, device_id,
-            )?;
-            let req = base64::encode(&req);
-            let url = format!(
-                "{:}/PSA/AttestationToken",
-                policy.proxy_attestation_server_url()
-            );
-            let resp = post_buffer(&url, &req)?;
-            let resp = base64::decode(&resp)?;
-            let pasr = transport_protocol::parse_proxy_attestation_server_response(None, &resp)?;
-            let cert_chain = pasr.get_cert_chain();
-            let root_cert = cert_chain.get_root_cert();
-            let compute_cert = cert_chain.get_enclave_cert();
-            (root_cert.to_vec(), compute_cert.to_vec())
+        let cert_chain = {
+            let cert_chain = proxy_attestation_client::complete_proxy_attestation_linux(
+                policy.proxy_attestation_server_url(),
+                &token,
+                &csr,
+                device_id,
+            )
+            .map_err(|err| err)?;
+            cert_chain
         };
-        println!("vc-server: send policy");
+
         match self_.communicate(&RuntimeManagerRequest::Initialize(
             policy_json.to_string(),
-            vec![compute_cert, root_cert],
+            cert_chain,
         ))? {
             RuntimeManagerResponse::Status(Status::Success) => (),
             resp => {
@@ -277,15 +271,6 @@ impl VeracruzServer for VeracruzServerIceCapCCA {
     fn new_tls_session(&mut self) -> Result<u32, VeracruzServerError> {
         match self.communicate(&RuntimeManagerRequest::NewTlsSession)? {
             RuntimeManagerResponse::TlsSession(session_id) => Ok(session_id),
-            resp => Err(VeracruzServerError::IceCapError(
-                IceCapError::UnexpectedRuntimeManagerResponse(resp),
-            )),
-        }
-    }
-
-    fn close_tls_session(&mut self, session_id: u32) -> Result<(), VeracruzServerError> {
-        match self.communicate(&RuntimeManagerRequest::CloseTlsSession(session_id))? {
-            RuntimeManagerResponse::Status(Status::Success) => Ok(()),
             resp => Err(VeracruzServerError::IceCapError(
                 IceCapError::UnexpectedRuntimeManagerResponse(resp),
             )),
@@ -308,11 +293,11 @@ impl VeracruzServer for VeracruzServerIceCapCCA {
 
         let mut acc = Vec::new();
         let active = loop {
-            if !self.tls_data_needed(session_id)? {
-                break true;
-            }
             match self.communicate(&RuntimeManagerRequest::GetTlsData(session_id))? {
                 RuntimeManagerResponse::TlsData(data, active) => {
+                    if data.len() == 0 {
+                        break active;
+                    }
                     acc.push(data);
                     if !active {
                         break false;
@@ -329,16 +314,6 @@ impl VeracruzServer for VeracruzServerIceCapCCA {
                 _ => Some(acc),
             },
         ))
-    }
-
-    fn shutdown_isolate(&mut self) -> Result<(), Box<dyn Error>> {
-        match self.0.take() {
-            Some(realm) => {
-                realm.shutdown()?;
-                Ok(())
-            }
-            None => Ok(()),
-        }
     }
 }
 

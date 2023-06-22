@@ -24,7 +24,15 @@ use icecap_core::{
 };
 use icecap_start_generic::declare_generic_main;
 use icecap_std_external;
-use runtime_manager::common_runtime::CommonRuntime;
+use runtime_manager::{
+    common_runtime::CommonRuntime,
+    managers::session_manager::init_session_manager,
+};
+
+use veracruz_utils::{
+    runtime_manager_message::{ RuntimeManagerRequest, RuntimeManagerResponse, Status },
+};
+
 use serde::{Deserialize, Serialize};
 
 use core::fmt::{self, Write};
@@ -35,7 +43,6 @@ pub(crate) struct Writer<'a>(pub &'a mut BufferedRingBuffer);
 macro_rules! out {
     ($dst:expr, $($arg:tt)*) => (Writer($dst).write_fmt(format_args!($($arg)*)).unwrap());
 }
-
 
 impl fmt::Write for Writer<'_> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
@@ -113,14 +120,19 @@ impl RuntimeManager {
         loop {
             let badge = self.event.wait();
             if badge &  self.virtio_console_server_rx != 0 {
-                self.process()?;
+                let received_buffer = self.receive_buffer()?;
+                let response_buffer = runtime.decode_dispatch(&received_buffer)
+                    .map_err(|e| format_err!("Failed to dispatch request: {}", e))?;
+                debug_println!("IceCap Runtime Manager::main_loop received:{:02x?}", response_buffer);
+                self.send_buffer(&response_buffer)?;
+
                 self.channel.rx_callback();
             }
             self.channel.tx_callback();
         }
     }
 
-    fn process(&mut self) -> Fallible<()> {
+    pub fn receive_buffer(&mut self) -> Result<Vec<u8>, Error> {
         let mut raw_header = vec![];
         while raw_header.len() < size_of::<u32>() {
             if let Some(raw) = self.channel.rx() {
@@ -132,74 +144,22 @@ impl RuntimeManager {
         if raw_header.len() > size_of::<u32>() {
             raw_request = raw_header[size_of::<u32>()..].to_vec();
         }
-        let header = bincode::deserialize::<u32>(&raw_header[..size_of::<u32>()]).map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
-        let size = usize::try_from(header).map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
+        let header = bincode::deserialize::<u32>(&raw_header[..size_of::<u32>()])
+            .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
+        let size = usize::try_from(header)
+            .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
         while raw_request.len() < size {
             if let Some(raw) = self.channel.rx() {
                 raw_request = [&raw_request[..], &raw[..]].concat();
             }
         }
-        let request: RuntimeManagerRequest = bincode::deserialize(&raw_request).map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
-        // process requests
-        let response = self.handle(request)?;
-        let raw_response = bincode::serialize(&response).map_err(|e| format_err!("Failed to serialize response: {}", e))?;
-        let raw_header = bincode::serialize(&u32::try_from(raw_response.len()).unwrap()).map_err(|e| format_err!("Failed to serialize response: {}", e))?;
-        //send response
-        self.channel.tx(&raw_header);
-        self.channel.tx(&raw_response);
+        Ok(raw_request)
+    }
+
+    pub fn send_buffer(&mut self, buffer: &[u8]) -> Result<(), Error> {
+        self.channel.tx(&buffer);
         Ok(())
     }
-
-    fn handle(&mut self, req: RuntimeManagerRequest) -> Fallible<RuntimeManagerResponse> {
-        Ok(match req {
-            RuntimeManagerRequest::Attestation(challenge, device_id) => {
-                match session_manager::init_session_manager()
-                    .and(self.handle_attestation(device_id, &challenge))
-                {
-                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
-                    Ok((token, csr)) => RuntimeManagerResponse::AttestationData(token, csr),
-                }
-            }
-            RuntimeManagerRequest::Initialize(policy_json, cert_chain) => {
-                match session_manager::load_policy(&policy_json)
-                    .and(session_manager::load_cert_chain(&cert_chain))
-                {
-                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
-                    Ok(()) => RuntimeManagerResponse::Status(Status::Success),
-                }
-            }
-            RuntimeManagerRequest::NewTlsSession => match session_manager::new_session() {
-                Err(_) => RuntimeManagerResponse::Status(Status::Fail),
-                Ok(sess) => RuntimeManagerResponse::TlsSession(sess),
-            },
-            RuntimeManagerRequest::CloseTlsSession(sess) => {
-                match session_manager::close_session(sess) {
-                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
-                    Ok(()) => RuntimeManagerResponse::Status(Status::Success),
-                }
-            }
-            RuntimeManagerRequest::SendTlsData(sess, data) => {
-                match session_manager::send_data(sess, &data) {
-                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
-                    Ok(()) => RuntimeManagerResponse::Status(Status::Success),
-                }
-            }
-            RuntimeManagerRequest::GetTlsDataNeeded(sess) => {
-                match session_manager::get_data_needed(sess) {
-                    Err(_) => RuntimeManagerResponse::Status(Status::Fail),
-                    Ok(needed) => RuntimeManagerResponse::TlsDataNeeded(needed),
-                }
-            }
-            RuntimeManagerRequest::GetTlsData(sess) => match session_manager::get_data(sess) {
-                Err(_) => RuntimeManagerResponse::Status(Status::Fail),
-                Ok((active, data)) => {
-                    self.active = active;
-                    RuntimeManagerResponse::TlsData(data, active)
-                }
-            },
-        })
-    }
-
 }
 
 const LOG_LEVEL: Level = Level::Error;

@@ -9,7 +9,7 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-#[cfg(feature = "icecap")]
+#[cfg(all(feature = "icecap", not(feature = "icecap-cca")))]
 use crate::platforms::icecap::IceCapError;
 #[cfg(feature = "icecap-cca")]
 use crate::platforms::icecap_cca::IceCapError;
@@ -56,7 +56,9 @@ pub enum VeracruzServerError {
     #[cfg(feature = "icecap-cca")]
     #[error(display = "VeracruzServer: IceCap CCA error: {:?}", _0)]
     IceCapError(#[error(source)] IceCapError),
-    #[cfg(feature = "icecap")]
+    #[cfg(all(feature = "icecap", not(feature = "icecap-cca")))]
+    #[error(display = "VeracruzServer: IceCap error: {:?}", _0)]
+    IceCapError(#[error(source)] IceCapError),
     #[error(display = "VeracruzServer: TransportProtocolError: {:?}.", _0)]
     TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
     #[error(display = "VeracruzServer: Join Error: {:?}.", _0)]

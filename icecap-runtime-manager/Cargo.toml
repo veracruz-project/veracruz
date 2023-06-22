@@ -4,6 +4,8 @@ version = "0.3.0"
 edition = "2018"
 
 [features]
+icecap-lkvm = []
+icecap-lkvm_realm = []
 icecap-qemu = []
 
 [dependencies]

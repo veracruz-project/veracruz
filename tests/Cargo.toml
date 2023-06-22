@@ -24,7 +24,6 @@ icecap = [
 ]
 icecap-cca = [
   "policy-utils/icecap",
-  "proxy-attestation-server/icecap",
   "veracruz-server/icecap-cca",
   "veracruz-utils/icecap",
 ]
