@@ -1168,38 +1168,53 @@ dependencies = [
 
 [[package]]
 name = "protobuf"
-version = "2.8.1"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40361836defdd5871ff7e84096c6f6444af7fc157f8ef1789f54f147687caa20"
+checksum = "b55bad9126f378a853655831eb7363b7b01b81d19f8cb1218861086ca4a1a61e"
+dependencies = [
+ "once_cell",
+ "protobuf-support",
+ "thiserror",
+]
 
 [[package]]
 name = "protobuf-codegen"
-version = "2.8.1"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12c6abd78435445fc86898ebbd0521a68438063d4a73e23527b7134e6bf58b4a"
+checksum = "0dd418ac3c91caa4032d37cb80ff0d44e2ebe637b2fb243b6234bf89cdac4901"
 dependencies = [
+ "anyhow",
+ "once_cell",
  "protobuf",
-]
-
-[[package]]
-name = "protoc"
-version = "2.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3998c4bc0af8ccbd3cc68245ee9f72663c5ae2fb78bc48ff7719aef11562edea"
-dependencies = [
- "log",
-]
-
-[[package]]
-name = "protoc-rust"
-version = "2.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "234c97039c32bb58a883d0deafa57db37e59428ce536f3bdfe1c46cffec04113"
-dependencies = [
- "protobuf",
- "protobuf-codegen",
- "protoc",
+ "protobuf-parse",
+ "regex",
  "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "protobuf-parse"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d39b14605eaa1f6a340aec7f320b34064feb26c93aec35d6a9a2272a8ddfa49"
+dependencies = [
+ "anyhow",
+ "indexmap",
+ "log",
+ "protobuf",
+ "protobuf-support",
+ "tempfile",
+ "thiserror",
+ "which",
+]
+
+[[package]]
+name = "protobuf-support"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5d4d7b8601c814cfb36bcebb79f0e61e45e1e93640cf778837833bbed05c372"
+dependencies = [
+ "thiserror",
 ]
 
 [[package]]
@@ -1862,7 +1877,7 @@ dependencies = [
  "err-derive",
  "lazy_static",
  "protobuf",
- "protoc-rust",
+ "protobuf-codegen",
 ]
 
 [[package]]
