@@ -44,7 +44,7 @@ lazy_static! {
     static ref RUNTIME_ENCLAVE_BINARY_PATH: String = {
         match env::var("RUNTIME_ENCLAVE_BINARY_PATH") {
             Ok(val) => val,
-            Err(_) => "../linux-runtime/target/debug/linux-runtime-manager".to_string(),
+            Err(_) => "workspaces/linux-runtime/target/debug/linux-runtime-manager".to_string(),
          }
     };
 }
@@ -120,6 +120,7 @@ impl VeracruzServer for VeracruzServerLinux {
             e
         })?;
 
+        println!("Looking at *RUNTIME_ENCLAVE_BINARY_PATH:{:?}", *RUNTIME_ENCLAVE_BINARY_PATH);
         // make sure our image is executable
         let mut runtime_enclave_binary_permissions =
             fs::metadata(&*RUNTIME_ENCLAVE_BINARY_PATH)?.permissions();
