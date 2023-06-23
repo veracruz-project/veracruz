@@ -38,8 +38,8 @@ use std::{
 };
 use transport_protocol;
 use veracruz_server::common::*;
-#[cfg(feature = "icecap")]
-use veracruz_server::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
+#[cfg(any(feature = "icecap-qemu", feature = "icecap"))]
+use icecap_veracruz_server::server::VeracruzServerIceCap as VeracruzServerEnclave;
 #[cfg(feature = "linux")]
 use linux_veracruz_server::server::VeracruzServerLinux as VeracruzServerEnclave;
 #[cfg(feature = "nitro")]

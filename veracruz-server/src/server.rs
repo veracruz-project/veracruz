@@ -10,8 +10,6 @@
 //! information on licensing and copyright.
 
 use crate::common::*;
-#[cfg(feature = "icecap")]
-use crate::platforms::icecap::VeracruzServerIceCap as VeracruzServerEnclave;
 #[cfg(feature = "nitro")]
 use crate::platforms::nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
 use policy_utils::policy::Policy;
@@ -36,7 +34,7 @@ fn handle_veracruz_server_request(
 ) -> Result<(), VeracruzServerError> {
     let session_id = {
         let mut enclave_handler_locked = enclave_handler.lock()?;
-        let mut enclave = enclave_handler_locked
+        let enclave = enclave_handler_locked
             .as_mut()
             .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
         new_tls_session(&mut **enclave)?

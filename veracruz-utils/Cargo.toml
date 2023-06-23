@@ -34,7 +34,7 @@ bincode = { version = "1.2.1", default-features = false, optional = true }
 chrono = { version = "0.4.19", default-features = false, features = ["clock", "std"], optional = true }
 err-derive = "0.2"
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
-platform-services = { path = "../platform-services" }
+platform-services = { path = "../platform-services", optional = true }
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
 serde = { version = "1.0.115", default-features = false, optional = true }
 serde_json = { version = "1.0", default-features = false }
