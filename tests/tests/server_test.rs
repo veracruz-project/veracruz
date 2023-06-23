@@ -43,7 +43,7 @@ use icecap_veracruz_server::server::VeracruzServerIceCap as VeracruzServerEnclav
 #[cfg(feature = "linux")]
 use linux_veracruz_server::server::VeracruzServerLinux as VeracruzServerEnclave;
 #[cfg(feature = "nitro")]
-use veracruz_server::nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
+use nitro_veracruz_server::server::VeracruzServerNitro as VeracruzServerEnclave;
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
 // Policy files

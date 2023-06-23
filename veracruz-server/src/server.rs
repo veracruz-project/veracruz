@@ -10,8 +10,6 @@
 //! information on licensing and copyright.
 
 use crate::common::*;
-#[cfg(feature = "nitro")]
-use crate::platforms::nitro::veracruz_server_nitro::VeracruzServerNitro as VeracruzServerEnclave;
 use policy_utils::policy::Policy;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};

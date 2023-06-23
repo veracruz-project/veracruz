@@ -14,6 +14,3 @@ pub use self::common::*;
 
 pub mod server;
 pub use self::server::*;
-
-pub mod platforms;
-pub use self::platforms::*;
