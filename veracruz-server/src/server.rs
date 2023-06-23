@@ -21,15 +21,14 @@ use veracruz_utils::runtime_manager_message::{
     RuntimeManagerRequest, RuntimeManagerResponse, Status,
 };
 
-type EnclaveHandlerServer = Box<dyn crate::common::VeracruzServer + Sync + Send>;
-type EnclaveHandler = Arc<Mutex<Option<EnclaveHandlerServer>>>;
+type EnclaveHandler<T> = Arc<Mutex<Option<T>>>;
 
 // This buffer size gave close to optimal performance for
 // copying a 100 MB file into the enclave on Linux:
 const BUFFER_SIZE: usize = 32768;
 
-fn handle_veracruz_server_request(
-    enclave_handler: EnclaveHandler,
+fn handle_veracruz_server_request<T: VeracruzServer + Sync + Send> (
+    enclave_handler: EnclaveHandler<T>,
     mut stream: TcpStream,
 ) -> Result<(), VeracruzServerError> {
     let session_id = {
@@ -37,7 +36,7 @@ fn handle_veracruz_server_request(
         let enclave = enclave_handler_locked
             .as_mut()
             .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
-        new_tls_session(&mut **enclave)?
+        new_tls_session(&mut *enclave)?
     };
 
     loop {
@@ -51,7 +50,7 @@ fn handle_veracruz_server_request(
             let enclave = enclave_handler_locked
                 .as_mut()
                 .ok_or(VeracruzServerError::UninitializedEnclaveError)?;
-            tls_data(session_id, buf[0..n].to_vec(), &mut **enclave)?
+            tls_data(session_id, buf[0..n].to_vec(), &mut *enclave)?
         };
 
         // Shutdown the enclave
@@ -154,9 +153,9 @@ pub fn tls_data<T: VeracruzServer + Send + Sync + ?Sized> (
     ))
 }
 
-fn serve_veracruz_server_requests(
+fn serve_veracruz_server_requests<T: VeracruzServer + Sync + Send + 'static>(
     veracruz_server_url: &str,
-    enclave_handler: EnclaveHandler,
+    enclave_handler: EnclaveHandler<T>,
 ) -> Result<(), VeracruzServerError> {
     let listener = TcpListener::bind(veracruz_server_url)?;
     thread::spawn(move || {
@@ -173,10 +172,10 @@ fn serve_veracruz_server_requests(
 
 /// A server that listens on one TCP port.
 /// This function returns when the spawned thread is listening.
-pub fn server(policy_json: &str, server: Box<dyn VeracruzServer + Send + Sync>) -> Result<(), VeracruzServerError> {
+pub fn server<T: VeracruzServer + Send + Sync + 'static> (policy_json: &str, server: T) -> Result<(), VeracruzServerError> {
     let policy: Policy = serde_json::from_str(policy_json)?;
     #[allow(non_snake_case)]
-    let VERACRUZ_SERVER: EnclaveHandler = Arc::new(Mutex::new(Some(
+    let VERACRUZ_SERVER: EnclaveHandler<T> = Arc::new(Mutex::new(Some(
         server,
     )));
 

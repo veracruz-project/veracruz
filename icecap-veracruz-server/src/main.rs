@@ -55,7 +55,7 @@ fn main() {
     info!("Loaded policy {}", policy.policy_hash().unwrap_or("???"));
 
     // create Veracruz Server instance
-    let server = Box::new(VeracruzServerIceCap::new(&policy_json).unwrap());
+    let server = VeracruzServerIceCap::new(&policy_json).unwrap();
 
     veracruz_server::server::server(&policy_json, server).unwrap();
     println!(

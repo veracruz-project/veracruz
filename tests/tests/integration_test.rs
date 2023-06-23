@@ -279,9 +279,9 @@ fn veracruz_phase4_linear_regression_two_clients_parallel() {
 
 fn server_tls_loop(policy_json: String) {
     #[cfg(feature = "linux")]
-    let platform_veracruz_server = Box::new(linux_veracruz_server::server::VeracruzServerLinux::new(&policy_json).unwrap());
+    let platform_veracruz_server = linux_veracruz_server::server::VeracruzServerLinux::new(&policy_json).unwrap();
     #[cfg(feature = "icecap")]
-    let platform_veracruz_server = Box::new(icecap_veracruz_server::server::VeracruzServerIceCap::new(&policy_json).unwrap());
+    let platform_veracruz_server = icecap_veracruz_server::server::VeracruzServerIceCap::new(&policy_json).unwrap();
     veracruz_server::server::server(&policy_json, platform_veracruz_server).unwrap()
 }
 
