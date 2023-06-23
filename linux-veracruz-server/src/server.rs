@@ -44,7 +44,7 @@ lazy_static! {
     static ref RUNTIME_ENCLAVE_BINARY_PATH: String = {
         match env::var("RUNTIME_ENCLAVE_BINARY_PATH") {
             Ok(val) => val,
-            Err(_) => "workspaces/linux-runtime/target/debug/linux-runtime-manager".to_string(),
+            Err(_) => "/work/veracruz/workspaces/linux-runtime/target/debug/linux-runtime-manager".to_string(),
          }
     };
 }

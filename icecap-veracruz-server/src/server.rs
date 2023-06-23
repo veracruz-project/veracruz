@@ -12,6 +12,7 @@
 use anyhow::anyhow;
 use err_derive::Error;
 use lazy_static::lazy_static;
+use log::info;
 use policy_utils::policy::Policy;
 use proxy_attestation_client;
 use signal_hook::{
@@ -138,14 +139,14 @@ impl IceCapRealm {
         )
         .map_err(|e| { anyhow!(e)})?;
 
-        // // temporary directory for things
+        // temporary directory for things
         let tempdir = tempfile::tempdir()?;
 
-        println!("vc-server: using image: {:?}", &*VERACRUZ_ICECAP_QEMU_PATH);
+        info!("vc-server: using image: {:?}", &*VERACRUZ_ICECAP_QEMU_PATH);
 
         // create a temporary socket for communication
         let channel_path = tempdir.path().join("console0");
-        println!("vc-server: using unix socket: {:?}", channel_path);
+        info!("vc-server: using unix socket: {:?}", channel_path);
 
         // startup qemu
         let child = Arc::new(Mutex::new(
@@ -235,7 +236,7 @@ impl IceCapRealm {
 
     // NOTE close can report errors, but drop can still happen in weird cases
     fn shutdown(self) -> Result<(), IceCapError> {
-        println!("vc-server: shutting down");
+        info!("vc-server: shutting down");
         self.signal_handle.close();
         self.child
             .lock()
