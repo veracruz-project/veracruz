@@ -49,7 +49,7 @@ strum_macros = "0.24"
 typetag = "=0.1.6"
 wasi-types = { path = "../third-party/wasi-types" }
 wasmi = { path = "../third-party/wasmi" }
-wasmtime = { version = "3.0.1", optional = true }
+wasmtime = { version = "9.0.1", optional = true }
 
 [lib]
 name = "execution_engine"
