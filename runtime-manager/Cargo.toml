@@ -63,4 +63,3 @@ transport-protocol = { path = "../transport-protocol" }
 uuid = { version = "1.1.2", features = ["serde"] }
 veracruz-utils = { path = "../veracruz-utils" }
 wasi-types = { path = "../third-party/wasi-types" }
-wasmi = { path = "../third-party/wasmi", optional = true }
