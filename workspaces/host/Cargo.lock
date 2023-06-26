@@ -1182,9 +1182,9 @@ dependencies = [
 
 [[package]]
 name = "memory_units"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71d96e3f3c0b6325d8ccd83c33b28acb183edcb6c67938ba104ec546854b0882"
+checksum = "8452105ba047068f40ff7093dd1d9da90898e63dd61736462e9cdda6a90ad3c3"
 
 [[package]]
 name = "minimal-lexical"
@@ -1339,9 +1339,9 @@ checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
 name = "parity-wasm"
-version = "0.42.2"
+version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be5e13c266502aadf83426d87d81a0f5d1ef45b8027f5a471c360abfe4bfae92"
+checksum = "e1ad0aff30c1da14b1254fcb2af73e1fa9a28670e584a626f53a369d0e157304"
 
 [[package]]
 name = "paste"
@@ -2082,24 +2082,33 @@ dependencies = [
 
 [[package]]
 name = "wasmi"
-version = "0.11.0"
+version = "0.13.2"
+dependencies = [
+ "parity-wasm",
+ "serde",
+ "typetag",
+ "wasmi-validation",
+ "wasmi_core",
+]
+
+[[package]]
+name = "wasmi-validation"
+version = "0.5.0"
+dependencies = [
+ "parity-wasm",
+]
+
+[[package]]
+name = "wasmi_core"
+version = "0.2.1"
 dependencies = [
  "downcast-rs",
  "libm",
  "memory_units",
  "num-rational",
  "num-traits",
- "parity-wasm",
  "serde",
  "typetag",
- "wasmi-validation",
-]
-
-[[package]]
-name = "wasmi-validation"
-version = "0.4.1"
-dependencies = [
- "parity-wasm",
 ]
 
 [[package]]
