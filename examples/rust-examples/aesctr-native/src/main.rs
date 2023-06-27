@@ -25,9 +25,8 @@
 
 use serde::Serialize;
 use std::{
-    fs::{read, write, File},
-    io::Read,
-    path::{Path, PathBuf},
+    fs::{read, write},
+    path::PathBuf,
 };
 
 /// The interface between Counter mode AES service
@@ -43,44 +42,60 @@ pub struct AesCtrInput {
 /// Example to invoke the Counter mode AES service. Encrypt `data.dat` and then
 /// decrypt it using the `key.dat` and iv.dat`.
 fn main() -> anyhow::Result<()> {
+    let mut failed = false;
+
     // Assume the key and iv are 128 bits.
-    let mut key = [0u8; 16];
-    read_exact_bytes("/input/key.dat", &mut key)?;
-    let mut iv = [0u8; 16];
-    read_exact_bytes("/input/iv.dat", &mut iv)?;
+    let key: [u8; 16] = *b"aujourdhuimamane";
+    let iv: [u8; 16] = *b"stmorteoupeutetr";
+    let input = *b"ehierje";
+    // printf ehierje > data.dat
+    // openssl enc -aes-128-ctr -in data.dat -out enc.dat \
+    //   -K $(printf aujourdhuimamane | od -An -tx1 | perl -pe 's/ //g;') \
+    //   -iv $(printf stmorteoupeutetr | od -An -tx1 | perl -pe 's/ //g;') -p
+    // od -An -tx1 enc.dat | perl -pe 's/ / 0x/g;'
+    let expected_output = [0xa1, 0x20, 0x5e, 0x15, 0x7c, 0xf1, 0xb3];
     let aes_ctr_enc_input = AesCtrInput {
         key,
         iv,
-        input_path: PathBuf::from("/input/data.dat"),
+        input_path: PathBuf::from("/output/data.dat"),
         output_path: PathBuf::from("/output/enc.dat"),
         is_encryption: true,
     };
-    let result = read(&aes_ctr_enc_input.input_path)?;
-    println!("data input {:x?}", result);
-    println!("service enc input {:x?}", aes_ctr_enc_input);
+    write(&aes_ctr_enc_input.input_path, input)?;
     let aes_ctr_enc_input_bytes = postcard::to_allocvec(&aes_ctr_enc_input)?;
-    println!("prepare the enc bytes {:x?}", aes_ctr_enc_input_bytes);
     write("/services/aesctr.dat", aes_ctr_enc_input_bytes)?;
-    let result = read(aes_ctr_enc_input.output_path)?;
-    println!("enc result {:x?}", result);
-    let aes_ctr_dec_input = AesCtrInput {
+    let output = read(aes_ctr_enc_input.output_path)?;
+    if output != expected_output {
+        failed = true;
+    }
+
+    // Assume the key and iv are 128 bits.
+    let key: [u8; 16] = *b"aujourdhuimamane";
+    let iv: [u8; 16] = *b"stmorteoupeutetr";
+    let input = *b"nesaispas";
+    // printf nesaispas > data.dat
+    // openssl enc -aes-128-ctr -in data.dat -out dec.dat \
+    //   -K $(printf aujourdhuimamane | od -An -tx1 | perl -pe 's/ //g;') \
+    //   -iv $(printf stmorteoupeutetr | od -An -tx1 | perl -pe 's/ //g;') -p
+    // od -An -tx1 dec.dat | perl -pe 's/ / 0x/g;'
+    let expected_output = [0xaa, 0x2d, 0x44, 0x11, 0x67, 0xe8, 0xa6, 0x2c, 0x9c];
+    let aes_ctr_enc_input = AesCtrInput {
         key,
         iv,
-        input_path: PathBuf::from("/output/enc.dat"),
+        input_path: PathBuf::from("/output/data.dat"),
         output_path: PathBuf::from("/output/dec.dat"),
         is_encryption: false,
     };
-    let aes_ctr_dec_input_bytes = postcard::to_allocvec(&aes_ctr_dec_input)?;
-    println!("prepare the enc bytes {:x?}", aes_ctr_dec_input_bytes);
-    write("/services/aesctr.dat", aes_ctr_dec_input_bytes)?;
-    let result = read(aes_ctr_dec_input.output_path)?;
-    println!("dec result {:x?}", result);
-    println!("service return");
-    Ok(())
-}
+    write(&aes_ctr_enc_input.input_path, input)?;
+    let aes_ctr_enc_input_bytes = postcard::to_allocvec(&aes_ctr_enc_input)?;
+    write("/services/aesctr.dat", aes_ctr_enc_input_bytes)?;
+    let output = read(aes_ctr_enc_input.output_path)?;
+    if output != expected_output {
+        failed = true;
+    }
 
-fn read_exact_bytes<T: AsRef<Path>>(path: T, buf: &mut [u8]) -> anyhow::Result<()> {
-    let mut f = File::open(path)?;
-    f.read_exact(buf)?;
+    if !failed {
+        write("/output/aesctr_native_pass.txt", [])?;
+    }
     Ok(())
 }

@@ -156,7 +156,8 @@ POLICY_FILES ?= \
 	triple_policy_2.json \
 	triple_policy_4.json \
 	quadruple_policy.json \
-	single_client_postcard_native.json
+	single_client_postcard_native.json \
+	single_client_aesctr_native.json
 
 PGEN = $(WORKSPACE_DIR)/host/target/$(PROFILE_PATH)/generate-policy
 
@@ -238,3 +239,12 @@ $(OUT_DIR)/single_client_postcard_native.json: $(PGEN) $(CREDENTIALS) $(WASM_PRO
 		--native-module-name "Postcard Service" --native-module-special-file "/services/postcard_string.dat" --native-module-entry-point "" \
 		--output-policy-file $@
 
+$(OUT_DIR)/single_client_aesctr_native.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
+	cd $(OUT_DIR) ; $(PGEN) --certificate $(CLIENT_CRT) \
+	    --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
+	    $(foreach prog_name,$(WASM_PROG_FILES),--program-binary $(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT), stdin : $(READ_RIGHT), stderr : $(WRITE_RIGHT), stdout : $(WRITE_RIGHT), /services/ : $(READ_WRITE_RIGHT)") \
+	    --pipeline "$(PROGRAM_DIR)random-u32-list.wasm ; if /output/unsorted_numbers.txt { $(PROGRAM_DIR)sort-numbers.wasm ; }" --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT), stdin : $(READ_RIGHT), stderr : $(WRITE_RIGHT), stdout : $(WRITE_RIGHT), /services/ : $(READ_WRITE_RIGHT)" \
+            --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 \
+	    --enclave-debug-mode $(PGEN_COMMON_PARAMS) --max-memory-mib $(MAX_MEMORY_MIB) \
+		--native-module-name "Counter mode AES Service" --native-module-special-file "/services/aesctr.dat" --native-module-entry-point "" \
+		--output-policy-file $@
