@@ -90,7 +90,7 @@ checksum = "17e83ef53714474149215e48438d2cf8f96fb76ae5a00f21f16051fab79c0627"
 dependencies = [
  "libc",
  "log",
- "nix",
+ "nix 0.20.2",
  "serde",
  "serde_bytes",
  "serde_cbor",
@@ -622,6 +622,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "icecap-veracruz-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "env_logger",
+ "err-derive",
+ "lazy_static",
+ "log",
+ "policy-utils",
+ "proxy-attestation-client",
+ "signal-hook",
+ "structopt",
+ "tempfile",
+ "veracruz-server",
+ "veracruz-utils",
+]
+
+[[package]]
 name = "idna"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -672,7 +691,7 @@ dependencies = [
  "byteorder",
  "err-derive",
  "log",
- "nix",
+ "nix 0.20.2",
  "serde",
  "serde_json",
  "stringreader",
@@ -808,6 +827,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef53942eb7bf7ff43a617b3e2c1c4a5ecf5944a7c1bc12d7ee39bbb15e5c1519"
 
 [[package]]
+name = "linux-veracruz-server"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "data-encoding",
+ "env_logger",
+ "io-utils",
+ "lazy_static",
+ "log",
+ "nix 0.20.2",
+ "policy-utils",
+ "proxy-attestation-client",
+ "rand",
+ "structopt",
+ "tempfile",
+ "veracruz-server",
+ "veracruz-utils",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -922,9 +961,25 @@ source = "git+https://github.com/veracruz-project/nitro-enclave?tag=v0.1#f9313e5
 dependencies = [
  "anyhow",
  "err-derive",
- "nix",
+ "nix 0.20.2",
  "raw-fd",
  "serde_json",
+]
+
+[[package]]
+name = "nitro-veracruz-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "env_logger",
+ "log",
+ "nitro-enclave",
+ "policy-utils",
+ "proxy-attestation-client",
+ "structopt",
+ "veracruz-server",
+ "veracruz-utils",
 ]
 
 [[package]]
@@ -938,6 +993,20 @@ dependencies = [
  "cfg-if",
  "libc",
  "memoffset",
+]
+
+[[package]]
+name = "nix"
+version = "0.25.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f346ff70e7dbfd675fe90590b92d59ef2de15a8779ae305ebcbfd3f0caf59be4"
+dependencies = [
+ "autocfg",
+ "bitflags",
+ "cfg-if",
+ "libc",
+ "memoffset",
+ "pin-utils",
 ]
 
 [[package]]
@@ -1132,7 +1201,7 @@ version = "0.3.0"
 dependencies = [
  "aws-nitro-enclaves-nsm-api",
  "getrandom",
- "nix",
+ "nix 0.20.2",
 ]
 
 [[package]]
@@ -1329,7 +1398,7 @@ source = "git+https://github.com/veracruz-project/nitro-enclave?tag=v0.1#f9313e5
 dependencies = [
  "anyhow",
  "byteorder",
- "nix",
+ "nix 0.20.2",
 ]
 
 [[package]]
@@ -1777,10 +1846,13 @@ dependencies = [
  "either",
  "env_logger",
  "hex",
+ "icecap-veracruz-server",
  "lazy_static",
+ "linux-veracruz-server",
  "log",
  "mbedtls",
- "nix",
+ "nitro-veracruz-server",
+ "nix 0.25.1",
  "policy-utils",
  "postcard",
  "reqwest",
@@ -2057,7 +2129,7 @@ dependencies = [
  "lazy_static",
  "log",
  "nitro-enclave",
- "nix",
+ "nix 0.20.2",
  "policy-utils",
  "postcard",
  "proxy-attestation-client",
