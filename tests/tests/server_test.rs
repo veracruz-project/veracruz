@@ -49,6 +49,7 @@ use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 // Policy files
 const POLICY: &'static str = "single_client.json";
 const POLICY_POSTCARD_NATIVE: &'static str = "single_client_postcard_native.json";
+const POLICY_AESCTR_NATIVE: &'static str = "single_client_aesctr_native.json";
 const CLIENT_CERT: &'static str = "client_cert.pem";
 const CLIENT_KEY: &'static str = "client_key.pem";
 const UNAUTHORIZED_CERT: &'static str = "data_client_cert.pem";
@@ -66,6 +67,7 @@ const INTERSECTION_SET_SUM_WASM: &'static str = "private-set-intersection-sum.wa
 const FD_CREATE_RUST_WASM: &'static str = "fd-create.wasm";
 const NUMBER_STREM_WASM: &'static str = "number-stream-accumulation.wasm";
 const POSTCARD_NATIVE_WASM: &'static str = "postcard-native.wasm";
+const AESCTR_NATIVE_WASM: &'static str = "aesctr-native.wasm";
 const POSTCARD_WASM: &'static str = "postcard-wasm.wasm";
 const SORT_NUBMER_WASM: &'static str = "sort-numbers.wasm";
 const RANDOM_U32_LIST_WASM: &'static str = "random-u32-list.wasm";
@@ -282,6 +284,21 @@ fn basic_unauthorized_certificate_key_pair() {
         false,
     );
     assert!(result.is_err(), "An error should occur");
+}
+
+#[test]
+/// Test AES native module.
+fn aesctr_native_module() {
+    let events = vec![
+        TestEvent::CheckHash,
+        TestEvent::write_program(AESCTR_NATIVE_WASM),
+        TestEvent::execute(AESCTR_NATIVE_WASM),
+        TestEvent::read_result("/output/aesctr_native_pass.txt"),
+        TestEvent::ShutDown,
+    ];
+
+    TestExecutor::test_template(POLICY_AESCTR_NATIVE, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
+        .unwrap();
 }
 
 #[test]
