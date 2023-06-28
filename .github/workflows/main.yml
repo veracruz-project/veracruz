@@ -202,9 +202,17 @@ jobs:
           rm -rf output
       - name: Run VOD in Veracruz-Linux
         run: |
-          POLICY_GENERATOR_PATH="artifacts/generate-policy" CLIENT_PATH="artifacts/veracruz-client" SERVER_PATH="artifacts/linux-veracruz-server" RUNTIME_MANAGER_PATH="artifacts/linux-runtime-manager" CA_CERT_CONF_PATH="artifacts/ca-cert.conf" CERT_CONF_PATH="artifacts/cert.conf" PROXY_CLEANUP_SCRIPT_PATH="artifacts/proxy_cleanup.sh" ./deploy_linux_wasm.sh
+          POLICY_GENERATOR_PATH="artifacts/generate-policy" CLIENT_PATH="artifacts/veracruz-client" SERVER_PATH="artifacts/linux-veracruz-server" RUNTIME_MANAGER_PATH="artifacts/linux-runtime-manager" CA_CERT_CONF_PATH="artifacts/ca-cert.conf" CERT_CONF_PATH="artifacts/cert.conf" PROXY_CLEANUP_SCRIPT_PATH="artifacts/proxy_cleanup.sh" SERVER_LOG="server.log" POLICY_PATH="policy.json" ./deploy_linux_wasm.sh
           # Check results
           file prediction.0.jpg | grep "JPEG image data"
+      - name: Upload VOD artifacts
+        id: upload-vod-artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux-vod
+          path: |
+            policy.json
+            server.log
 
   nitro:
     runs-on: ubuntu-latest
