@@ -32,6 +32,7 @@ const ATTESTATION_REPORT_SIZE: usize = 1184;
 
 extern "C" {
     fn get_report(data: *const u8, data_size: usize, report: *mut u8)-> i32;
+    fn get_extended_report(data: *const u8, data_size: usize, report: *mut u8, certs: *mut *mut u8, cert_size: *mut usize) -> i32;
 }
 
 pub struct SevRuntime {
@@ -61,7 +62,11 @@ impl PlatformRuntime for SevRuntime {
             println!("sev-runtime-manager::SevRuntime::attestation csr file completed write");
         }
         println!("sev-runtime-manager::SevRuntime::attestation calling get_report with 32");
-        let retval = unsafe { get_report(csr.as_ptr() as *const u8, 32 /*csr.len()*/, attestation_report.as_mut_ptr() as *mut u8) };
+        let mut certs: *mut u8 = std::ptr::null_mut();
+        let certs_ptr: *mut *mut u8 = &mut certs;
+        let mut certs_size: usize = 0;
+        //let retval = unsafe { get_report(csr.as_ptr() as *const u8, 32 /*csr.len()*/, attestation_report.as_mut_ptr() as *mut u8) };
+        let retval = unsafe { get_extended_report(csr.as_ptr() as *const u8, 32 /*csr.len()*/, attestation_report.as_mut_ptr() as *mut u8, certs_ptr, &mut certs_size as *mut usize) };
         println!("sev-runtime-manager::SevRuntime::attestation get_report returned");
         if retval != 0 {
             println!("sev-runtime-manager::SevRuntime::attestation get_report returned:{:?}", retval);

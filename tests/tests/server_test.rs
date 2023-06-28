@@ -695,7 +695,7 @@ impl TestExecutor {
 
         info!("Initialise Veracruz runtime.");
         // Create the server
-        let mut veracruz_server_native =
+        let mut platform_veracruz_server =
             Box::new(VeracruzServerEnclave::new(&policy_json).map_err(|e| {
                 println!("VeracruzServerEnclave::new failed:{:?}", e);
                 anyhow!("{:?}", e)
@@ -703,7 +703,7 @@ impl TestExecutor {
 
         // Create the client tls session. Note that we need the session id.
         let client_connection_id =
-            veracruz_server::server::new_tls_session(&mut veracruz_server_native)
+            veracruz_server::server::new_tls_session(&mut platform_veracruz_server)
                 .map_err(|e| {
                     println!("new_tls_session failed:{:?}", e);
                     anyhow!("{:?}", e)
@@ -721,7 +721,7 @@ impl TestExecutor {
         let init_flag_clone = init_flag.clone();
         let server_thread = thread::spawn(move || {
             if let Err(e) = TestExecutor::simulated_server(
-                &mut veracruz_server_native,
+                &mut platform_veracruz_server,
                 server_tls_sender,
                 server_tls_receiver,
                 alive_flag_clone.clone(),
