@@ -186,7 +186,7 @@ jobs:
           # Check results
           file output/prediction.0.jpg | grep "JPEG image data"
           rm -rf output
-      - name: Run VOD in Freestanding Execution Engine
+      - name: Run VOD in Freestanding Execution Engine as WASM
         run: |
           # grab every bash code block for this step, remove line continuation,
           # and only keep lines that start with '$' (of course removing that '$'
@@ -200,9 +200,25 @@ jobs:
           # Check results
           file output/prediction.0.jpg | grep "JPEG image data"
           rm -rf output
-      - name: Run VOD in Veracruz-Linux
+      - name: Run VOD in Veracruz-Linux as WASM
         run: |
           POLICY_GENERATOR_PATH="artifacts/generate-policy" CLIENT_PATH="artifacts/veracruz-client" SERVER_PATH="artifacts/linux-veracruz-server" RUNTIME_MANAGER_PATH="artifacts/linux-runtime-manager" CA_CERT_CONF_PATH="artifacts/ca-cert.conf" CERT_CONF_PATH="artifacts/cert.conf" PROXY_CLEANUP_SCRIPT_PATH="artifacts/proxy_cleanup.sh" SERVER_LOG="server.log" POLICY_PATH="policy.json" ./deploy_linux_wasm.sh
+          # Check results
+          file prediction.0.jpg | grep "JPEG image data"
+          rm prediction.0.jpg
+      - name: Set up sandbox environment
+        run: |
+          git clone --recursive https://github.com/veracruz-project/native-module-sandboxer
+          cd native-module-sandboxer
+          mkdir build
+          cd build
+          cmake ..
+          make
+          mkdir /tmp/nmm
+          cp -a native-module-sandboxer /tmp/nmm
+      - name: Run VOD in Veracruz-Linux as sandboxed native code (PNM)
+        run: |
+          POLICY_GENERATOR_PATH="artifacts/generate-policy" CLIENT_PATH="artifacts/veracruz-client" SERVER_PATH="artifacts/linux-veracruz-server" RUNTIME_MANAGER_PATH="artifacts/linux-runtime-manager" NATIVE_MODULE_SANDBOXER_PATH="/tmp/nmm/native-module-sandboxer" CA_CERT_CONF_PATH="artifacts/ca-cert.conf" CERT_CONF_PATH="artifacts/cert.conf" PROXY_CLEANUP_SCRIPT_PATH="artifacts/proxy_cleanup.sh" SERVER_LOG="server.log" POLICY_PATH="policy.json" ./deploy_linux_pnm.sh
           # Check results
           file prediction.0.jpg | grep "JPEG image data"
       - name: Upload VOD artifacts
