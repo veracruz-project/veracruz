@@ -1,0 +1,14 @@
+[Unit]
+Description=Veracruz Runtime Manager
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+ExecStart=-/root/sev-runtime-manager
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/root
+Restart=on-failure
+ExecStartPost=/usr/bin/systemctl poweroff

@@ -10,13 +10,18 @@
 //! information on licensing and copyright.
 
 use std::{
+    env,
     path::Path,
     process::Command
 };
 
 fn main() {
-    if !Path::new("linux").is_dir() {
+    let out_dir_var = &env::var_os("OUT_DIR").unwrap();
+    let out_dir = Path::new(&out_dir_var);
+    let linux_dir = out_dir.join("linux");
+    if !linux_dir.is_dir() {
         let git_status = Command::new("git")
+            .current_dir(out_dir)
             .args(&["clone", "https://github.com/AMDESE/linux.git", "--depth", "1"])
             .status()
             .unwrap();
@@ -26,7 +31,7 @@ fn main() {
     }
 
     let make_status = Command::new("make")
-        .current_dir("./linux")
+        .current_dir(linux_dir)
         .args(&["headers"])
         .status()
         .unwrap();
@@ -34,8 +39,10 @@ fn main() {
         panic!("Failed to build linux headers");
     }
 
-    if !Path::new("sev-guest").is_dir() {
+    let sev_guest_dir = out_dir.join("sev-guest");
+    if !sev_guest_dir.is_dir() {
         let git_status = Command::new("git")
+            .current_dir(out_dir)
             .args(&["clone", "--single-branch", "-b", "main", "https://github.com/AMDESE/sev-guest.git",])
             .status()
             .unwrap();
@@ -43,8 +50,8 @@ fn main() {
             panic!("Failed to clone sev-guest project");
         }
         let git_patch_status = Command::new("git")
-            .current_dir("./sev-guest")
-            .args(&["apply", "../get-report.patch"])
+            .current_dir(&sev_guest_dir)
+            .args(&["apply", "./get-report.patch"])
             .status()
             .unwrap();
         if !git_patch_status.success() {
@@ -53,8 +60,8 @@ fn main() {
     }
 
     let make_status = Command::new("make")
-        .current_dir("./sev-guest")
-        .args(&["-f", "../veracruz.mk", "LINUX_INCLUDE=../linux/usr/include"])
+        .current_dir(sev_guest_dir)
+        .args(&["-f", "./veracruz.mk", "LINUX_INCLUDE=../linux/usr/include"])
         .status()
         .unwrap();
     if !make_status.success() {
