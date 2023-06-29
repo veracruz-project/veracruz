@@ -1140,8 +1140,8 @@ fn create_client_test_connection<P: AsRef<Path>, Q: AsRef<Path>>(
         mbedtls::ssl::config::Transport::Stream,
         mbedtls::ssl::config::Preset::Default,
     );
-    config.set_min_version(mbedtls::ssl::config::Version::Tls1_3)?;
-    config.set_max_version(mbedtls::ssl::config::Version::Tls1_3)?;
+    config.set_min_version(mbedtls::ssl::config::Version::Tls13)?;
+    config.set_max_version(mbedtls::ssl::config::Version::Tls13)?;
     let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(ciphersuite_str)
         .ok_or_else(|| anyhow!("invalid ciphersuite"))?;
     let cipher_suites: Vec<i32> = vec![policy_ciphersuite.into(), 0];

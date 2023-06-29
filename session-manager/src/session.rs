@@ -196,7 +196,7 @@ impl Session {
                 shared_buffers: Arc::clone(&self.shared_buffers),
             };
             match self.tls_context.establish(conn, None) {
-                Err(mbedtls::Error::SslWantRead) => (),
+                Err(e) if e.high_level() == Some(mbedtls::error::codes::SslWantRead) => (),
                 x => x?,
             };
             self.established = true;

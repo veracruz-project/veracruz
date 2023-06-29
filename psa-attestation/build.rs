@@ -47,9 +47,8 @@ fn main() {
 
     println!("cargo:rustc-link-lib=static=psa_attestation");
     println!("cargo:rustc-link-search={:}", target_dir);
-    // These two C libraries come from mbedtls-sys-auto:
+    // This C library comes from mbedtls-sys-auto:
     println!("cargo:rustc-link-lib=static=mbedcrypto");
-    println!("cargo:rustc-link-lib=static=shim");
 
     // Tell cargo to invalidate the build crate whenever the wrapper changes
     //println!("cargo:rerun-if-changed=wrapper.h");

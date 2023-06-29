@@ -12,7 +12,7 @@ crate-type = ["rlib"]
 
 [features]
 # build.rs depends on features
-icecap = []
+icecap = ["mbedtls-sys-auto/icecap"]
 linux = []
 nitro = [
   "mbedtls-sys-auto/monitor_getrandom",
@@ -21,8 +21,8 @@ nitro = [
 [dependencies]
 libc = "0.2.124"
 # We are not really using mbedtls-sys-auto but we are using the C
-# libraries libmbedcrypto.a and libshim.a that mbedtls-sys-auto builds.
-mbedtls-sys-auto = { path = "../third-party/rust-mbedtls/mbedtls-sys" }
+# library libmbedcrypto.a that mbedtls-sys-auto builds.
+mbedtls-sys-auto = { path = "../third-party/rust-mbedtls/mbedtls-sys", default-features = false }
 
 [build-dependencies]
 bindgen = "0.59.2"

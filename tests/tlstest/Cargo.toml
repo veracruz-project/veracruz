@@ -4,4 +4,4 @@ edition = "2018"
 version = "0.3.0"
 
 [dependencies]
-mbedtls = { path = "../../third-party/rust-mbedtls/mbedtls" }
+mbedtls = { path = "../../third-party/rust-mbedtls/mbedtls", default-features = false, features = ["std", "aesni", "padlock", "tls13"] }
