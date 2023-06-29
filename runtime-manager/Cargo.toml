@@ -12,7 +12,7 @@ icecap = [
   "bincode",
   "execution-engine/icecap",
   "policy-utils/icecap",
-  "psa-attestation",
+  "psa-attestation/icecap",
   "serde",
   "session-manager/icecap",
   "transport-protocol/icecap",

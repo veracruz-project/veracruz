@@ -155,8 +155,8 @@ impl SessionContext {
         let entropy = Arc::new(mbedtls::rng::OsEntropy::new());
         let rng = Arc::new(mbedtls::rng::CtrDrbg::new(entropy, None)?);
         config.set_rng(rng);
-        config.set_min_version(config::Version::Tls1_3)?;
-        config.set_max_version(config::Version::Tls1_3)?;
+        config.set_min_version(config::Version::Tls13)?;
+        config.set_max_version(config::Version::Tls13)?;
         config.set_ca_list(Arc::new(self.root_certs.clone()), None);
         config.push_cert(
             Arc::new(self.cert_chain.clone()),

@@ -17,6 +17,7 @@ path = "./src/lib.rs"
 debug = ["veracruz-server/debug"]
 icecap = [
   "icecap-veracruz-server",
+  "mbedtls/icecap",
   "policy-utils/icecap",
   "veracruz-server/icecap",
   "veracruz-utils/icecap",
@@ -47,7 +48,7 @@ icecap-veracruz-server = { path = "../icecap-veracruz-server", optional = true }
 lazy_static = "1.4.0"
 linux-veracruz-server = { path = "../linux-veracruz-server", optional = true }
 log = "0.4.13"
-mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
+mbedtls = { path = "../third-party/rust-mbedtls/mbedtls", default-features = false, features = ["std", "aesni", "padlock", "tls13"] }
 nitro-veracruz-server = { path = "../nitro-veracruz-server", optional = true }
 nix = "0.25.0"
 policy-utils = { path = "../policy-utils", optional = true }

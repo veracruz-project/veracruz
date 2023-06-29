@@ -69,8 +69,8 @@ fn client_config() -> Config {
         config::Transport::Stream,
         config::Preset::Default,
     );
-    config.set_min_version(config::Version::Tls1_3).unwrap();
-    config.set_max_version(config::Version::Tls1_3).unwrap();
+    config.set_min_version(config::Version::Tls13).unwrap();
+    config.set_max_version(config::Version::Tls13).unwrap();
     let ciphersuite_name = "TLS1-3-CHACHA20-POLY1305-SHA256";
     let ciphersuite = ciphersuites::lookup_ciphersuite(&ciphersuite_name).unwrap();
     config.set_ciphersuites(Arc::new(vec![ciphersuite, 0]));
@@ -95,8 +95,8 @@ fn server_config() -> Config {
         config::Transport::Stream,
         config::Preset::Default,
     );
-    config.set_min_version(config::Version::Tls1_3).unwrap();
-    config.set_max_version(config::Version::Tls1_3).unwrap();
+    config.set_min_version(config::Version::Tls13).unwrap();
+    config.set_max_version(config::Version::Tls13).unwrap();
     let ciphersuite_name = "TLS1-3-CHACHA20-POLY1305-SHA256";
     let ciphersuite = ciphersuites::lookup_ciphersuite(&ciphersuite_name).unwrap();
     config.set_ciphersuites(Arc::new(vec![ciphersuite, 0]));
@@ -239,14 +239,14 @@ fn run_script(script: &[&[u8]]) {
     let mut server = Context::new(Arc::new(server_config()));
     match server.establish(server_connection, None) {
         Ok(()) => (),
-        Err(mbedtls::Error::SslWantRead) => (),
+        Err(e) if e.high_level() == Some(mbedtls::error::codes::SslWantRead) => (),
         err => err.unwrap(),
     }
 
     let mut client = Context::new(Arc::new(client_config()));
     match client.establish(client_connection, None) {
         Ok(()) => (),
-        Err(mbedtls::Error::SslWantRead) => (),
+        Err(e) if e.high_level() == Some(mbedtls::error::codes::SslWantRead) => (),
         err => err.unwrap(),
     }
 
