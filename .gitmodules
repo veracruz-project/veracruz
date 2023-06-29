@@ -1,7 +1,7 @@
 [submodule "psa_attestation/lib/QCBOR"]
 	path = psa-attestation/lib/QCBOR
 	url = https://github.com/veracruz-project/QCBOR.git
-    branch = master
+	branch = master
 [submodule "psa_attestation/lib/t_cose"]
 	path = psa-attestation/lib/t_cose
 	url = https://github.com/veracruz-project/t_cose.git
@@ -45,3 +45,4 @@
 [submodule "third-party/rust-mbedtls"]
 	path = third-party/rust-mbedtls
 	url = https://github.com/veracruz-project/rust-mbedtls.git
+	branch = veracruz
