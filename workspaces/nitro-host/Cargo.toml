@@ -19,7 +19,7 @@ exclude = [
 ]
 members = [
   "crates/veracruz-client",
-  "crates/veracruz-server",
+  "crates/nitro-veracruz-server",
   "crates/tests",
   "src/nitro-host",
 ]

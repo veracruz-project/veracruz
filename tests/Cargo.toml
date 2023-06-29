@@ -16,19 +16,22 @@ path = "./src/lib.rs"
 # cannot connect)
 debug = ["veracruz-server/debug"]
 icecap = [
+  "icecap-veracruz-server",
   "policy-utils/icecap",
   "veracruz-server/icecap",
   "veracruz-utils/icecap",
 ]
 icecap-lkvm = ["veracruz-server/icecap-lkvm"]
-icecap-qemu = ["veracruz-server/icecap-qemu"]
+icecap-qemu = ["veracruz-server/icecap-qemu", "icecap-veracruz-server"]
 linux = [
+  "linux-veracruz-server",
   "policy-utils/std",
   "veracruz-server/linux",
   "veracruz-utils/linux",
 ]
 nitro = [
   "mbedtls/monitor_getrandom",
+  "nitro-veracruz-server",
   "policy-utils/std",
   "veracruz-server/nitro",
   "veracruz-utils/nitro",
@@ -40,12 +43,15 @@ anyhow = "1"
 either = "1.6.1"
 env_logger = "0.9.0"
 hex = "0.4.2"
+icecap-veracruz-server = { path = "../icecap-veracruz-server", optional = true }
 lazy_static = "1.4.0"
+linux-veracruz-server = { path = "../linux-veracruz-server", optional = true }
 log = "0.4.13"
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
-nix = "0.20.2"
-postcard = "1.0.0"
+nitro-veracruz-server = { path = "../nitro-veracruz-server", optional = true }
+nix = "0.25.0"
 policy-utils = { path = "../policy-utils", optional = true }
+postcard = "1.0.0"
 reqwest = { version = "0.11", default-features = false, features = ["blocking", "rustls-tls"]}
 transport-protocol = { path = "../transport-protocol" }
 veracruz-client = { path = "../veracruz-client" }

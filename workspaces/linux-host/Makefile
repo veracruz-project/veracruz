@@ -47,9 +47,9 @@ build: $(RUNTIME_ENCLAVE_BINARY_PATH)
 install:
 	# create full names
 	cp -f target/$(PROFILE_PATH)/veracruz-client $(BIN_DIR)
-	cp -f target/$(PROFILE_PATH)/veracruz-server $(BIN_DIR)
+	cp -f target/$(PROFILE_PATH)/linux-veracruz-server $(BIN_DIR)
 	# create short names
-	ln -sf $(BIN_DIR)/veracruz-server $(BIN_DIR)/vc-server
+	ln -sf $(BIN_DIR)/linux-veracruz-server $(BIN_DIR)/vc-server
 	ln -sf $(BIN_DIR)/veracruz-client $(BIN_DIR)/vc-client
 
 test-dependencies: test-collateral $(RUNTIME_ENCLAVE_BINARY_PATH)

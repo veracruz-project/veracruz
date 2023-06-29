@@ -36,7 +36,7 @@ all: build test-collateral
 
 build:
 	cargo build $(PROFILE_FLAG) $(V_FLAG)
-	strip -p target/$(PROFILE_PATH)/veracruz-client target/$(PROFILE_PATH)/veracruz-server
+	strip -p target/$(PROFILE_PATH)/veracruz-client target/$(PROFILE_PATH)/nitro-veracruz-server
 
 .PHONY: $(MEASUREMENT_FILE)
 $(MEASUREMENT_FILE):
@@ -44,7 +44,7 @@ $(MEASUREMENT_FILE):
 
 test-dependencies: test-collateral
 
-CARGO_TEST = $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG)
+CARGO_TEST = $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) --features nitro
 
 build-tests:
 	$(CARGO_TEST) --no-run
@@ -70,7 +70,7 @@ clippy:
 	# workspace members and relevant dependencies
 	$(CC) cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
 		-p veracruz-client \
-		-p veracruz-server -p io-utils -p transport-protocol \
+		-p nitro-veracruz-server -p io-utils -p transport-protocol \
 		-p psa-attestation -p veracruz-utils \
 		-- $(CLIPPY_OPTIONS)
 	# workspace testing crates

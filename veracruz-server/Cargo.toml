@@ -5,10 +5,9 @@ edition = "2018"
 name = "veracruz-server"
 version = "0.3.0"
 
-[[bin]]
-name = "veracruz-server"
-path = "src/cli.rs"
-required-features = ["cli"]
+[lib]
+name = "veracruz_server"
+path = "src/lib.rs"
 
 [features]
 # a feature to enable CLI-only dependencies
@@ -59,7 +58,7 @@ log = "0.4.13"
 nitro-enclave = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.1", optional = true}
 nix = { version = "0.20.2", optional = true }
 postcard = "1.0.0"
-policy-utils = { path = "../policy-utils", optional = true }
+policy-utils = { path = "../policy-utils" }
 proxy-attestation-client = { git = "https://github.com/veracruz-project/proxy-attestation-client", tag = "v0.2" }
 psa-attestation = { path = "../psa-attestation", optional = true }
 rand = "0.8.3"
@@ -71,4 +70,4 @@ structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
 tempfile = { version = "3.2.0", optional = true }
 transport-protocol = { path = "../transport-protocol" }
 uuid = { version = "1.1.2", features = ["serde"] }
-veracruz-utils = { path = "../veracruz-utils", optional = true }
+veracruz-utils = { path = "../veracruz-utils" }

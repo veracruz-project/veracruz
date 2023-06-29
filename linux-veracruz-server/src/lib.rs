@@ -1,4 +1,5 @@
-//! Veracruz Server on Specific Platforms.
+//! Lib target for Linux Veracruz Server.
+//! It's used for unit testing
 //!
 //! ## Authors
 //!
@@ -9,9 +10,4 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-#[cfg(feature = "icecap")]
-pub mod icecap;
-#[cfg(feature = "linux")]
-pub mod linux;
-#[cfg(feature = "nitro")]
-pub mod nitro;
+pub mod server;
