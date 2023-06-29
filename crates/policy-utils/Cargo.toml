@@ -27,7 +27,7 @@ mbedtls = { path = "../third-party/rust-mbedtls/mbedtls", default-features = fal
 regex = "1"
 serde = { version = "1.0.185", features = ["derive"] }
 serde_json = { version = "1.0", default-features = false }
-veracruz-utils = { path = "../veracruz-utils", optional = true }
+veracruz-utils = { path = "../veracruz-utils" }
 wasi-types = { path = "../third-party/wasi-types" }
 
 [build-dependencies]

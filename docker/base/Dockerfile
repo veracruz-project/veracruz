@@ -149,3 +149,9 @@ COPY --from=corim_builder /go/nitro_corim.cbor /opt/veraison/
 COPY vts_config.yaml /opt/veraison/vts/config.yaml
 COPY --from=go_builder /go/proxy_attestation_server/vts/skey.jwk /opt/veraison/vts/
 COPY provisioning_config.yaml /opt/veraison/provisioning/config.yaml
+
+WORKDIR /tmp/
+RUN wget https://dl.google.com/go/go1.19.linux-amd64.tar.gz
+RUN tar -xvf go1.19.linux-amd64.tar.gz && mv go /usr/local/
+RUN set -eux; \
+    /usr/local/go/bin/go install github.com/veraison/corim/cocli@latest

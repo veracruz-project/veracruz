@@ -25,6 +25,8 @@ use log::{error, info};
 use mbedtls::{alloc::List, x509::Certificate};
 #[cfg(feature = "nitro")]
 use nitro_veracruz_server::server::VeracruzServerNitro as VeracruzServerEnclave;
+#[cfg(feature = "sev")]
+use sev_veracruz_server::server::VeracruzServerSev as VeracruzServerEnclave;
 use policy_utils::{policy::Policy, Platform};
 use std::{
     env,

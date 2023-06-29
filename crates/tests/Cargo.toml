@@ -29,6 +29,11 @@ nitro = [
   "veracruz-utils/nitro",
 ]
 
+sev = [
+  "policy-utils/std",
+  "sev-veracruz-server",
+]
+
 [dependencies]
 actix-rt = "2"
 anyhow = "1"
@@ -47,4 +52,10 @@ reqwest = { version = "0.11", default-features = false, features = ["blocking", 
 transport-protocol = { path = "../transport-protocol" }
 veracruz-client = { path = "../veracruz-client" }
 veracruz-server = { path = "../veracruz-server" }
-veracruz-utils = { path = "../veracruz-utils", optional = true }
+veracruz-utils = { path = "../veracruz-utils" }
+
+[patch.'https://github.com/veracruz-project/nitro-enclave']
+raw-fd = { path = "../nitro-enclave/raw-fd" }
+vsocket = {path ="../nitro-enclave/vsocket" }
+[patch.'https://github.com/veracruz-project/proxy-attestation-client']
+proxy-attestation-client = { path = "../proxy-attestation-client"}
