@@ -11,6 +11,9 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+env:
+  WASMTIME_VERSION: v9.0.1
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -110,7 +113,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: 'veracruz-project/video-object-detection'
-          ref: '20230627'
+          ref: '20230704'
           submodules: recursive
           set-safe-directory: true
       - name: Build
@@ -118,12 +121,12 @@ jobs:
           # grab every bash code block for this step, remove line continuation,
           # and only keep lines that start with '$' (of course removing that '$'
           # in the process)
-          sed -n '/``` bash ci-build/,/```/{/```/d; p}' README.md \
+          sed -n '/```.*veracruz-ci-build/,/```/{/```/d; p}' README.md \
             | sed ':a; /\\$/{N; s/\\\n//; ta}' \
             | sed -n '/^ *\$/{s/^ *\$ \?//; p}' \
-            > README.md.ci-build.sh
+            > README.md.veracruz-ci-build.sh
           # run the script
-          bash -euxo pipefail README.md.ci-build.sh
+          bash -euxo pipefail README.md.veracruz-ci-build.sh
           # Add current directory to $GITHUB_PATH
           echo "$GITHUB_WORKSPACE" >> $GITHUB_PATH
       - name: Download artifacts
@@ -141,12 +144,12 @@ jobs:
           # grab every bash code block for this step, remove line continuation,
           # and only keep lines that start with '$' (of course removing that '$'
           # in the process)
-          sed -n '/``` bash ci-video/,/```/{/```/d; p}' README.md \
+          sed -n '/```.*veracruz-ci-video/,/```/{/```/d; p}' README.md \
             | sed ':a; /\\$/{N; s/\\\n//; ta}' \
             | sed -n '/^ *\$/{s/^ *\$ \?//; p}' \
-            > README.md.ci-video.sh
+            > README.md.veracruz-ci-video.sh
           # run the script
-          bash -euxo pipefail README.md.ci-video.sh
+          bash -euxo pipefail README.md.veracruz-ci-video.sh
       - name: Replace big YOLO model with small one
         run: |
           cd program_data
@@ -157,29 +160,29 @@ jobs:
           # grab every bash code block for this step, remove line continuation,
           # and only keep lines that start with '$' (of course removing that '$'
           # in the process)
-          sed -n '/``` bash ci-run-native/,/```/{/```/d; p}' README.md \
+          sed -n '/```.*veracruz-ci-run-native/,/```/{/```/d; p}' README.md \
             | sed ':a; /\\$/{N; s/\\\n//; ta}' \
             | sed -n '/^ *\$/{s/^ *\$ \?//; p}' \
-            > README.md.ci-run-native.sh
+            > README.md.veracruz-ci-run-native.sh
           # run the script
-          bash -euxo pipefail README.md.ci-run-native.sh
+          bash -euxo pipefail README.md.veracruz-ci-run-native.sh
           # Check results
           file output/prediction.0.jpg | grep "JPEG image data"
           rm -rf output
       - name: Run VOD in wasmtime
         run: |
           # Install wasmtime
-          curl https://wasmtime.dev/install.sh -sSf | bash -s -- --version v9.0.1 && \
+          curl https://wasmtime.dev/install.sh -sSf | bash -s -- --version $WASMTIME_VERSION && \
           . ~/.bashrc
           # grab every bash code block for this step, remove line continuation,
           # and only keep lines that start with '$' (of course removing that '$'
           # in the process)
-          sed -n '/``` bash ci-run-wasmtime/,/```/{/```/d; p}' README.md \
+          sed -n '/```.*veracruz-ci-run-wasmtime/,/```/{/```/d; p}' README.md \
             | sed ':a; /\\$/{N; s/\\\n//; ta}' \
             | sed -n '/^ *\$/{s/^ *\$ \?//; p}' \
-            > README.md.ci-run-wasmtime.sh
+            > README.md.veracruz-ci-run-wasmtime.sh
           # run the script
-          bash -euxo pipefail README.md.ci-run-wasmtime.sh
+          bash -euxo pipefail README.md.veracruz-ci-run-wasmtime.sh
           # Check results
           file output/prediction.0.jpg | grep "JPEG image data"
           rm -rf output
@@ -188,20 +191,28 @@ jobs:
           # grab every bash code block for this step, remove line continuation,
           # and only keep lines that start with '$' (of course removing that '$'
           # in the process)
-          sed -n '/``` bash ci-run-fee/,/```/{/```/d; p}' README.md \
+          sed -n '/```.*veracruz-ci-run-fee/,/```/{/```/d; p}' README.md \
             | sed ':a; /\\$/{N; s/\\\n//; ta}' \
             | sed -n '/^ *\$/{s/^ *\$ \?//; p}' \
-            > README.md.ci-run-fee.sh
+            > README.md.veracruz-ci-run-fee.sh
           # run the script
-          bash -euxo pipefail README.md.ci-run-fee.sh
+          bash -euxo pipefail README.md.veracruz-ci-run-fee.sh
           # Check results
           file output/prediction.0.jpg | grep "JPEG image data"
           rm -rf output
       - name: Run VOD in Veracruz-Linux
         run: |
-          POLICY_GENERATOR_PATH="artifacts/generate-policy" CLIENT_PATH="artifacts/veracruz-client" SERVER_PATH="artifacts/linux-veracruz-server" RUNTIME_MANAGER_PATH="artifacts/linux-runtime-manager" CA_CERT_CONF_PATH="artifacts/ca-cert.conf" CERT_CONF_PATH="artifacts/cert.conf" PROXY_CLEANUP_SCRIPT_PATH="artifacts/proxy_cleanup.sh" ./deploy_linux_wasm.sh
+          POLICY_GENERATOR_PATH="artifacts/generate-policy" CLIENT_PATH="artifacts/veracruz-client" SERVER_PATH="artifacts/linux-veracruz-server" RUNTIME_MANAGER_PATH="artifacts/linux-runtime-manager" CA_CERT_CONF_PATH="artifacts/ca-cert.conf" CERT_CONF_PATH="artifacts/cert.conf" PROXY_CLEANUP_SCRIPT_PATH="artifacts/proxy_cleanup.sh" SERVER_LOG="server.log" POLICY_PATH="policy.json" ./deploy_linux_wasm.sh
           # Check results
           file prediction.0.jpg | grep "JPEG image data"
+      - name: Upload VOD artifacts
+        id: upload-vod-artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux-vod
+          path: |
+            policy.json
+            server.log
 
   nitro:
     runs-on: ubuntu-latest
