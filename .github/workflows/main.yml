@@ -216,8 +216,6 @@ jobs:
           cd build
           cmake ..
           make
-          mkdir /tmp/nmm
-          cp -a native-module-sandboxer /tmp/nmm
       - name: Run VOD in Veracruz-Linux as sandboxed native code (PNM)
         run: |
           POLICY_GENERATOR_PATH="artifacts/generate-policy" CLIENT_PATH="artifacts/veracruz-client" SERVER_PATH="artifacts/linux-veracruz-server" RUNTIME_MANAGER_PATH="artifacts/linux-runtime-manager" NATIVE_MODULE_SANDBOXER_PATH="/tmp/nmm/native-module-sandboxer" CA_CERT_CONF_PATH="artifacts/ca-cert.conf" CERT_CONF_PATH="artifacts/cert.conf" PROXY_CLEANUP_SCRIPT_PATH="artifacts/proxy_cleanup.sh" SERVER_LOG="server.log" POLICY_PATH="policy.json" ./deploy_linux_pnm.sh
