@@ -36,7 +36,7 @@ use std::{
 };
 // TODO: wait for icecap to support direct conversion between bytes and os_str, bypassing
 // potential utf-8 encoding check
-use log::error;
+use log::{error, info};
 #[cfg(not(feature = "icecap"))]
 use std::{
     ffi::OsString,
@@ -268,19 +268,34 @@ impl InodeImpl {
             Self::File(b) | Self::NativeModule(.., b) => b,
             Self::Directory(_) => return Err(ErrNo::IsDir),
             Self::Socket(sock, path) => {
-                if let None = sock {
-                    let stream = UnixStream::connect(&path).map_err(|_| ErrNo::ConnRefused)?;
-                    *self = Self::Socket(Some(stream), path.clone());
-                }
-                let sock = match self {
-                    Self::Socket(Some(s), ..) => s,
-                    _ => unreachable!(),
-                };
+                let path = path.clone();
 
-                return sock
-                    .write_all(buf)
-                    .map(|_| buf.len())
-                    .map_err(|_| ErrNo::ConnAborted);
+                return match sock
+                    .as_mut()
+                    .ok_or(std::io::Error::new(
+                        ErrorKind::BrokenPipe,
+                        "Reconnect required",
+                    ))
+                    .and_then(|s| s.write_all(buf))
+                {
+                    Err(e) => {
+                        if e.kind() == ErrorKind::BrokenPipe {
+                            let stream =
+                                UnixStream::connect(&path).map_err(|_| ErrNo::ConnRefused)?;
+                            *self = Self::Socket(Some(stream), path.clone());
+                            let sock = match self {
+                                Self::Socket(Some(s), ..) => s,
+                                _ => unreachable!(),
+                            };
+                            return sock
+                                .write_all(buf)
+                                .map(|_| buf.len())
+                                .map_err(|_| ErrNo::ConnAborted);
+                        }
+                        Err(ErrNo::ConnAborted)
+                    }
+                    Ok(()) => Ok(buf.len()),
+                };
             }
         };
         // NOTE: It should be safe to convert a u64 to usize.
@@ -524,7 +539,7 @@ impl InodeTable {
                     socket,
                     &PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT)
                         .join(native_module.name())
-                        .join(socket.strip_prefix("/").unwrap())
+                        .join(socket.strip_prefix("/").unwrap()),
                 )?;
                 info!(
                     "Installed socket => {:?}",

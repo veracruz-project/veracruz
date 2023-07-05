@@ -845,6 +845,7 @@ fn serialize_capability_entry(cap_string: &str) -> Result<FileRights> {
     let WRITE_RIGHTS: Rights = Rights::FD_WRITE
         | Rights::PATH_CREATE_FILE
         | Rights::PATH_FILESTAT_SET_SIZE
+        | Rights::FD_FILESTAT_SET_SIZE
         | Rights::FD_SEEK
         | Rights::PATH_OPEN
         | Rights::PATH_CREATE_DIRECTORY;

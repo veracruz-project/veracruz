@@ -124,6 +124,7 @@ impl NativeModuleManager {
     /// To be useful, this function must be called after provisioning files to
     /// the VFS, and maybe even after the WASM program invokes the native module.
     fn prepare_fs(&mut self) -> FileSystemResult<Vec<PathBuf>> {
+        remove_dir_all(self.native_module_directory.as_path()).map_err(|_| ErrNo::Access)?;
         create_dir_all(self.native_module_directory.as_path()).map_err(|_| ErrNo::Access)?;
         let (visible_files_and_dirs, top_level_files) = self
             .native_module_vfs
@@ -305,7 +306,17 @@ impl NativeModuleManager {
             Command::new("chmod").args(["500", entry_point]).output()?;
 
             info!("Calling sandboxer...");
-            let output = Command::new(entry_point).spawn()?;
+            Command::new(NATIVE_MODULE_MANAGER_SANDBOXER_PATH)
+                .args([
+                    "--sandbox2tool_resolve_and_add_libraries",
+                    "--sandbox2tool_mount_tmp",
+                    "--sandbox2tool_additional_bind_mounts",
+                    &mount_mappings,
+                    "--sandbox2tool_file_size_creation_limit",
+                    "1048576",
+                    entry_point,
+                ])
+                .spawn()?;
 
             info!("Propagating side effects to the VFS (access errors are ignored)...");
             // self.copy_fs_to_vfs(&PathBuf::from(""))?;
