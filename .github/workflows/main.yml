@@ -12,6 +12,8 @@ on:
   workflow_dispatch:
 
 env:
+  NATIVE_MODULE_SANDBOXER_TAG: 20230705
+  VOD_TAG: 20230704
   WASMTIME_VERSION: v9.0.1
 
 jobs:
@@ -113,7 +115,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: 'veracruz-project/video-object-detection'
-          ref: '20230704'
+          ref: $VOD_TAG
           submodules: recursive
           set-safe-directory: true
       - name: Build
@@ -208,7 +210,7 @@ jobs:
           rm prediction.0.jpg
       - name: Set up sandbox environment
         run: |
-          git clone --recursive https://github.com/veracruz-project/native-module-sandboxer
+          git clone --recursive https://github.com/veracruz-project/native-module-sandboxer -b $NATIVE_MODULE_SANDBOXER_TAG
           cd native-module-sandboxer
           mkdir build
           cd build
