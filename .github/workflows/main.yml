@@ -110,6 +110,7 @@ jobs:
       image: ghcr.io/veracruz-project/veracruz/ci@sha256:38add618b42f59a89fdd4c46831dcf9c9e73b159bc74c87251c8263a2ec6238a
       volumes:
         - ${{ github.workspace }}:/work/video-object-detection
+      options: --cap-add SYS_ADMIN
     steps:
       - name: Check out the VOD repository
         uses: actions/checkout@v3
