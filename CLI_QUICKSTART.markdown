@@ -53,7 +53,7 @@ separate binaries:
 ## Building the example
 
 For this walkthrough we're going to use the Shamir secret sharing example,
-which can be found in the `sdk/rust-examples/shamir-secret-sharing`
+which can be found in the `examples/rust-examples/shamir-secret-sharing`
 directory.
 
 The rust-examples are a part of the `applications` workspace in the workspaces
