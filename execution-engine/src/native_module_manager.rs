@@ -124,7 +124,11 @@ impl NativeModuleManager {
     /// To be useful, this function must be called after provisioning files to
     /// the VFS, and maybe even after the WASM program invokes the native module.
     fn prepare_fs(&mut self) -> FileSystemResult<Vec<PathBuf>> {
-        remove_dir_all(self.native_module_directory.as_path()).map_err(|_| ErrNo::Access)?;
+        match remove_dir_all(self.native_module_directory.as_path()) {
+            Ok(_) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            _ => Err(ErrNo::Access),
+        }?;
         create_dir_all(self.native_module_directory.as_path()).map_err(|_| ErrNo::Access)?;
         let (visible_files_and_dirs, top_level_files) = self
             .native_module_vfs

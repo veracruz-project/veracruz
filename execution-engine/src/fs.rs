@@ -234,7 +234,16 @@ impl InodeImpl {
                     _ => unreachable!(),
                 };
 
-                return sock.read(buf).map_err(|_| ErrNo::ConnAborted);
+                sock.set_nonblocking(true).unwrap();
+                match sock.read(buf) {
+                    Ok(n) => Ok(n),
+                    Err(e)
+                        if e.kind() == ErrorKind::TimedOut || e.kind() == ErrorKind::WouldBlock =>
+                    {
+                        Ok(0)
+                    }
+                    _ => Err(ErrNo::ConnAborted),
+                }
             }
         }
     }

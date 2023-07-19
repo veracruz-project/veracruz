@@ -370,6 +370,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         | Rights::FD_WRITE
         | Rights::PATH_CREATE_FILE
         | Rights::PATH_FILESTAT_SET_SIZE
+        | Rights::FD_FILESTAT_SET_SIZE
         | Rights::PATH_CREATE_DIRECTORY;
 
     // Set up standard streams table
