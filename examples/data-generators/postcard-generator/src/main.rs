@@ -1,4 +1,4 @@
-//! Data generator sdk/rust-examples/postcard-native and postcard-wasm
+//! Data generator examples/rust-examples/postcard-native and postcard-wasm
 //!
 //! # Authors
 //!

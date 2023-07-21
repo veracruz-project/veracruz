@@ -23,9 +23,9 @@ pkill vc-pas || true
 # build dependencies
 make sgx-cli-install sdk
 
-make -C sdk/rust-examples/shamir-secret-sharing
+make -C examples/rust-examples/shamir-secret-sharing
 mkdir -p veracruz-mcu-client/test-data
-cp sdk/rust-examples/shamir-secret-sharing/target/wasm32-wasi/release/shamir-secret-sharing.wasm veracruz-mcu-client/test-data/test-binary.wasm
+cp examples/rust-examples/shamir-secret-sharing/target/wasm32-wasi/release/shamir-secret-sharing.wasm veracruz-mcu-client/test-data/test-binary.wasm
 ./sdk/wasm-checker/wabt/bin/wasm-strip veracruz-mcu-client/test-data/test-binary.wasm
 
 # setup identities
