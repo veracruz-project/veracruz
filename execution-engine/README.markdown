@@ -135,7 +135,7 @@ We only tested the following calls:
 * `fd_tell`
 * `path_open`
 
-The test source programs can be found at `$VERACRUZ_ROOT/sdk/rust-examples`.
+The test source programs can be found at `$VERACRUZ_ROOT/examples/rust-examples`.
 
 #### `fd_advise`
 ```rust
