@@ -12,6 +12,8 @@ on:
   workflow_dispatch:
 
 env:
+  NATIVE_MODULE_SANDBOXER_TAG: 20230705
+  VOD_TAG: 20230704
   WASMTIME_VERSION: v9.0.1
 
 jobs:
@@ -108,12 +110,13 @@ jobs:
       image: ghcr.io/veracruz-project/veracruz/ci@sha256:38add618b42f59a89fdd4c46831dcf9c9e73b159bc74c87251c8263a2ec6238a
       volumes:
         - ${{ github.workspace }}:/work/video-object-detection
+      options: --privileged
     steps:
       - name: Check out the VOD repository
         uses: actions/checkout@v3
         with:
           repository: 'veracruz-project/video-object-detection'
-          ref: '20230704'
+          ref: ${{ env.VOD_TAG }}
           submodules: recursive
           set-safe-directory: true
       - name: Build
@@ -186,7 +189,7 @@ jobs:
           # Check results
           file output/prediction.0.jpg | grep "JPEG image data"
           rm -rf output
-      - name: Run VOD in Freestanding Execution Engine
+      - name: Run VOD in Freestanding Execution Engine as WASM
         run: |
           # grab every bash code block for this step, remove line continuation,
           # and only keep lines that start with '$' (of course removing that '$'
@@ -200,16 +203,42 @@ jobs:
           # Check results
           file output/prediction.0.jpg | grep "JPEG image data"
           rm -rf output
-      - name: Run VOD in Veracruz-Linux
+      - name: Run VOD in Veracruz-Linux as WASM
+        id: linux-vod-wasm
         run: |
           POLICY_GENERATOR_PATH="artifacts/generate-policy" CLIENT_PATH="artifacts/veracruz-client" SERVER_PATH="artifacts/linux-veracruz-server" RUNTIME_MANAGER_PATH="artifacts/linux-runtime-manager" CA_CERT_CONF_PATH="artifacts/ca-cert.conf" CERT_CONF_PATH="artifacts/cert.conf" PROXY_CLEANUP_SCRIPT_PATH="artifacts/proxy_cleanup.sh" SERVER_LOG="server.log" POLICY_PATH="policy.json" ./deploy_linux_wasm.sh
           # Check results
           file prediction.0.jpg | grep "JPEG image data"
-      - name: Upload VOD artifacts
-        id: upload-vod-artifacts
+          rm prediction.0.jpg
+      - name: Upload VOD artifacts (WASM)
+        id: upload-vod-artifacts-wasm
+        if: success() || steps.linux-vod-wasm.conclusion == 'failure'
         uses: actions/upload-artifact@v3
         with:
-          name: linux-vod
+          name: linux-vod-wasm
+          path: |
+            policy.json
+            server.log
+      - name: Set up sandbox environment
+        run: |
+          git clone --recursive https://github.com/veracruz-project/native-module-sandboxer -b $NATIVE_MODULE_SANDBOXER_TAG
+          cd native-module-sandboxer
+          mkdir build
+          cd build
+          cmake ..
+          make
+      - name: Run VOD in Veracruz-Linux as sandboxed native code (PNM)
+        id: linux-vod-pnm
+        run: |
+          POLICY_GENERATOR_PATH="artifacts/generate-policy" CLIENT_PATH="artifacts/veracruz-client" SERVER_PATH="artifacts/linux-veracruz-server" RUNTIME_MANAGER_PATH="artifacts/linux-runtime-manager" NATIVE_MODULE_SANDBOXER_PATH="native-module-sandboxer/build/native-module-sandboxer" CA_CERT_CONF_PATH="artifacts/ca-cert.conf" CERT_CONF_PATH="artifacts/cert.conf" PROXY_CLEANUP_SCRIPT_PATH="artifacts/proxy_cleanup.sh" SERVER_LOG="server.log" POLICY_PATH="policy.json" ./deploy_linux_pnm.sh
+          # Check results
+          file prediction.0.jpg | grep "JPEG image data"
+      - name: Upload VOD artifacts (PNM)
+        id: upload-vod-artifacts-pnm
+        if: success() || steps.linux-vod-pnm.conclusion == 'failure'
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux-vod-pnm
           path: |
             policy.json
             server.log
