@@ -62,8 +62,12 @@ RUN set -eux; \
     rm -rf $HOME/.stack
 
 RUN \
-    curl -o /tmp/aarch64-linux-musl-cross.tgz https://musl.cc/aarch64-linux-musl-cross.tgz && \
-    echo "c909817856d6ceda86aa510894fa3527eac7989f0ef6e87b5721c58737a06c38  /tmp/aarch64-linux-musl-cross.tgz" | sha256sum -c - && \
-    tar zxf /tmp/aarch64-linux-musl-cross.tgz -C /work
+    if [ -d /work/aarch64-linux-musl-native ] ; then \
+        ln -s /work/aarch64-linux-musl-native /work/aarch64-linux-musl-cross ; \
+    else \
+        curl -o /tmp/aarch64-linux-musl-cross.tgz https://musl.cc/aarch64-linux-musl-cross.tgz && \
+        echo "c909817856d6ceda86aa510894fa3527eac7989f0ef6e87b5721c58737a06c38  /tmp/aarch64-linux-musl-cross.tgz" | sha256sum -c - && \
+        tar zxf /tmp/aarch64-linux-musl-cross.tgz -C /work ; \
+    fi
 
 ENV PATH=$PATH:/work/aarch64-linux-musl-cross/bin
