@@ -20,9 +20,16 @@ DOCKER_GROUP_ID=$(shell stat --format "%g" $(shell readlink -f /var/run/docker.s
 NE_GID := $(shell getent group ne | awk -F: '{printf $$3}')
 endif
 
+ifeq ($(ARCH),x86_64)
+DOCKER_ARCH = amd64/
+endif
+ifeq ($(ARCH),aarch64)
+DOCKER_ARCH = arm64v8/
+endif
+
 DOCKER_BUILD_CMD = DOCKER_BUILDKIT=1 docker build
 
-BUILD_ARGS = --build-arg ARCH=$(ARCH) \
+BUILD_ARGS = --build-arg ARCH=$(ARCH) --build-arg DOCKER_ARCH=$(DOCKER_ARCH) \
 	--build-arg VERSION=$(VERSION) \
 	$(EXTRA_BUILD_ARGS)
 

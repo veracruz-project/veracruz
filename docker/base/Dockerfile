@@ -15,7 +15,7 @@
 # NOTE: We try to follow the guide in https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
 #       Each RUN contains a bundle of steps, which reduces the cache.
 
-from golang:1.19 AS go_builder
+from ${DOCKER_ARCH}golang:1.19 AS go_builder
 
 RUN set -eux; \
     echo "iteration 0"; \
@@ -27,7 +27,7 @@ RUN set -eux; \
     go build .; \
     ls
 
-from golang:1.19 AS corim_builder
+from ${DOCKER_ARCH}golang:1.19 AS corim_builder
 
 RUN set -eux; \
     go install github.com/veraison/corim/cocli@latest
@@ -40,7 +40,7 @@ RUN cocli comid create --template AWSNitroComid.json
 RUN cocli corim create -m MyComidPsaIak.cbor -t corimMini.json -o psa_corim.cbor
 RUN cocli corim create -m AWSNitroComid.cbor -t corimMini.json -o nitro_corim.cbor
 
-FROM ubuntu:22.04
+FROM ${DOCKER_ARCH}ubuntu:22.04
 
 ARG ARCH=x86_64
 ENV DEBIAN_FRONTEND noninteractive
