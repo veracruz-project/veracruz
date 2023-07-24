@@ -118,7 +118,7 @@ RUN apt-get update && \
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH \
-    RUST_VERSION=1.65.0
+    RUST_VERSION=1.66.0
 
 RUN set -eux; \
     dpkgArch="$(dpkg --print-architecture)"; \
@@ -149,4 +149,3 @@ COPY --from=corim_builder /go/nitro_corim.cbor /opt/veraison/
 COPY vts_config.yaml /opt/veraison/vts/config.yaml
 COPY --from=go_builder /go/proxy_attestation_server/vts/skey.jwk /opt/veraison/vts/
 COPY provisioning_config.yaml /opt/veraison/provisioning/config.yaml
-
