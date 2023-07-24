@@ -104,7 +104,7 @@ include $(PROJECT)/icecap.mk
 
 mk_dirs := $(sel4_build_dir) $(elfloader_build_dir) $(misc_build_dir)
 
-$(mk_dirs):
+$(mk_dirs) &:
 		mkdir -p $@
 
 # HACK

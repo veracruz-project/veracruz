@@ -9,9 +9,9 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-.PHONY: all build install clean clean-cargo-lock default doc fmt clippy \
-	test-dependencies test-collateral test-server test-client veracruz-test \
-	tests build-tests
+.PHONY: all build build-tests clean clean-cargo-lock clippy default doc fmt \
+	install linux-runtime test-client test-collateral test-dependencies \
+	test-server tests veracruz-test
 
 default: build
 
@@ -40,7 +40,7 @@ unresolved_crates_path := $(shell pwd)/crates
 
 all: build test-collateral
 
-build: $(RUNTIME_ENCLAVE_BINARY_PATH)
+build: linux-runtime
 	$(BUILD_ENV) \
 		cargo build $(PROFILE_FLAG) $(V_FLAG)
 
@@ -52,7 +52,7 @@ install:
 	ln -sf $(BIN_DIR)/linux-veracruz-server $(BIN_DIR)/vc-server
 	ln -sf $(BIN_DIR)/veracruz-client $(BIN_DIR)/vc-client
 
-test-dependencies: test-collateral $(RUNTIME_ENCLAVE_BINARY_PATH)
+test-dependencies: test-collateral linux-runtime
 
 CARGO_TEST = $(BUILD_ENV) $(TEST_PARAMETERS) \
 	cargo test $(PROFILE_FLAG)
@@ -69,10 +69,12 @@ test-client: test-dependencies
 veracruz-test: test-dependencies build-tests
 	RUST_LOG="integration_test=info,error" $(CARGO_TEST) --test integration_test -- --test-threads=1 --nocapture
 
-$(RUNTIME_ENCLAVE_BINARY_PATH):
+measurement-file: linux-runtime
+
+linux-runtime:
 	$(MAKE) -C ../linux-runtime linux
 
-clippy: $(RUNTIME_ENCLAVE_BINARY_PATH)
+clippy: linux-runtime
 	# workspace members and relevant dependencies
 	RUNTIME_ENCLAVE_BINARY_PATH=$(RUNTIME_ENCLAVE_BINARY_PATH) \
 		cargo clippy $(PROFILE_FLAG) $(V_FLAG) \

@@ -9,8 +9,8 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-.PHONY: all build clean clean-cargo-lock clippy default doc fmt \
-	test-client test-dependencies test-server veracruz-test build-tests
+.PHONY: all build build-tests clean clean-cargo-lock clippy default doc fmt \
+	nitro-runtime test-client test-dependencies test-server tests veracruz-test
 
 default: build
 
@@ -38,11 +38,12 @@ build:
 	cargo build $(PROFILE_FLAG) $(V_FLAG)
 	strip -p target/$(PROFILE_PATH)/veracruz-client target/$(PROFILE_PATH)/nitro-veracruz-server
 
-.PHONY: $(MEASUREMENT_FILE)
-$(MEASUREMENT_FILE):
+measurement-file: nitro-runtime
+
+nitro-runtime:
 	$(MAKE) -C ../nitro-runtime nitro
 
-test-dependencies: test-collateral
+test-dependencies: test-collateral nitro-runtime
 
 CARGO_TEST = $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG) --features nitro
 
@@ -66,7 +67,7 @@ doc:
 fmt:
 	cargo fmt
 
-clippy:
+clippy: nitro-runtime
 	# workspace members and relevant dependencies
 	$(CC) cargo clippy $(PROFILE_FLAG) $(V_FLAG) \
 		-p veracruz-client \
