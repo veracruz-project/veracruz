@@ -59,7 +59,7 @@ all-base: base linux-base nitro-base icecap-base
 
 # Make sure the cargo registry directory exists to avoid permission issues
 $(HOME)/.cargo/registry:
-	mkdir -p $(HOME)/.cargo/registry
+	mkdir -p $@
 
 #####################################################################
 # CI-related targets
