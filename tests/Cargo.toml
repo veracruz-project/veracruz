@@ -8,12 +8,12 @@ version = "0.3.0"
 [lib]
 path = "./src/lib.rs"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
 # debug feature means the enclaves will be started in debug mode (when available)
 # which changes behaviors depending on the platform (for example in Debug mode,
 # Nitro enclave attestation documents have the PCRs zeroed out and the console
 # cannot connect)
+default = []
 debug = ["veracruz-server/debug"]
 icecap = [
   "icecap-veracruz-server",
@@ -22,8 +22,13 @@ icecap = [
   "veracruz-server/icecap",
   "veracruz-utils/icecap",
 ]
-icecap-lkvm = ["veracruz-server/icecap-lkvm"]
-icecap-qemu = ["veracruz-server/icecap-qemu", "icecap-veracruz-server"]
+icecap-lkvm = [
+  "veracruz-server/icecap-lkvm"
+]
+icecap-qemu = [
+  "veracruz-server/icecap-qemu",
+  "icecap-veracruz-server"
+]
 linux = [
   "linux-veracruz-server",
   "policy-utils/std",
@@ -50,7 +55,7 @@ linux-veracruz-server = { path = "../linux-veracruz-server", optional = true }
 log = "0.4.13"
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls", default-features = false, features = ["std", "aesni", "padlock", "tls13"] }
 nitro-veracruz-server = { path = "../nitro-veracruz-server", optional = true }
-nix = "0.25.0"
+nix = "0.20.2"
 policy-utils = { path = "../policy-utils", optional = true }
 postcard = "1.0.0"
 reqwest = { version = "0.11", default-features = false, features = ["blocking", "rustls-tls"]}
