@@ -16,6 +16,7 @@ cargo-features = ["resolver"]
 exclude = [
   "crates/third-party/rust-mbedtls",
   "crates/third-party/wasmi",
+  "crates/wasmi",
 ]
 members = [
   "crates/freestanding-execution-engine",

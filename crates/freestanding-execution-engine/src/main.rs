@@ -499,31 +499,31 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Dump the contents of the 'stdout' file
 
-    if cmdline.dump_stdout {
-        let buf = vfs.read_stdout()?;
-        let stdout_dump = std::str::from_utf8(&buf)?;
+    //if cmdline.dump_stdout {
+        //let buf = vfs.read_stdout()?;
+        //let stdout_dump = std::str::from_utf8(&buf)?;
 
-        print!(
-            "---- stdout dump ----\n{}---- stdout dump end ----\n",
-            stdout_dump
-        );
+        //print!(
+            //"---- stdout dump ----\n{}---- stdout dump end ----\n",
+            //stdout_dump
+        //);
 
-        std::io::stdout().flush()?;
-    }
+        //std::io::stdout().flush()?;
+    //}
 
-    // Dump the contents of the 'stderr' file
+    //// Dump the contents of the 'stderr' file
 
-    if cmdline.dump_stderr {
-        let buf = vfs.read_stderr()?;
-        let stderr_dump = std::str::from_utf8(&buf)?;
+    //if cmdline.dump_stderr {
+        //let buf = vfs.read_stderr()?;
+        //let stderr_dump = std::str::from_utf8(&buf)?;
 
-        eprint!(
-            "---- stderr dump ----\n{}---- stderr dump end ----\n",
-            stderr_dump
-        );
+        //eprint!(
+            //"---- stderr dump ----\n{}---- stderr dump end ----\n",
+            //stderr_dump
+        //);
 
-        std::io::stderr().flush()?;
-    }
+        //std::io::stderr().flush()?;
+    //}
 
     // Map all output directories
 
