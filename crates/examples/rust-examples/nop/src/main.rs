@@ -18,4 +18,6 @@
 //! and copyright information.
 
 /// Entry point: immediately returns success.
-fn main() {}
+fn main() {
+    println!("hello");
+}
