@@ -1,4 +1,4 @@
-VERSION = v23.03
+VERSION = v23.07
 IMAGE ?= veracruz
 CONTAINER ?= veracruz
 VERACRUZ_ROOT ?= ..
@@ -20,9 +20,16 @@ DOCKER_GROUP_ID=$(shell stat --format "%g" $(shell readlink -f /var/run/docker.s
 NE_GID := $(shell getent group ne | awk -F: '{printf $$3}')
 endif
 
+ifeq ($(ARCH),x86_64)
+DOCKER_ARCH = amd64/
+endif
+ifeq ($(ARCH),aarch64)
+DOCKER_ARCH = arm64v8/
+endif
+
 DOCKER_BUILD_CMD = DOCKER_BUILDKIT=1 docker build
 
-BUILD_ARGS = --build-arg ARCH=$(ARCH) \
+BUILD_ARGS = --build-arg ARCH=$(ARCH) --build-arg DOCKER_ARCH=$(DOCKER_ARCH) \
 	--build-arg VERSION=$(VERSION) \
 	$(EXTRA_BUILD_ARGS)
 
@@ -50,6 +57,10 @@ base: base/Dockerfile
 all-base: base linux-base nitro-base icecap-base
 	echo 'All base docker images re-built from scratch'
 
+# Make sure the cargo registry directory exists to avoid permission issues
+$(HOME)/.cargo/registry:
+	mkdir -p $@
+
 #####################################################################
 # CI-related targets
 #
@@ -59,9 +70,7 @@ all-base: base linux-base nitro-base icecap-base
 ci-base: ci/Dockerfile.base nitro-base
 	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/ci-base:$(VERSION) -f $< .
 
-ci-run: ci-image
-	# Make sure the cargo registry directory exists to avoid permission issues
-	mkdir -p $(HOME)/.cargo/registry
+ci-run: | $(HOME)/.cargo/registry
 	docker run --init --privileged --rm -d \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v $(abspath $(VERACRUZ_ROOT)):/work/veracruz \
@@ -86,9 +95,7 @@ ci-image-sign:
 
 # "localci" is similar to "ci" but does not run as root to avoid problems
 # with file permissions.
-localci-run: localci-build
-	# Make sure the cargo registry directory exists to avoid permission issues
-	mkdir -p $(HOME)/.cargo/registry
+localci-run: | $(HOME)/.cargo/registry
 	docker run --init --privileged --rm -d $(DOCKER_RUN_PARAMS) \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		--name $(CONTAINER)-localci-$(USER)-$(VERSION) \
@@ -108,9 +115,7 @@ all-ci: ci-image localci-base
 # IceCap-related targets
 
 .PHONY:
-icecap-run: icecap-build
-	# Make sure the cargo registry directory exists to avoid permission issues
-	mkdir -p $(HOME)/.cargo/registry
+icecap-run: | $(HOME)/.cargo/registry
 	docker run --init --privileged --rm -d $(DOCKER_RUN_PARAMS) \
 		--name $(CONTAINER)-icecap-$(USER)-$(VERSION) \
 		$(IMAGE)/icecap/$(USER):$(VERSION) sleep inf
@@ -127,9 +132,7 @@ icecap-base: icecap/Dockerfile base
 # Linux-related targets
 
 .PHONY:
-linux-run: linux-build
-	# Make sure the cargo registry directory exists to avoid permission issues
-	mkdir -p $(HOME)/.cargo/registry
+linux-run: | $(HOME)/.cargo/registry
 	docker run --init --privileged --rm -d $(DOCKER_RUN_PARAMS) \
 		--name $(CONTAINER)-linux-$(USER)-$(VERSION) \
 		$(IMAGE)/linux/$(USER):$(VERSION) sleep inf
@@ -149,9 +152,7 @@ linux-base: linux/Dockerfile base
 
 # "nitro-run" should be run on a AWS Nitro Enclave instance, "nitro-run-build"
 # allows to build Veracruz with Nitro support on other machines.
-nitro-run: nitro-build
-	# Make sure the cargo registry directory exists to avoid permission issues
-	mkdir -p $(HOME)/.cargo/registry
+nitro-run: | $(HOME)/.cargo/registry
 	# This container must be started on a "Nitro Enclave"-capable AWS instance
 	docker run --init --privileged --rm -d $(DOCKER_RUN_PARAMS) \
 		-v /usr/bin:/host/bin \
@@ -165,9 +166,7 @@ nitro-run: nitro-build
 		--name $(CONTAINER)-nitro-$(USER)-$(VERSION) \
 		$(IMAGE)/nitro/$(USER):$(VERSION) sleep inf
 
-nitro-run-build: nitro-build
-	# Make sure the cargo registry directory exists to avoid permission issues
-	mkdir -p $(HOME)/.cargo/registry
+nitro-run-build: | $(HOME)/.cargo/registry
 	# This container does not need to be run in AWS, it can build but not start enclaves
 	docker run --init --privileged --rm -d $(DOCKER_RUN_PARAMS) \
 		-v /var/run/docker.sock:/var/run/docker.sock \

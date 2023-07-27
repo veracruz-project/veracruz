@@ -14,6 +14,8 @@ cargo-features = ["resolver"]
 
 [workspace]
 exclude = [
+  "crates/linux-veracruz-server",
+  "crates/nitro-veracruz-server",
   "crates/third-party/rust-mbedtls",
   "crates/third-party/wasmi",
 ]
@@ -29,4 +31,3 @@ resolver = "2"
 codegen-units = 1
 lto = true
 opt-level = 3
-

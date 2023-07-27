@@ -15,7 +15,7 @@
 # NOTE: We try to follow the guide in https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
 #       Each RUN contains a bundle of steps, which reduces the cache.
 
-from golang:1.19 AS go_builder
+from ${DOCKER_ARCH}golang:1.19 AS go_builder
 
 RUN set -eux; \
     echo "iteration 0"; \
@@ -27,7 +27,7 @@ RUN set -eux; \
     go build .; \
     ls
 
-from golang:1.19 AS corim_builder
+from ${DOCKER_ARCH}golang:1.19 AS corim_builder
 
 RUN set -eux; \
     go install github.com/veraison/corim/cocli@latest
@@ -40,7 +40,7 @@ RUN cocli comid create --template AWSNitroComid.json
 RUN cocli corim create -m MyComidPsaIak.cbor -t corimMini.json -o psa_corim.cbor
 RUN cocli corim create -m AWSNitroComid.cbor -t corimMini.json -o nitro_corim.cbor
 
-FROM ubuntu:22.04
+FROM ${DOCKER_ARCH}ubuntu:22.04
 
 ARG ARCH=x86_64
 ENV DEBIAN_FRONTEND noninteractive
@@ -118,7 +118,7 @@ RUN apt-get update && \
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH \
-    RUST_VERSION=1.65.0
+    RUST_VERSION=1.66.0
 
 RUN set -eux; \
     dpkgArch="$(dpkg --print-architecture)"; \
@@ -149,4 +149,3 @@ COPY --from=corim_builder /go/nitro_corim.cbor /opt/veraison/
 COPY vts_config.yaml /opt/veraison/vts/config.yaml
 COPY --from=go_builder /go/proxy_attestation_server/vts/skey.jwk /opt/veraison/vts/
 COPY provisioning_config.yaml /opt/veraison/provisioning/config.yaml
-

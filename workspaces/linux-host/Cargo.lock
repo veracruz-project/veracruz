@@ -100,7 +100,7 @@ checksum = "17e83ef53714474149215e48438d2cf8f96fb76ae5a00f21f16051fab79c0627"
 dependencies = [
  "libc",
  "log",
- "nix 0.20.2",
+ "nix",
  "serde",
  "serde_bytes",
  "serde_cbor",
@@ -657,7 +657,7 @@ dependencies = [
 
 [[package]]
 name = "icecap-veracruz-server"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "bincode",
@@ -725,7 +725,7 @@ dependencies = [
  "byteorder",
  "err-derive",
  "log",
- "nix 0.20.2",
+ "nix",
  "serde",
  "serde_json",
  "stringreader",
@@ -869,7 +869,7 @@ dependencies = [
  "io-utils",
  "lazy_static",
  "log",
- "nix 0.20.2",
+ "nix",
  "policy-utils",
  "proxy-attestation-client",
  "rand",
@@ -1006,14 +1006,14 @@ source = "git+https://github.com/veracruz-project/nitro-enclave?tag=v0.1#f9313e5
 dependencies = [
  "anyhow",
  "err-derive",
- "nix 0.20.2",
+ "nix",
  "raw-fd",
  "serde_json",
 ]
 
 [[package]]
 name = "nitro-veracruz-server"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "bincode",
@@ -1038,20 +1038,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "memoffset",
-]
-
-[[package]]
-name = "nix"
-version = "0.25.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f346ff70e7dbfd675fe90590b92d59ef2de15a8779ae305ebcbfd3f0caf59be4"
-dependencies = [
- "autocfg",
- "bitflags",
- "cfg-if",
- "libc",
- "memoffset",
- "pin-utils",
 ]
 
 [[package]]
@@ -1246,7 +1232,7 @@ version = "0.3.0"
 dependencies = [
  "aws-nitro-enclaves-nsm-api",
  "getrandom",
- "nix 0.20.2",
+ "nix",
 ]
 
 [[package]]
@@ -1453,7 +1439,7 @@ source = "git+https://github.com/veracruz-project/nitro-enclave?tag=v0.1#f9313e5
 dependencies = [
  "anyhow",
  "byteorder",
- "nix 0.20.2",
+ "nix",
 ]
 
 [[package]]
@@ -1919,7 +1905,7 @@ dependencies = [
  "log",
  "mbedtls",
  "nitro-veracruz-server",
- "nix 0.25.1",
+ "nix",
  "policy-utils",
  "postcard",
  "reqwest",
@@ -2196,7 +2182,7 @@ dependencies = [
  "lazy_static",
  "log",
  "nitro-enclave",
- "nix 0.20.2",
+ "nix",
  "policy-utils",
  "postcard",
  "proxy-attestation-client",
