@@ -9,9 +9,9 @@
 # See the `LICENSING.markdown` file in the Veracruz root directory for
 # licensing and copyright information.
 
-.PHONY: all build clean clean-cargo-lock default doc fmt clippy \
-	test-dependencies test-collateral test-server test-client veracruz-test \
-	tests build-tests
+.PHONY: all build build-tests build-veracruz-server-test clean \
+	clean-cargo-lock clippy default doc fmt icecap-runtime \
+	test-client test-dependencies test-server tests veracruz-test
 
 default: build
 
@@ -47,11 +47,11 @@ CLIPPY_OPTIONS = --no-deps -A clippy::type_complexity -A clippy::module_inceptio
 
 all: build test-collateral
 
-build: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
+build: rustup-plat icecap-runtime
 	$(COMPILERS) $(BUILD_PARAMETERS) \
 		cargo build $(PROFILE_FLAG) $(host_feature_flags) $(V_FLAG)
 
-build-veracruz-server-test: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
+build-veracruz-server-test: rustup-plat icecap-runtime
 	$(COMPILERS) $(BUILD_PARAMETERS) \
 		cargo test --no-run $(PROFILE_FLAG) \
 		$(host_feature_flags) \
@@ -64,11 +64,12 @@ build-veracruz-server-test: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
 			--message-format=json | jq -r '.executable | select(.)' \
 		) target/release/veracruz-server-test
 
-.PHONY: $(MEASUREMENT_FILE)
-$(MEASUREMENT_FILE):
-	$(MAKE) -C ../icecap-runtime elfloader css-icecap.bin ICECAP_PLAT=$(ICECAP_PLAT)
+measurement-file: icecap-runtime
 
-test-dependencies: test-collateral $(VERACRUZ_ICECAP_QEMU_IMAGE)
+icecap-runtime:
+	$(MAKE) -C ../icecap-runtime elfloader css-icecap.bin ICECAP_PLAT=$(icecap_plat)
+
+test-dependencies: test-collateral icecap-runtime
 
 CARGO_TEST = $(COMPILERS) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG)
 
@@ -84,16 +85,13 @@ test-client: test-dependencies
 veracruz-test: test-dependencies build-tests
 	$(CARGO_TEST) --test integration_test -- --test-threads=1
 
-$(VERACRUZ_ICECAP_QEMU_IMAGE):
-	$(MAKE) -C ../icecap-runtime elfloader ICECAP_PLAT=$(ICECAP_PLAT)
-
 doc:
 	cargo doc
 
 fmt:
 	cargo fmt
 
-clippy: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
+clippy: rustup-plat icecap-runtime
 	# workspace members and relevant dependencies
 	$(BUILD_PARAMETERS) $(COMPILERS) \
 	cargo clippy $(PROFILE_FLAG) \

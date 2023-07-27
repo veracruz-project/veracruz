@@ -11,9 +11,9 @@
 
 PLATFORM := $(shell uname)
 
-.PHONY: wasm-files datasets policy-files test-collateral
+.PHONY: datasets measurement-file policy-files test-collateral wasm-files
 
-test-collateral: wasm-files datasets $(MEASUREMENT_FILE) policy-files
+test-collateral: datasets measurement-file policy-files wasm-files
 
 ###################################################
 # Wasm programs
@@ -165,7 +165,7 @@ $(PGEN): $(WORKSPACE_DIR)/host/crates/sdk/generate-policy/src/main.rs \
 	$(WORKSPACE_DIR)/host/crates/sdk/generate-policy/Cargo.toml
 	$(MAKE) -C $(WORKSPACE_DIR)/host
 
-policy-files: $(OUT_DIR) $(MEASUREMENT_FILE) $(patsubst %.json, $(OUT_DIR)/%.json, $(POLICY_FILES))
+policy-files: $(OUT_DIR) measurement-file $(patsubst %.json, $(OUT_DIR)/%.json, $(POLICY_FILES))
 	@echo $(INFO_COLOR)"GEN   =>  $(POLICY_FILES)"$(RESET_COLOR)
 
 PROGRAM_DIR = /program/
