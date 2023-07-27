@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 env:
-  WASMTIME_VERSION: v9.0.1
+  WASMTIME_VERSION: v9.0.4
 
 jobs:
   check:
@@ -27,7 +27,7 @@ jobs:
         id: cosign-verify
         run: |
             COSIGN_EXPERIMENTAL=true cosign verify \
-              ghcr.io/veracruz-project/veracruz/ci@sha256:f9c1d079ce0fc404ec8a9c5f6c70a52fc5e52dc4866847d1b66260006207f67b
+              ghcr.io/veracruz-project/veracruz/ci@sha256:dd434df33153bd8915859eb0f280270d2cdf07d6100ef4332bcd18c5e8525068
 
   linux:
     runs-on: ubuntu-latest
@@ -35,7 +35,7 @@ jobs:
     outputs:
       output: ${{ steps.check-diff.outputs.cargo-lock }}
     container:
-      image: ghcr.io/veracruz-project/veracruz/ci@sha256:38add618b42f59a89fdd4c46831dcf9c9e73b159bc74c87251c8263a2ec6238a
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:dd434df33153bd8915859eb0f280270d2cdf07d6100ef4332bcd18c5e8525068
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -105,7 +105,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [linux]
     container:
-      image: ghcr.io/veracruz-project/veracruz/ci@sha256:38add618b42f59a89fdd4c46831dcf9c9e73b159bc74c87251c8263a2ec6238a
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:dd434df33153bd8915859eb0f280270d2cdf07d6100ef4332bcd18c5e8525068
       volumes:
         - ${{ github.workspace }}:/work/video-object-detection
     steps:
@@ -220,7 +220,7 @@ jobs:
     outputs:
       output: ${{ steps.check-diff.outputs.cargo-lock }}
     container:
-      image: ghcr.io/veracruz-project/veracruz/ci@sha256:38add618b42f59a89fdd4c46831dcf9c9e73b159bc74c87251c8263a2ec6238a
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:dd434df33153bd8915859eb0f280270d2cdf07d6100ef4332bcd18c5e8525068
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -258,7 +258,7 @@ jobs:
     outputs:
       output: ${{ steps.check-diff.outputs.cargo-lock }}
     container:
-      image: ghcr.io/veracruz-project/veracruz/ci@sha256:38add618b42f59a89fdd4c46831dcf9c9e73b159bc74c87251c8263a2ec6238a
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:dd434df33153bd8915859eb0f280270d2cdf07d6100ef4332bcd18c5e8525068
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
@@ -297,7 +297,7 @@ jobs:
     outputs:
       output: ${{ steps.check-diff.outputs.cargo-lock }}
     container:
-      image: ghcr.io/veracruz-project/veracruz/ci@sha256:38add618b42f59a89fdd4c46831dcf9c9e73b159bc74c87251c8263a2ec6238a
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:dd434df33153bd8915859eb0f280270d2cdf07d6100ef4332bcd18c5e8525068
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
