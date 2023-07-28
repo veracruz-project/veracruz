@@ -24,9 +24,7 @@ use icecap_core::{
 };
 use icecap_start_generic::declare_generic_main;
 use icecap_std_external;
-use runtime_manager::{
-    common_runtime::CommonRuntime,
-};
+use runtime_manager::common_runtime::CommonRuntime;
 use serde::{Deserialize, Serialize};
 
 mod icecap_runtime;
@@ -45,7 +43,7 @@ struct Badges {
     virtio_console_server_ring_buffer: Badge,
 }
 
-fn  main(config: Config) -> Fallible<()> {
+fn main(config: Config) -> Fallible<()> {
     // TODO why do we need this?
     icecap_runtime_init();
 
@@ -89,7 +87,7 @@ impl RuntimeManager {
     }
 
     fn run(&mut self) -> Fallible<()> {
-        let icecap_runtime = icecap_runtime::IcecapRuntime{};
+        let icecap_runtime = icecap_runtime::IcecapRuntime {};
 
         debug_println!("icecap_runtime_manager::run looping");
         let mut runtime = CommonRuntime::new(&icecap_runtime);
@@ -130,7 +128,8 @@ impl RuntimeManager {
 
         // process requests
         //let response = self.handle(request)?;
-        let response_buffer = runtime.decode_dispatch(&raw_request)
+        let response_buffer = runtime
+            .decode_dispatch(&raw_request)
             .map_err(|err| format_err!("runtime.decode_dispatch failed: {}", err))?;
 
         // send response

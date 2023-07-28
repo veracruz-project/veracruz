@@ -122,22 +122,22 @@ impl IceCapRealm {
 
         // Allow overriding these from environment variables
         let qemu_bin = env_flags("VERACRUZ_ICECAP_QEMU_BIN", VERACRUZ_ICECAP_QEMU_BIN_DEFAULT)
-            .map_err(|e| { anyhow!(e)})?;
+            .map_err(|e| anyhow!(e))?;
         let qemu_flags = env_flags(
             "VERACRUZ_ICECAP_QEMU_FLAGS",
             VERACRUZ_ICECAP_QEMU_FLAGS_DEFAULT,
         )
-        .map_err(|e| { anyhow!(e)})?;
+        .map_err(|e| anyhow!(e))?;
         let qemu_console_flags = env_flags(
             "VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS",
             VERACRUZ_ICECAP_QEMU_CONSOLE_FLAGS_DEFAULT,
         )
-        .map_err(|e| { anyhow!(e) })?;
+        .map_err(|e| anyhow!(e))?;
         let qemu_image_flags = env_flags(
             "VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS",
             VERACRUZ_ICECAP_QEMU_IMAGE_FLAGS_DEFAULT,
         )
-        .map_err(|e| { anyhow!(e)})?;
+        .map_err(|e| anyhow!(e))?;
 
         // temporary directory for things
         let tempdir = tempfile::tempdir()?;
@@ -218,7 +218,9 @@ impl IceCapRealm {
                     continue;
                 }
                 Err(err) => {
-                    return Err(VeracruzServerError::Anyhow(anyhow!(IceCapError::ChannelError(err))));
+                    return Err(VeracruzServerError::Anyhow(anyhow!(
+                        IceCapError::ChannelError(err)
+                    )));
                 }
             };
         };
@@ -280,9 +282,9 @@ impl VeracruzServer for VeracruzServerIceCap {
             match response {
                 RuntimeManagerResponse::AttestationData(token, csr) => (token, csr),
                 resp => {
-                    return Err(VeracruzServerError::Anyhow(
-                        anyhow!(IceCapError::UnexpectedRuntimeManagerResponse(resp)),
-                    ))
+                    return Err(VeracruzServerError::Anyhow(anyhow!(
+                        IceCapError::UnexpectedRuntimeManagerResponse(resp)
+                    )))
                 }
             }
         };
@@ -305,9 +307,9 @@ impl VeracruzServer for VeracruzServerIceCap {
         match response {
             RuntimeManagerResponse::Status(Status::Success) => (),
             resp => {
-                return Err(VeracruzServerError::Anyhow(
-                    anyhow!(IceCapError::UnexpectedRuntimeManagerResponse(resp)),
-                ))
+                return Err(VeracruzServerError::Anyhow(anyhow!(
+                    IceCapError::UnexpectedRuntimeManagerResponse(resp)
+                )))
             }
         }
 
@@ -316,27 +318,33 @@ impl VeracruzServer for VeracruzServerIceCap {
 
     fn send_buffer(&mut self, buffer: &[u8]) -> Result<(), VeracruzServerError> {
         let header = bincode::serialize(&u32::try_from(buffer.len()).unwrap())?;
-        self.0.as_mut()
+        self.0
+            .as_mut()
             .ok_or(VeracruzServerError::UninitializedEnclaveError)?
             .channel
             .write_all(&header)
             .map_err(|e| anyhow!(e))?;
-        self.0.as_mut()
+        self.0
+            .as_mut()
             .ok_or(VeracruzServerError::UninitializedEnclaveError)?
-            .channel.write_all(&buffer)
+            .channel
+            .write_all(&buffer)
             .map_err(|e| anyhow!(e))?;
         return Ok(());
     }
 
     fn receive_buffer(&mut self) -> Result<Vec<u8>, VeracruzServerError> {
         let mut raw_header = [0; size_of::<u32>()];
-        self.0.as_mut()
+        self.0
+            .as_mut()
             .ok_or(VeracruzServerError::UninitializedEnclaveError)?
-            .channel.read_exact(&mut raw_header)
+            .channel
+            .read_exact(&mut raw_header)
             .map_err(|e| anyhow!(e))?;
         let header = bincode::deserialize::<u32>(&raw_header)?;
         let mut buffer = vec![0; usize::try_from(header).unwrap()];
-        self.0.as_mut()
+        self.0
+            .as_mut()
             .ok_or(VeracruzServerError::UninitializedEnclaveError)?
             .channel
             .read_exact(&mut buffer)

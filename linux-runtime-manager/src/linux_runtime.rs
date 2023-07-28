@@ -16,16 +16,10 @@ use psa_attestation::{
     psa_initial_attest_get_token, psa_initial_attest_load_key, psa_initial_attest_remove_key,
 };
 use runtime_manager::{
-    managers::{
-        RuntimeManagerError,
-        session_manager::generate_csr,
-    },
+    managers::{session_manager::generate_csr, RuntimeManagerError},
     platform_runtime::PlatformRuntime,
 };
-use veracruz_utils::{
-    runtime_manager_message::RuntimeManagerResponse,
-    sha256::sha256,
-};
+use veracruz_utils::{runtime_manager_message::RuntimeManagerResponse, sha256::sha256};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -55,8 +49,7 @@ static TOTALLY_INSECURE_ROOT_PUBLIC_KEY: [u8; 65] = [
     0x22,
 ];
 
-pub struct LinuxRuntime {
-}
+pub struct LinuxRuntime {}
 
 impl PlatformRuntime for LinuxRuntime {
     /// Performs a dummy implementation of native attestation using the insecure
@@ -64,7 +57,6 @@ impl PlatformRuntime for LinuxRuntime {
     /// produces a PSA attestation token binding the CSR hash, runtime manager hash,
     /// and challenge.
     fn attestation(&self, challenge: &Vec<u8>) -> Result<RuntimeManagerResponse> {
-
         let csr = generate_csr().map_err(|e| {
             error!(
                 "Failed to generate certificate signing request.  Error produced: {:?}.",

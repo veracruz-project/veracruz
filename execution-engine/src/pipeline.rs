@@ -65,7 +65,9 @@ pub fn execute_pipeline(
                 // Treat program as a provisioned native module
                 let native_module = NativeModule::new(
                     path_string.clone(),
-                    NativeModuleType::Provisioned { entry_point: PathBuf::from(&path_string) },
+                    NativeModuleType::Provisioned {
+                        entry_point: PathBuf::from(&path_string),
+                    },
                 );
 
                 // Invoke native module in the native module manager with no input.
@@ -84,7 +86,13 @@ pub fn execute_pipeline(
         Seq(vec) => {
             info!("Seq {:?}", vec);
             for expr in vec {
-                let return_code = execute_pipeline(strategy, caller_filesystem, pipeline_filesystem, expr, options)?;
+                let return_code = execute_pipeline(
+                    strategy,
+                    caller_filesystem,
+                    pipeline_filesystem,
+                    expr,
+                    options,
+                )?;
 
                 // An error occurs
                 if return_code != 0 {
@@ -94,19 +102,34 @@ pub fn execute_pipeline(
 
             // default return_code is zero.
             Ok(0)
-        },
+        }
         IfElse(cond, true_branch, false_branch) => {
-            info!("IfElse {:?} true -> {:?} false -> {:?}", cond, true_branch, false_branch);
+            info!(
+                "IfElse {:?} true -> {:?} false -> {:?}",
+                cond, true_branch, false_branch
+            );
             let return_code = if caller_filesystem.file_exists(cond)? {
-                execute_pipeline(strategy, caller_filesystem, pipeline_filesystem, true_branch, options)?
+                execute_pipeline(
+                    strategy,
+                    caller_filesystem,
+                    pipeline_filesystem,
+                    true_branch,
+                    options,
+                )?
             } else {
                 match false_branch {
-                    Some(f) => execute_pipeline(strategy, caller_filesystem, pipeline_filesystem, f, options)?,
+                    Some(f) => execute_pipeline(
+                        strategy,
+                        caller_filesystem,
+                        pipeline_filesystem,
+                        f,
+                        options,
+                    )?,
                     None => 0,
                 }
             };
             Ok(return_code)
-        },
+        }
     }
 }
 
@@ -118,7 +141,9 @@ fn execute_program(
     options: &Options,
 ) -> Result<u32> {
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
-        ExecutionStrategy::Interpretation => Box::new(WASMIRuntimeState::new(filesystem, options.clone())?),
+        ExecutionStrategy::Interpretation => {
+            Box::new(WASMIRuntimeState::new(filesystem, options.clone())?)
+        }
         ExecutionStrategy::JIT => {
             cfg_if::cfg_if! {
                 if #[cfg(any(feature = "std", feature = "nitro"))] {

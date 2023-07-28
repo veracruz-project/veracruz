@@ -19,8 +19,14 @@ use common::event::TestEvent;
 use common::proxy_attestation_server::*;
 use common::util::*;
 use env_logger;
+#[cfg(any(feature = "icecap-qemu", feature = "icecap"))]
+use icecap_veracruz_server::server::VeracruzServerIceCap as VeracruzServerEnclave;
+#[cfg(feature = "linux")]
+use linux_veracruz_server::server::VeracruzServerLinux as VeracruzServerEnclave;
 use log::{error, info};
 use mbedtls::{alloc::List, x509::Certificate};
+#[cfg(feature = "nitro")]
+use nitro_veracruz_server::server::VeracruzServerNitro as VeracruzServerEnclave;
 use policy_utils::{policy::Policy, Platform};
 use std::{
     env,
@@ -38,12 +44,6 @@ use std::{
 };
 use transport_protocol;
 use veracruz_server::common::*;
-#[cfg(any(feature = "icecap-qemu", feature = "icecap"))]
-use icecap_veracruz_server::server::VeracruzServerIceCap as VeracruzServerEnclave;
-#[cfg(feature = "linux")]
-use linux_veracruz_server::server::VeracruzServerLinux as VeracruzServerEnclave;
-#[cfg(feature = "nitro")]
-use nitro_veracruz_server::server::VeracruzServerNitro as VeracruzServerEnclave;
 use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
 // Policy files
@@ -297,8 +297,15 @@ fn aesctr_native_module() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY_AESCTR_NATIVE, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
-        .unwrap();
+    TestExecutor::test_template(
+        POLICY_AESCTR_NATIVE,
+        CLIENT_CERT,
+        CLIENT_KEY,
+        events,
+        TIME_OUT_SECS,
+        true,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -313,8 +320,15 @@ fn basic_postcard_native_module() {
         TestEvent::ShutDown,
     ];
 
-    TestExecutor::test_template(POLICY_POSTCARD_NATIVE, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
-        .unwrap();
+    TestExecutor::test_template(
+        POLICY_POSTCARD_NATIVE,
+        CLIENT_CERT,
+        CLIENT_KEY,
+        events,
+        TIME_OUT_SECS,
+        true,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -700,16 +714,17 @@ impl TestExecutor {
 
         info!("Initialise Veracruz runtime.");
         // Create the server
-        let mut platform_veracruz_server =
-            VeracruzServerEnclave::new(&policy_json).map_err(|e| anyhow!("{:?}", e))
-                .map_err(|e| {
-                    println!("VeracruzServerEnclave::new failed:{:?}", e);
-                    anyhow!("{:?}", e)
-                })?;
+        let mut platform_veracruz_server = VeracruzServerEnclave::new(&policy_json)
+            .map_err(|e| anyhow!("{:?}", e))
+            .map_err(|e| {
+                println!("VeracruzServerEnclave::new failed:{:?}", e);
+                anyhow!("{:?}", e)
+            })?;
 
         // Create the client tls session. Note that we need the session id.
-        let client_connection_id = veracruz_server::server::new_tls_session(&mut platform_veracruz_server)
-            .map_err(|e| anyhow!("{:?}", e))?;
+        let client_connection_id =
+            veracruz_server::server::new_tls_session(&mut platform_veracruz_server)
+                .map_err(|e| anyhow!("{:?}", e))?;
         if client_connection_id == 0 {
             return Err(anyhow!("client session id is zero"));
         }
@@ -754,7 +769,7 @@ impl TestExecutor {
     }
 
     /// This function simulating a Veracruz server, it should run on a separate thread.
-    fn simulated_server<T: VeracruzServer + Send + Sync + ?Sized> (
+    fn simulated_server<T: VeracruzServer + Send + Sync + ?Sized>(
         platform_veracruz_server: &mut T,
         sender: Sender<Vec<u8>>,
         receiver: Receiver<(u32, Vec<u8>)>,
@@ -774,13 +789,17 @@ impl TestExecutor {
                 session_id
             );
 
-            let (veracruz_active_flag, output_data_option) = veracruz_server::server::tls_data(session_id, received_buffer, platform_veracruz_server)
-                .map_err(|e| {
-                    // This point has a high chance to fail.
-                    error!("Veracruz Server: {:?}", e);
-                    e
-                })
-                .map_err(|e| anyhow!("{:?}", e))?;
+            let (veracruz_active_flag, output_data_option) = veracruz_server::server::tls_data(
+                session_id,
+                received_buffer,
+                platform_veracruz_server,
+            )
+            .map_err(|e| {
+                // This point has a high chance to fail.
+                error!("Veracruz Server: {:?}", e);
+                e
+            })
+            .map_err(|e| anyhow!("{:?}", e))?;
 
             // At least send an empty message, this notifies the client.
             let output_data = output_data_option.unwrap_or_else(|| vec![vec![]]);

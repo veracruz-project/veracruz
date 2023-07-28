@@ -14,24 +14,18 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use runtime_manager::managers::RuntimeManagerError;
 use anyhow::{anyhow, Result};
 use clap::{App, Arg};
 use hex::decode_to_slice;
-use log::debug;
-use raw_fd::{ receive_buffer, send_buffer };
 use lazy_static::lazy_static;
-use log::{ error, info };
+use log::debug;
+use log::{error, info};
+use raw_fd::{receive_buffer, send_buffer};
+use runtime_manager::managers::RuntimeManagerError;
 use runtime_manager::{
-    common_runtime::CommonRuntime,
-    managers::session_manager::init_session_manager,
+    common_runtime::CommonRuntime, managers::session_manager::init_session_manager,
 };
-use std::{
-    net::TcpStream,
-    os::unix::io::AsRawFd,
-    os::unix::prelude::RawFd,
-    sync::Mutex,
-};
+use std::{net::TcpStream, os::unix::io::AsRawFd, os::unix::prelude::RawFd, sync::Mutex};
 
 mod linux_runtime;
 
@@ -43,7 +37,12 @@ lazy_static! {
 ////////////////////////////////////////////////////////////////////////////////
 
 fn main() -> Result<(), String> {
-    linux_main().map_err(|err| format!("Linux Enclave Runtime Manager::main encap returned error:{:?}", err))
+    linux_main().map_err(|err| {
+        format!(
+            "Linux Enclave Runtime Manager::main encap returned error:{:?}",
+            err
+        )
+    })
 }
 
 /// Main entry point for Linux: parses command line arguments to find the port
@@ -90,7 +89,6 @@ pub fn linux_main() -> Result<()> {
         return Err(anyhow!(RuntimeManagerError::CommandLineArguments));
     };
 
-
     let mut measurement_bytes = vec![0u8; 32];
 
     if let Err(err) = decode_to_slice(measurement, &mut measurement_bytes) {
@@ -106,8 +104,7 @@ pub fn linux_main() -> Result<()> {
         *rmm = measurement_bytes;
     }
 
-
-    let linux_runtime = linux_runtime::LinuxRuntime{};
+    let linux_runtime = linux_runtime::LinuxRuntime {};
 
     debug!("linux_runtime_manager::linux_main accept succeeded. looping");
     let runtime = CommonRuntime::new(&linux_runtime);
@@ -128,9 +125,11 @@ pub fn linux_main() -> Result<()> {
         loop {
             let received_buffer = receive_buffer(fd)?;
             let response_buffer = runtime.decode_dispatch(&received_buffer)?;
-            debug!("Linux Runtime Manager::main_loop received:{:02x?}", response_buffer);
+            debug!(
+                "Linux Runtime Manager::main_loop received:{:02x?}",
+                response_buffer
+            );
             send_buffer(fd, &response_buffer)?;
         }
     }
 }
-

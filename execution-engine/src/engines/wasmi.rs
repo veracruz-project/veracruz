@@ -1290,7 +1290,6 @@ impl WASMIRuntimeState {
         let address = args.nth_checked::<u32>(0)?;
         Self::convert_to_errno(self.vfs.fd_create(&mut self.memory()?, address))
     }
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////

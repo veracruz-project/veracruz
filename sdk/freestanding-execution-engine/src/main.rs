@@ -28,8 +28,8 @@ use clap::{App, Arg};
 use execution_engine::{execute, fs::FileSystem, Options};
 use log::*;
 use policy_utils::{
-    parsers::{parse_pipeline, enforce_leading_slash},
-    pipeline::Expr, 
+    parsers::{enforce_leading_slash, parse_pipeline},
+    pipeline::Expr,
     principal::{ExecutionStrategy, NativeModule, NativeModuleType, Principal},
     CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
 };
@@ -234,9 +234,7 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
     // Read all native module names
     let native_modules_names = matches
         .values_of("native-module-name")
-        .map_or(Vec::new(), |p| {
-            p.map(|s| s.to_string()).collect::<Vec<_>>()
-        });
+        .map_or(Vec::new(), |p| p.map(|s| s.to_string()).collect::<Vec<_>>());
 
     // Read all native module entry points
     let native_modules_entry_points = matches
@@ -359,7 +357,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Convert the program paths to absolute if needed.
 
-
     // Construct file table for all programs
 
     let mut file_table = HashMap::new();
@@ -378,7 +375,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     file_table.insert(PathBuf::from(CANONICAL_STDERR_FILE_PATH), write_right);
 
     // Set up services
-    
+
     file_table.insert(PathBuf::from("/services"), read_right);
     file_table.insert(PathBuf::from("/services"), write_right);
 
@@ -406,10 +403,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // used internally to read the program on behalf of the executing party
 
     let mut su_read_rights = HashMap::new();
-    su_read_rights.insert(
-        PathBuf::from("/"),
-        write_right,
-    );
+    su_read_rights.insert(PathBuf::from("/"), write_right);
     right_table.insert(Principal::InternalSuperUser, su_read_rights);
 
     info!("The final rights table: {:?}", right_table);
@@ -417,25 +411,39 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Construct the native module table
     info!("Serializing native modules.");
 
-    assert_eq!(cmdline.native_modules_names.len(), cmdline.native_modules_entry_points.len());
-    assert_eq!(cmdline.native_modules_entry_points.len(), cmdline.native_modules_special_files.len());
+    assert_eq!(
+        cmdline.native_modules_names.len(),
+        cmdline.native_modules_entry_points.len()
+    );
+    assert_eq!(
+        cmdline.native_modules_entry_points.len(),
+        cmdline.native_modules_special_files.len()
+    );
 
     let mut native_modules = Vec::new();
-    for ((name, entry_point_path), special_file) in cmdline.native_modules_names
+    for ((name, entry_point_path), special_file) in cmdline
+        .native_modules_names
         .iter()
         .zip(&cmdline.native_modules_entry_points)
         .zip(&cmdline.native_modules_special_files)
     {
         // Add a backslash (VFS requirement)
-        let special_file = enforce_leading_slash(special_file.to_str()
-        .ok_or(
-            anyhow!("Fail to convert special_file to str."),
-        )?).into_owned();
+        let special_file = enforce_leading_slash(
+            special_file
+                .to_str()
+                .ok_or(anyhow!("Fail to convert special_file to str."))?,
+        )
+        .into_owned();
 
         let nm_type = if entry_point_path == &PathBuf::from("") {
-            NativeModuleType::Static { special_file: PathBuf::from(special_file) }
+            NativeModuleType::Static {
+                special_file: PathBuf::from(special_file),
+            }
         } else {
-            NativeModuleType::Dynamic { special_file: PathBuf::from(special_file), entry_point: entry_point_path.to_path_buf() }
+            NativeModuleType::Dynamic {
+                special_file: PathBuf::from(special_file),
+                entry_point: entry_point_path.to_path_buf(),
+            }
         };
         native_modules.push(NativeModule::new(name.to_string(), nm_type));
     }

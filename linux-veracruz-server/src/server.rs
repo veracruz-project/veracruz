@@ -38,7 +38,6 @@ use veracruz_utils::sha256::sha256;
 // Constants.
 ////////////////////////////////////////////////////////////////////////////
 
-
 lazy_static! {
     /// The Runtime Manager path
     static ref RUNTIME_ENCLAVE_BINARY_PATH: String = {
@@ -120,7 +119,10 @@ impl VeracruzServer for VeracruzServerLinux {
             e
         })?;
 
-        println!("Looking at *RUNTIME_ENCLAVE_BINARY_PATH:{:?}", *RUNTIME_ENCLAVE_BINARY_PATH);
+        println!(
+            "Looking at *RUNTIME_ENCLAVE_BINARY_PATH:{:?}",
+            *RUNTIME_ENCLAVE_BINARY_PATH
+        );
         // make sure our image is executable
         let mut runtime_enclave_binary_permissions =
             fs::metadata(&*RUNTIME_ENCLAVE_BINARY_PATH)?.permissions();
@@ -341,16 +343,13 @@ impl VeracruzServer for VeracruzServerLinux {
         };
     }
 
-    fn send_buffer(&mut self, buffer: &[u8])-> Result<(), VeracruzServerError> {
+    fn send_buffer(&mut self, buffer: &[u8]) -> Result<(), VeracruzServerError> {
         io_utils::fd::send_buffer(&self.runtime_manager_socket, buffer)?;
-        return Ok(())
+        return Ok(());
     }
 
     fn receive_buffer(&mut self) -> Result<Vec<u8>, VeracruzServerError> {
         io_utils::fd::receive_buffer(&self.runtime_manager_socket)
-            .map_err(|err| {
-                VeracruzServerError::Anyhow(anyhow!(err))
-            })
+            .map_err(|err| VeracruzServerError::Anyhow(anyhow!(err)))
     }
-
 }

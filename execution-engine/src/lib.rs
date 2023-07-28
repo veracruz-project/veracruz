@@ -67,5 +67,11 @@ pub fn execute(
     pipeline: Box<Expr>,
     options: &Options,
 ) -> anyhow::Result<u32> {
-    Ok(pipeline::execute_pipeline(strategy, &mut caller_filesystem, &pipepine_filesystem, pipeline, options)?)
+    Ok(pipeline::execute_pipeline(
+        strategy,
+        &mut caller_filesystem,
+        &pipepine_filesystem,
+        pipeline,
+        options,
+    )?)
 }

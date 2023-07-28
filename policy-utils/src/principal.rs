@@ -154,7 +154,10 @@ pub enum NativeModuleType {
     /// filesystem. The environment's filesystem is copied back to the VFS after
     /// execution.
     /// Dynamic linking is supported if the shared libraries can be found.
-    Dynamic { special_file: PathBuf, entry_point: PathBuf },
+    Dynamic {
+        special_file: PathBuf,
+        entry_point: PathBuf,
+    },
     /// Native module that is provisioned to the enclave and executed just like
     /// a regular WASM program, i.e. via a result request from a participant.
     /// Dynamic linking is supported if the shared libraries can be found.
@@ -179,12 +182,8 @@ pub struct NativeModule {
 impl NativeModule {
     /// Creates a Veracruz native module.
     #[inline]
-    pub fn new(name: String, r#type: NativeModuleType) -> Self
-    {
-        Self {
-            name,
-            r#type,
-        }
+    pub fn new(name: String, r#type: NativeModuleType) -> Self {
+        Self { name, r#type }
     }
 
     /// Return the name.

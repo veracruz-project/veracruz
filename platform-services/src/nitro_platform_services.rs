@@ -16,7 +16,7 @@ use super::result;
 use nix::{errno::Errno, sys::time::TimeValLike, time};
 use nsm_api::{
     api::{Request, Response},
-    driver::{nsm_init, nsm_process_request, nsm_exit}
+    driver::{nsm_exit, nsm_init, nsm_process_request},
 };
 
 /// Fills a buffer, `buffer`, with random bytes sampled from the thread-local
@@ -36,7 +36,7 @@ pub fn platform_getrandom(buffer: &mut [u8]) -> result::Result<()> {
                 let to_copy = std::cmp::min(buffer.len - written, random.len());
                 std::ptr::copy_nonoverlapping(random.as_ptr().offset(written), buffer, to_copy);
                 written += to_copy;
-            },
+            }
             _ => {
                 nsm_exit(nsm_fd);
                 return result::Result::UnknownError;

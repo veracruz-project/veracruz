@@ -7,4 +7,3 @@ pub enum Expr {
     Seq(Vec<Box<Expr>>),
     IfElse(String, Box<Expr>, Option<Box<Expr>>),
 }
-

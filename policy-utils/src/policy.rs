@@ -37,7 +37,10 @@
 use super::{
     error::PolicyError,
     expiry::Timepoint,
-    principal::{ExecutionStrategy, FileHash, Identity, NativeModule, Pipeline, Principal, Program, RightsTable},
+    principal::{
+        ExecutionStrategy, FileHash, Identity, NativeModule, Pipeline, Principal, Program,
+        RightsTable,
+    },
     Platform,
 };
 use anyhow::{anyhow, Result};

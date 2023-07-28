@@ -23,7 +23,7 @@
 //!    environment by the native module manager. Static native modules, on the
 //!    other hand, read the data via `try_parse()` (cf. the `StaticNativeModule`
 //!    trait)
-//! 
+//!
 //! ## Authors
 //!
 //! The Veracruz Development Team.
@@ -34,19 +34,19 @@
 //! information on licensing and copyright.
 
 use crate::{
-    fs::{FileSystem, FileSystemResult, strip_root_slash_path, strip_root_slash_str},
-    native_modules::common::STATIC_NATIVE_MODULES
+    fs::{strip_root_slash_path, strip_root_slash_str, FileSystem, FileSystemResult},
+    native_modules::common::STATIC_NATIVE_MODULES,
 };
 use log::info;
-use policy_utils::principal::{NativeModule, NativeModuleType};
-use std::{
-    fs::{create_dir, create_dir_all, File, read_dir, remove_dir_all},
-    io::{Read, Write},
-    path::{Path, PathBuf},
-    process::Command
-};
 #[cfg(feature = "std")]
 use nix::sys::signal;
+use policy_utils::principal::{NativeModule, NativeModuleType};
+use std::{
+    fs::{create_dir, create_dir_all, read_dir, remove_dir_all, File},
+    io::{Read, Write},
+    path::{Path, PathBuf},
+    process::Command,
+};
 use wasi_types::{ErrNo, FdFlags, LookupFlags, OpenFlags};
 
 /// Path to the native module's manager sysroot on the kernel filesystem. Native
@@ -75,7 +75,8 @@ pub struct NativeModuleManager {
 
 impl NativeModuleManager {
     pub fn new(native_module: NativeModule, native_module_vfs: FileSystem) -> Self {
-        let native_module_directory = PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT).join(strip_root_slash_str(native_module.name()));
+        let native_module_directory = PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT)
+            .join(strip_root_slash_str(native_module.name()));
         Self {
             native_module,
             native_module_vfs,
@@ -104,13 +105,14 @@ impl NativeModuleManager {
 
         // Add the execution configuration file
         mappings = mappings
-                   + &self.native_module_directory
-                     .join(strip_root_slash_str(EXECUTION_CONFIGURATION_FILE))
-                     .to_str()
-                     .ok_or(ErrNo::Inval)?
-                     .to_owned()
-                   + "=>/"
-                   + EXECUTION_CONFIGURATION_FILE;
+            + &self
+                .native_module_directory
+                .join(strip_root_slash_str(EXECUTION_CONFIGURATION_FILE))
+                .to_str()
+                .ok_or(ErrNo::Inval)?
+                .to_owned()
+            + "=>/"
+            + EXECUTION_CONFIGURATION_FILE;
         Ok(mappings)
     }
 
@@ -123,9 +125,13 @@ impl NativeModuleManager {
     /// the VFS, and maybe even after the WASM program invokes the native module.
     fn prepare_fs(&mut self) -> FileSystemResult<Vec<PathBuf>> {
         create_dir_all(self.native_module_directory.as_path()).map_err(|_| ErrNo::Access)?;
-        let (visible_files_and_dirs, top_level_files) = self.native_module_vfs.read_all_files_and_dirs_by_absolute_path("/")?;
+        let (visible_files_and_dirs, top_level_files) = self
+            .native_module_vfs
+            .read_all_files_and_dirs_by_absolute_path("/")?;
         for (path, buffer) in visible_files_and_dirs {
-            let path = self.native_module_directory.join(strip_root_slash_path(&path));
+            let path = self
+                .native_module_directory
+                .join(strip_root_slash_path(&path));
 
             // Create parent directories
             let parent_path = path.parent().ok_or(ErrNo::NoEnt)?;
@@ -135,10 +141,8 @@ impl NativeModuleManager {
                 Some(b) => {
                     let mut file = File::create(path)?;
                     file.write_all(&b)?;
-                },
-                None => {
-                    create_dir(path)?
                 }
+                None => create_dir(path)?,
             }
         }
 
@@ -165,12 +169,16 @@ impl NativeModuleManager {
     /// This function should be called after the native module's execution to
     /// reflect the side effects of execution onto the VFS.
     fn copy_fs_to_vfs(&mut self, path_unprefixed: &Path) -> FileSystemResult<()> {
-        let path_prefixed = self.native_module_directory.join(strip_root_slash_path(&path_unprefixed));
+        let path_prefixed = self
+            .native_module_directory
+            .join(strip_root_slash_path(&path_unprefixed));
         if path_prefixed.is_dir() {
             for entry in read_dir(path_prefixed)? {
                 let entry = entry?;
                 let path_prefixed = entry.path();
-                let path_unprefixed = path_prefixed.strip_prefix(&self.native_module_directory).map_err(|_| ErrNo::Access)?;
+                let path_unprefixed = path_prefixed
+                    .strip_prefix(&self.native_module_directory)
+                    .map_err(|_| ErrNo::Access)?;
 
                 // Ignore execution configuration file
                 if path_unprefixed == PathBuf::from(EXECUTION_CONFIGURATION_FILE) {
@@ -202,13 +210,21 @@ impl NativeModuleManager {
                     // Copy file to the VFS. First truncate the VFS file then
                     // append to it. If the principal doesn't have write access,
                     // just ignore it
-                    if self.native_module_vfs.write_file_by_absolute_path(&path_unprefixed, vec![], false).is_ok() {
+                    if self
+                        .native_module_vfs
+                        .write_file_by_absolute_path(&path_unprefixed, vec![], false)
+                        .is_ok()
+                    {
                         loop {
                             let n = f.read(&mut buf)?;
                             if n == 0 {
                                 break;
                             }
-                            self.native_module_vfs.write_file_by_absolute_path(&path_unprefixed, buf[..n].to_vec(), true)?;
+                            self.native_module_vfs.write_file_by_absolute_path(
+                                &path_unprefixed,
+                                buf[..n].to_vec(),
+                                true,
+                            )?;
                         }
                     }
                 }
@@ -233,9 +249,7 @@ impl NativeModuleManager {
     pub fn execute(&mut self, input: Vec<u8>) -> FileSystemResult<()> {
         if self.native_module.is_static() {
             // Look up native module in the static native modules table
-            let mut nm = STATIC_NATIVE_MODULES
-                .lock()
-                .map_err(|_| ErrNo::Inval)?;
+            let mut nm = STATIC_NATIVE_MODULES.lock().map_err(|_| ErrNo::Inval)?;
             let nm = nm
                 .get_mut(&self.native_module.name().to_string())
                 .ok_or(ErrNo::Inval)?;
@@ -248,7 +262,10 @@ impl NativeModuleManager {
             info!("OK");
 
             // Inject execution configuration into the native module's directory
-            let mut file = File::create(self.native_module_directory.join(strip_root_slash_str(EXECUTION_CONFIGURATION_FILE)))?;
+            let mut file = File::create(
+                self.native_module_directory
+                    .join(strip_root_slash_str(EXECUTION_CONFIGURATION_FILE)),
+            )?;
             file.write_all(&input)?;
 
             // Enable SIGCHLD handling in order to synchronously execute the
@@ -271,23 +288,23 @@ impl NativeModuleManager {
             let mount_mappings = self.build_mappings(top_level_files)?;
             let entry_point_tmp;
             let entry_point = match self.native_module.r#type() {
-                NativeModuleType::Dynamic { special_file: _, entry_point } => entry_point.to_str().ok_or(ErrNo::Inval)?,
+                NativeModuleType::Dynamic {
+                    special_file: _,
+                    entry_point,
+                } => entry_point.to_str().ok_or(ErrNo::Inval)?,
                 NativeModuleType::Provisioned { entry_point } => {
-                    entry_point_tmp = self.native_module_directory.join(strip_root_slash_path(entry_point));
+                    entry_point_tmp = self
+                        .native_module_directory
+                        .join(strip_root_slash_path(entry_point));
                     entry_point_tmp.to_str().ok_or(ErrNo::Inval)?
-                },
+                }
                 _ => panic!("should not happen"),
             };
 
             // Make sure the entry point is executable.
             // This is a temporary workaround that only works on Linux.
-            Command::new("chmod")
-                .args([
-                    "500",
-                    entry_point,
-                ])
-                .output()?;
-            
+            Command::new("chmod").args(["500", entry_point]).output()?;
+
             info!("Calling sandboxer...");
             let output = Command::new(NATIVE_MODULE_MANAGER_SANDBOXER_PATH)
                 .args([

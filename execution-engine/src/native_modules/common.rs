@@ -11,7 +11,7 @@
 
 use crate::{
     fs::{FileSystem, FileSystemResult},
-    native_modules::{aead::AeadService, aes::AesCounterModeService, postcard::PostcardService}
+    native_modules::{aead::AeadService, aes::AesCounterModeService, postcard::PostcardService},
 };
 use lazy_static::lazy_static;
 use std::{collections::HashMap, sync::Mutex};
