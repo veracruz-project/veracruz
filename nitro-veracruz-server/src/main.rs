@@ -12,27 +12,27 @@
 mod server;
 
 use anyhow::anyhow;
+use clap::Parser;
 use env_logger;
 use log::info;
 use policy_utils::policy::Policy;
 use server::VeracruzServerNitro;
 use std::{fs, path, process};
-use structopt::StructOpt;
 use veracruz_server;
 use veracruz_server::VeracruzServer;
 
-#[derive(Debug, StructOpt)]
+#[derive(Parser, Debug)]
 #[structopt(rename_all = "kebab")]
-struct Opt {
+struct Args {
     /// Path to policy file
-    #[structopt(parse(from_os_str))]
+    #[clap()]
     policy_path: path::PathBuf,
 }
 
 /// Entry point
 fn main() {
     // parse args
-    let opt = Opt::from_args();
+    let opt = Args::parse();
 
     // setup logger
     env_logger::init();

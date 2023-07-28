@@ -9,9 +9,9 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
+use clap::Parser;
 use rand::Rng;
 use std::{convert::TryFrom, error, iter};
-use structopt::StructOpt;
 
 // lookup tables for log and exp of polynomials in GF(256),
 #[rustfmt::skip]
@@ -214,24 +214,24 @@ fn shares_reconstruct<S: AsRef<[u8]>>(shares: &[S]) -> Vec<u8> {
     secret
 }
 
-#[derive(Debug, StructOpt)]
-#[structopt(rename_all = "kebab")]
-struct Opt {
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab")]
+struct Args {
     /// Secret to split into shares
-    #[structopt()]
+    #[clap()]
     secret: String,
 
     /// Number of shares to generate
-    #[structopt(short)]
+    #[clap(short)]
     n: usize,
 
     /// Number of shares required to reconstruct secret
-    #[structopt(short)]
+    #[clap(short)]
     k: Option<usize>,
 }
 
 fn main() -> Result<(), Box<dyn error::Error>> {
-    let opt = Opt::from_args();
+    let opt = Args::parse();
 
     // create shares
     let shares = shares_generate(opt.secret.as_bytes(), opt.n, opt.k.unwrap_or(opt.n));

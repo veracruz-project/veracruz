@@ -9,7 +9,7 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use clap::{App, Arg};
+use clap::Arg;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, error::Error, fs::File, io::Write};
 
@@ -60,24 +60,24 @@ fn extract_columns(entries: &[csv::StringRecord]) -> Result<HashSet<Person>, Box
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let matches = App::new("Data generator for private set intersection")
+    let matches = clap::Command::new("Data generator for private set intersection")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
         .about("Convert the [INPUT] csv file to postcard. Each entry in the file comprises name (String), employee_id (String), age (u8), and grade (u8).")
         .arg(
-            Arg::with_name("input_file")
-                .short("f")
+            Arg::new("input_file")
+                .short('f')
                 .long("input_file")
                 .value_name("STRING")
                 .help("The input file")
-                .takes_value(true)
+                .num_args(1)
                 .required(true)
         )
         .get_matches();
 
     let input_file = matches
-        .value_of("input_file")
-        .ok_or("Failed to read the input filename.")?;
+        .get_one::<String>("input_file")
+        .expect("Failed to read the input filename.");
     let file_prefix: Vec<&str> = input_file.split('.').collect();
     let file_prefix = file_prefix.first().ok_or("filename error")?;
 

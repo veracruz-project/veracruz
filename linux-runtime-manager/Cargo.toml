@@ -5,7 +5,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1"
-clap = { version = "2.33" }
+clap = "4"
 env_logger = { version = "0.10.0" }
 hex = { version = "0.4.2" }
 io-utils = { path = "../io-utils" }

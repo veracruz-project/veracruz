@@ -24,7 +24,7 @@
 //! and copyright information.
 
 use anyhow::anyhow;
-use clap::{App, Arg};
+use clap::{Arg, ArgAction};
 use execution_engine::{execute, fs::FileSystem, Options};
 use log::*;
 use policy_utils::{
@@ -98,13 +98,13 @@ struct CommandLineOptions {
 /// of them.  If required options are not present, or if any options are
 /// malformed, this will abort the program.
 fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
-    let matches = App::new(APPLICATION_NAME)
+    let matches = clap::Command::new(APPLICATION_NAME)
         .version(VERSION)
         .author(AUTHORS)
         .about(ABOUT)
         .arg(
-            Arg::with_name("input")
-                .short("i")
+            Arg::new("input")
+                .short('i')
                 .long("input-source")
                 .value_name("DIRECTORIES")
                 .help(
@@ -112,106 +112,115 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                      copied into the root directory in Veracruz space. All programs are granted \
                      with read capabilities.",
                 )
-                .multiple(true),
+                .num_args(0..),
         )
         .arg(
-            Arg::with_name("output")
-                .short("o")
+            Arg::new("output")
+                .short('o')
                 .long("output-source")
                 .value_name("DIRECTORIES")
                 .help(
                     "Space-separated paths to the output directories. The directories are copied \
                      into disk on the host. All program are granted with write capabilities.",
                 )
-                .multiple(true),
+                .num_args(0..),
         )
         .arg(
-            Arg::with_name("native-module-name")
+            Arg::new("native-module-name")
                 .long("native-module-name")
                 .value_name("NAME")
                 .help("Specifies the name of the native module to use for the computation. \
 This must be of the form \"--native-module-name name\". Multiple --native-module-name flags may be provided.")
-                .required(false)
-                .multiple(true),
+                .num_args(1)
+                .action(ArgAction::Append),
         )
         .arg(
-            Arg::with_name("native-module-entry-point")
+            Arg::new("native-module-entry-point")
                 .long("native-module-entry-point")
                 .value_name("FILE")
                 .help("Specifies the path to the entry point of the native module to use for the computation. \
 This must be of the form \"--native-module-entry-point path\". Multiple --native-module-entry-point flags may be provided. \
 If the value is an empty string, the native module is assumed to be static, i.e. part of the Veracruz runtime, \
 and is looked up by name in the static native modules table.")
-                .required(false)
-                .multiple(true),
+                .num_args(1)
+                .action(ArgAction::Append),
         )
         .arg(
-            Arg::with_name("native-module-special-file")
+            Arg::new("native-module-special-file")
                 .long("native-module-special-file")
                 .value_name("FILE")
                 .help("Specifies the path to the special file of the native module to use for the computation. \
 This must be of the form \"--native-module-special-file path\". Multiple --native-module-special-file flags may be provided.")
-                .required(false)
-                .multiple(true),
+                .num_args(1)
+                .action(ArgAction::Append),
         )
         .arg(
-            Arg::with_name("pipeline")
-                .short("r")
+            Arg::new("pipeline")
+                .short('r')
                 .long("pipeline")
                 .value_name("PIPELINE")
                 .help("The conditional pipeline of programs to be executed.")
-                .multiple(false)
                 .required(true),
         )
         .arg(
-            Arg::with_name("execution-strategy")
-                .short("x")
+            Arg::new("execution-strategy")
+                .short('x')
                 .long("execution-strategy")
                 .value_name("interp | jit")
+                .default_value("jit")
                 .help(
                     "Selects the execution strategy to use: interpretation or JIT (defaults to \
                      interpretation).",
                 ),
         )
         .arg(
-            Arg::with_name("dump-stdout")
-                .short("d")
+            Arg::new("dump-stdout")
+                .short('d')
                 .long("dump-stdout")
-                .help("Whether the contents of stdout should be dumped before exiting"),
+                .help("Whether the contents of stdout should be dumped before exiting")
+                .action(ArgAction::SetTrue),
         )
         .arg(
-            Arg::with_name("dump-stderr")
-                .short("e")
+            Arg::new("dump-stderr")
+                .short('e')
                 .long("dump-stderr")
-                .help("Whether the contents of stderr should be dumped before exiting"),
+                .help("Whether the contents of stderr should be dumped before exiting")
+                .action(ArgAction::SetTrue),
         )
         .arg(
-            Arg::with_name("enable-clock")
-                .short("c")
+            Arg::new("enable-clock")
+                .short('c')
                 .long("enable-clock")
                 .help(
                     "Whether clock functions (`clock_getres()`, `clock_gettime()`) should be \
                      enabled.",
-                ),
+                )
+                .action(ArgAction::SetTrue),
         )
         .arg(
-            Arg::with_name("env")
+            Arg::new("env")
                 .long("env")
                 .help("Specify an environment variable and value (VAR=VAL).")
                 .value_name("VAR=VAL")
-                .multiple(true),
+                .num_args(1)
+                .action(ArgAction::Append),
         )
         .arg(
-            Arg::with_name("strace")
+            Arg::new("strace")
                 .long("strace")
-                .help("Enable strace-like output for WASI calls."),
+                .help("Enable strace-like output for WASI calls.")
+                .action(ArgAction::SetTrue),
         )
         .get_matches();
 
     info!("Parsed command line.");
 
     let execution_strategy = {
-        let strategy = matches.value_of("execution-strategy").unwrap_or("jit");
+        let strategy = matches
+            .get_one::<String>("execution-strategy")
+            .ok_or("jit")?
+            .as_str();
+
         match strategy {
             "interp" => {
                 info!("Selecting interpretation as the execution strategy.");
@@ -233,30 +242,30 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
 
     // Read all native module names
     let native_modules_names = matches
-        .values_of("native-module-name")
+        .get_many::<String>("native-module-name")
         .map_or(Vec::new(), |p| p.map(|s| s.to_string()).collect::<Vec<_>>());
 
     // Read all native module entry points
     let native_modules_entry_points = matches
-        .values_of_os("native-module-entry-point")
+        .get_many::<String>("native-module-entry-point")
         .map_or(Vec::new(), |p| {
             p.map(|s| PathBuf::from(s)).collect::<Vec<_>>()
         });
 
     // Read all native module special files
     let native_modules_special_files = matches
-        .values_of_os("native-module-special-file")
+        .get_many::<String>("native-module-special-file")
         .map_or(Vec::new(), |p| {
             p.map(|s| PathBuf::from(s)).collect::<Vec<_>>()
         });
 
-    let pipeline = if let Some(pipeline_string) = matches.value_of("pipeline") {
+    let pipeline = if let Some(pipeline_string) = matches.get_one::<String>("pipeline") {
         parse_pipeline(pipeline_string)?
     } else {
         return Err("No executable pipeline provided".into());
     };
 
-    let input_sources = if let Some(data) = matches.values_of("input") {
+    let input_sources = if let Some(data) = matches.get_many::<String>("input") {
         let input_sources: Vec<String> = data.map(|e| e.to_string()).collect();
         info!(
             "Selected {} data sources as input to computation.",
@@ -267,7 +276,7 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
         Vec::new()
     };
 
-    let output_sources = if let Some(data) = matches.values_of("output") {
+    let output_sources = if let Some(data) = matches.get_many::<String>("output") {
         let output_sources: Vec<String> = data.map(|e| e.to_string()).collect();
         info!(
             "Selected {} data sources as input to computation.",
@@ -278,11 +287,11 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
         Vec::new()
     };
 
-    let enable_clock = matches.is_present("enable-clock");
-    let dump_stdout = matches.is_present("dump-stdout");
-    let dump_stderr = matches.is_present("dump-stderr");
+    let enable_clock = matches.get_flag("enable-clock");
+    let dump_stdout = matches.get_flag("dump-stdout");
+    let dump_stderr = matches.get_flag("dump-stderr");
 
-    let environment_variables = match matches.values_of("env") {
+    let environment_variables = match matches.get_many::<String>("env") {
         None => Vec::new(),
         Some(x) => x
             .map(|e| {
@@ -292,7 +301,7 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
             .collect(),
     };
 
-    let enable_strace = matches.is_present("strace");
+    let enable_strace = matches.get_flag("strace");
 
     Ok(CommandLineOptions {
         input_sources,

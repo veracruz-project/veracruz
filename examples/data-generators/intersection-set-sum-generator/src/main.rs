@@ -9,74 +9,68 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use clap::{App, Arg};
+use clap::Arg;
 use rand::{prelude::*, rngs::StdRng, SeedableRng};
 use std::{error::Error, fs::File, io::prelude::*};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let matches = App::new("Data generator for intersection set sum")
+    let matches = clap::Command::new("Data generator for intersection set sum")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
         .about("Generate customer and advertisement-viewer. The former contains a vector of customer identifiers and private values, of the type Vec<(String, f64)>. The latter contains a vector of customer identifiers, of the type Vec<String>. Both are encoded by postcard.")
         .arg(
-            Arg::with_name("file_prefix")
-                .short("f")
+            Arg::new("file_prefix")
+                .short('f')
                 .long("file_prefix")
                 .value_name("STRING")
                 .help("The prefix of data files for the customer and advertisement-viewer.")
-                .takes_value(true)
+                .num_args(1)
                 .required(true)
         )
         .arg(
-            Arg::with_name("size")
-                .short("s")
+            Arg::new("size")
+                .short('s')
                 .long("size")
                 .value_name("NUBMER")
                 .help("The size of the customer vector and advertisement-viewer vector.")
-                .takes_value(true)
-                .validator(is_u64)
+                .num_args(1)
+                .value_parser(clap::value_parser!(u64))
                 .default_value("1000")
         )
         .arg(
-            Arg::with_name("number_of_difference")
-                .short("n")
+            Arg::new("number_of_difference")
+                .short('n')
                 .long("num_of_diff")
                 .value_name("NUBMER")
                 .help("The size of the intersection between the customer vector and advertisement-viewer vector.")
-                .takes_value(true)
-                .validator(is_u64)
+                .num_args(1)
+                .value_parser(clap::value_parser!(u64))
                 .default_value("250")
         )
         .arg(
-            Arg::with_name("seed")
-                .short("e")
+            Arg::new("seed")
+                .short('e')
                 .long("seed")
                 .value_name("NUBMER")
                 .help("The seed for the random number generator.")
-                .takes_value(true)
-                .validator(is_u64)
+                .num_args(1)
+                .value_parser(clap::value_parser!(u64))
                 .default_value("0"),
         )
         .get_matches();
 
     let file_prefix = matches
-        .value_of("file_prefix")
-        .ok_or("Failed to read the file_prefix.")?;
-    let row = matches
-        .value_of("size")
-        .ok_or("Failed to read the size.")?
-        .parse::<u64>()
-        .map_err(|_| "Failed to parse the size.")?;
-    let difference = matches
-        .value_of("number_of_difference")
-        .ok_or("Failed to read the number of difference.")?
-        .parse::<u64>()
-        .map_err(|_| "Failed to parse the number of difference.")?;
-    let seed = matches
-        .value_of("seed")
-        .ok_or("Failed to read the seed")?
-        .parse::<u64>()
-        .map_err(|_| "Cannot parse seed")?;
+        .get_one::<String>("file_prefix")
+        .expect("Failed to read the file prefix.");
+    let row = *matches
+        .get_one::<u64>("size")
+        .expect("Failed to read the size.");
+    let difference = *matches
+        .get_one::<u64>("number_of_difference")
+        .expect("Failed to read the number of difference.");
+    let seed = *matches
+        .get_one::<u64>("seed")
+        .expect("Failed to read the seed.");
 
     let mut rng = StdRng::seed_from_u64(seed);
 
@@ -106,11 +100,4 @@ fn main() -> Result<(), Box<dyn Error>> {
     file.write_all(&encode)?;
 
     Ok(())
-}
-
-fn is_u64(v: String) -> Result<(), String> {
-    match v.parse::<u64>() {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("Cannot parse {} to u64, with error {:?}", v, e)),
-    }
 }

@@ -5,6 +5,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1"
+clap = { version = "4", features = ["derive"]}
 data-encoding = { version = "2.3.2" }
 env_logger = { version = "0.10.0" }
 io-utils = { path = "../io-utils", features = ["linux"] }
@@ -14,7 +15,6 @@ nix = { version = "0.20.2" }
 policy-utils = { path = "../policy-utils", features = ["std", ] }
 proxy-attestation-client = { git = "https://github.com/veracruz-project/proxy-attestation-client", tag = "v0.2" }
 rand = "0.8.3"
-structopt = { version = "0.3", features = ["wrap_help"] }
 tempfile = { version = "3.2.0" }
 veracruz-server = { path = "../veracruz-server", features = ["linux"]}
 veracruz-utils = { path = "../veracruz-utils", features = ["linux"] }

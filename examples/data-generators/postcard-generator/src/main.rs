@@ -14,7 +14,7 @@
 //! cargo run -- --file [STRING] --size [VEC_SIZE] --seed [RANDOM_SEED];
 //! ```
 
-use clap::{App, Arg};
+use clap::Arg;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{error::Error, fs, vec::Vec};
@@ -73,54 +73,50 @@ pub struct Struct3 {
 
 /// Generate a vector of T3 instances
 fn main() -> Result<(), Box<dyn Error>> {
-    let matches = App::new("Data generator for postcard encoding of a vector of T3, a made-up type")
+    let matches = clap::Command::new("Data generator for postcard encoding of a vector of T3, a made-up type")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
         .about("Generate a vector of T3, a made-up type for profiling the performance on native and wasm programs.")
        .arg(
-           Arg::with_name("file")
-               .short("f")
+           Arg::new("file")
+               .short('f')
                .long("file")
                .value_name("STRING")
                .help("The prefix for the output file")
-               .takes_value(true)
+               .num_args(1)
                .required(true)
        )
        .arg(
-           Arg::with_name("size")
-               .short("s")
+           Arg::new("size")
+               .short('s')
                .long("size")
                .value_name("NUMBER")
                .help("The number of float-point numbers in each stream")
-               .takes_value(true)
-               .validator(is_u64)
+               .num_args(1)
+               .value_parser(clap::value_parser!(u64))
                .default_value("10")
        )
        .arg(
-           Arg::with_name("seed")
-               .short("e")
+           Arg::new("seed")
+               .short('e')
                .long("seed")
                .value_name("NUBMER")
                .help("The seed for the random number generator.")
-               .takes_value(true)
-               .validator(is_u64)
+               .num_args(1)
+               .value_parser(clap::value_parser!(u64))
                .default_value("0"),
         )
         .get_matches();
 
     let file = matches
-        .value_of("file")
-        .ok_or("Failed to read the file prefix.")?;
-    let size = matches
-        .value_of("size")
-        .ok_or("Failed to read the size")?
-        .parse::<u64>()
-        .map_err(|_| "Cannot parse size")?;
-    let seed = matches
-        .value_of("seed")
-        .ok_or("Failed to read the seed")?
-        .parse::<u64>()
-        .map_err(|_| "Cannot parse seed")?;
+        .get_one::<String>("file")
+        .expect("Failed to read the file prefix.");
+    let size = *matches
+        .get_one::<u64>("size")
+        .expect("Failed to read the size.");
+    let seed = *matches
+        .get_one::<u64>("seed")
+        .expect("Failed to read the seed.");
 
     let mut rng = StdRng::seed_from_u64(seed);
     let mut array = Vec::new();
@@ -173,12 +169,5 @@ fn gen_enum1<T: Rng>(rng: &mut T) -> Enum1 {
         2 => Enum1::ENUM1_3(rng.gen()),
         3 => Enum1::ENUM1_4(rng.gen()),
         _other => panic!("Should not reach here"),
-    }
-}
-
-fn is_u64(v: String) -> Result<(), String> {
-    match v.parse::<u64>() {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("Cannot parse {} to u64, with error {:?}", v, e)),
     }
 }

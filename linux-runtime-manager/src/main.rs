@@ -15,7 +15,7 @@
 //! information on licensing and copyright.
 
 use anyhow::{anyhow, Result};
-use clap::{App, Arg};
+use clap::Arg;
 use hex::decode_to_slice;
 use lazy_static::lazy_static;
 use log::debug;
@@ -53,41 +53,42 @@ pub fn linux_main() -> Result<()> {
 
     init_session_manager()?;
 
-    let matches = App::new("Linux runtime manager enclave")
+    let matches = clap::Command::new("Linux runtime manager enclave")
         .author("The Veracruz Development Team")
         .arg(
-            Arg::with_name("address")
-                .short("a")
+            Arg::new("address")
+                .short('a')
                 .long("address")
-                .takes_value(true)
+                .num_args(1)
                 .required(true)
                 .help("Address for connecting to Veracruz Server.")
                 .value_name("ADDRESS"),
         )
         .arg(
-            Arg::with_name("runtime_manager_measurement")
-                .short("m")
+            Arg::new("runtime_manager_measurement")
+                .short('m')
                 .long("measurement")
-                .takes_value(true)
+                .num_args(1)
                 .required(true)
                 .help("SHA256 measurement of the Runtime Manager enclave binary.")
                 .value_name("MEASUREMENT"),
         )
         .get_matches();
 
-    let address = if let Some(address) = matches.value_of("address") {
+    let address = if let Some(address) = matches.get_one::<String>("address") {
         address
     } else {
         error!("No address given. Exiting...");
         return Err(anyhow!(RuntimeManagerError::CommandLineArguments));
     };
 
-    let measurement = if let Some(measurement) = matches.value_of("runtime_manager_measurement") {
-        measurement
-    } else {
-        error!("No measurement given. Exiting...");
-        return Err(anyhow!(RuntimeManagerError::CommandLineArguments));
-    };
+    let measurement =
+        if let Some(measurement) = matches.get_one::<String>("runtime_manager_measurement") {
+            measurement
+        } else {
+            error!("No measurement given. Exiting...");
+            return Err(anyhow!(RuntimeManagerError::CommandLineArguments));
+        };
 
     let mut measurement_bytes = vec![0u8; 32];
 

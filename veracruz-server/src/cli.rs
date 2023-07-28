@@ -10,24 +10,24 @@
 //! information on licensing and copyright.
 
 use anyhow::anyhow;
+use clap::Parser;
 use log::info;
 use policy_utils::policy::Policy;
 use std::{fs, path, process};
-use structopt::StructOpt;
 use veracruz_server;
 
-#[derive(Debug, StructOpt)]
-#[structopt(rename_all = "kebab")]
-struct Opt {
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab")]
+struct Args {
     /// Path to policy file
-    #[structopt(parse(from_os_str))]
+    #[arg()]
     policy_path: path::PathBuf,
 }
 
 /// Entry point
 fn main() {
     // parse args
-    let opt = Opt::from_args();
+    let opt = Args::parse();
 
     // setup logger
     env_logger::init();

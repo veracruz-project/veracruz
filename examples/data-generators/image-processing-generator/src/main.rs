@@ -14,7 +14,7 @@
 //! cargo run -- --file_prefix [PREFIX_STRING] --width [WIDTH] --height [HEIGHT];
 //! ```
 
-use clap::{App, Arg};
+use clap::Arg;
 use image::{imageops::FilterType, io::Reader, ImageFormat};
 use std::error::Error;
 
@@ -25,66 +25,60 @@ use std::error::Error;
 /// * `width`, u64, the image width, default is 10.
 /// * `height`, u64, the image height, default is 10.
 fn main() -> Result<(), Box<dyn Error>> {
-    let matches = App::new("Data generator for image processing")
+    let matches = clap::Command::new("Data generator for image processing")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
         .about("Load a JPEG image and convert it to a PNG image of dimensions ([WIDTH], [HEIGHT])")
         .arg(
-            Arg::with_name("file_prefix")
-                .short("f")
+            Arg::new("file_prefix")
+                .short('f')
                 .long("file_prefix")
                 .value_name("STRING")
                 .help("The prefix for the output file")
-                .takes_value(true)
+                .num_args(1)
                 .required(true),
         )
         .arg(
-            Arg::with_name("image_path")
-                .short("i")
+            Arg::new("image_path")
+                .short('i')
                 .long("image_path")
                 .value_name("STRING")
                 .help("The path to the JPEG image to load")
-                .takes_value(true)
+                .num_args(1)
                 .required(true),
         )
         .arg(
-            Arg::with_name("width")
-                .short("w")
+            Arg::new("width")
                 .long("width")
                 .value_name("NUMBER")
                 .help("The width of the image to generate")
-                .takes_value(true)
-                .validator(is_u64)
+                .num_args(1)
+                .value_parser(clap::value_parser!(u32))
                 .default_value("10"),
         )
         .arg(
-            Arg::with_name("height")
-                .short("h")
+            Arg::new("height")
                 .long("height")
                 .value_name("NUMBER")
                 .help("The height of the image to generate")
-                .takes_value(true)
-                .validator(is_u64)
+                .num_args(1)
+                .value_parser(clap::value_parser!(u32))
                 .default_value("10"),
         )
         .get_matches();
 
     let file_prefix = matches
-        .value_of("file_prefix")
-        .ok_or("Failed to read the file prefix.")?;
+        .get_one::<String>("file_prefix")
+        .expect("Failed to read the file prefix.");
     let image_path = matches
-        .value_of("image_path")
-        .ok_or("Failed to read the image path.")?;
-    let image_width = matches
-        .value_of("width")
-        .ok_or("Failed to read the width")?
-        .parse::<u64>()
-        .map_err(|_| "Failed to parse the width.")? as u32;
-    let image_height = matches
-        .value_of("height")
-        .ok_or("Failed to read the height")?
-        .parse::<u64>()
-        .map_err(|_| "Failed to parse the height.")? as u32;
+        .get_one::<String>("image_path")
+        .expect("Failed to read the image path.");
+    let image_width = *matches
+        .get_one::<u32>("width")
+        .expect("Failed to read the width.");
+    let image_height = *matches
+        .get_one::<u32>("height")
+        .expect("Failed to read the height.");
 
     let output_filename = format!("{}.png", file_prefix);
 
@@ -107,11 +101,4 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map_err(|e| format!("Failed to save image: {}", e));
 
     Ok(())
-}
-
-fn is_u64(v: String) -> Result<(), String> {
-    match v.parse::<u64>() {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("Cannot parse {} to u64, with error {:?}", v, e)),
-    }
 }

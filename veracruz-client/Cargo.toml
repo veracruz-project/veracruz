@@ -13,7 +13,7 @@ required-features = ["cli"]
 [features]
 # a feature to enable CLI-only dependencies
 # https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
-cli = ["structopt", "env_logger"]
+cli = ["clap", "env_logger"]
 linux = []
 nitro = [
   "mbedtls/monitor_getrandom",
@@ -22,6 +22,7 @@ nitro = [
 [dependencies]
 anyhow = "1"
 bincode = { version = "1.2.1", default-features = false }
+clap = { version = "4", features = ["derive"], optional = true }
 env_logger = { version = "0.10.0", optional = true }
 err-derive = "0.2"
 hex = "0.4.2"
@@ -31,6 +32,5 @@ policy-utils = { path = "../policy-utils", features = ["std"] }
 rand = "0.8.3"
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
 serde_json = "1.0"
-structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-utils = { path = "../veracruz-utils", features = ["std"] }
