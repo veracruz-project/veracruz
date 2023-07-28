@@ -28,7 +28,12 @@ const PORT: u32 = 5005;
 const BACKLOG: usize = 128;
 
 fn main() -> Result<(), String> {
-    encap().map_err(|err| format!("AWS Nitro Enclave Runtime Manager::main encap returned error:{:?}", err))
+    encap().map_err(|err| {
+        format!(
+            "AWS Nitro Enclave Runtime Manager::main encap returned error:{:?}",
+            err
+        )
+    })
 }
 
 fn encap() -> Result<()> {
@@ -49,7 +54,7 @@ fn encap() -> Result<()> {
 
     listen_vsock(socket_fd, BACKLOG)?;
 
-    let nitro_runtime = nitro_runtime::NitroRuntime{};
+    let nitro_runtime = nitro_runtime::NitroRuntime {};
 
     debug!("runtime_manager_nitro::nitro_main accept succeeded. looping");
     let runtime = CommonRuntime::new(&nitro_runtime);
@@ -61,7 +66,10 @@ fn encap() -> Result<()> {
         loop {
             let received_buffer = receive_buffer(fd)?;
             let response_buffer = runtime.decode_dispatch(&received_buffer)?;
-            debug!("Nitro Runtime Manager::main_loop received:{:02x?}", response_buffer);
+            debug!(
+                "Nitro Runtime Manager::main_loop received:{:02x?}",
+                response_buffer
+            );
             send_buffer(fd, &response_buffer)?;
         }
     }

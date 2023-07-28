@@ -1,6 +1,6 @@
 //! Veracruz server
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

@@ -11,17 +11,17 @@
 
 use anyhow::Result;
 use log::debug;
-use veracruz_utils::{
-    runtime_manager_message::{ RuntimeManagerRequest, RuntimeManagerResponse, Status},
+use veracruz_utils::runtime_manager_message::{
+    RuntimeManagerRequest, RuntimeManagerResponse, Status,
 };
 
-use crate::platform_runtime::PlatformRuntime;
 use crate::managers;
+use crate::platform_runtime::PlatformRuntime;
 
 pub struct CommonRuntime<'a> {
     platform_runtime: &'a (dyn PlatformRuntime + 'a),
 }
- 
+
 impl<'a> CommonRuntime<'a> {
     pub fn new(pr: &'a dyn PlatformRuntime) -> CommonRuntime {
         return CommonRuntime {
@@ -35,7 +35,10 @@ impl<'a> CommonRuntime<'a> {
             RuntimeManagerRequest::Attestation(challenge, _challenge_id) => {
                 debug!("common_runtime::decode_dispatch Attestation");
                 let ret = self.platform_runtime.attestation(&challenge)?;
-                debug!("common_runtime::decode_dispatch Attestation complete with ret:{:?}\n", ret);
+                debug!(
+                    "common_runtime::decode_dispatch Attestation complete with ret:{:?}\n",
+                    ret
+                );
                 ret
             }
             RuntimeManagerRequest::Initialize(policy_json, certificate_chain) => {

@@ -1,6 +1,6 @@
 //! Logistic regression example, using an off-the-shelf Rust library for machine learning.
 //!
-//! ## Context
+//! ## Context
 //!
 //! A number of competing supermarkets want to collectively pool some of their data on
 //! customer preferences to be able to better compete against their larger competitors.  However,
@@ -16,7 +16,7 @@
 //! Ensured form of outputs: A Postcard-encoded Rust vector of `f64` values describing the
 //!                          parameters of the learnt logistic regression model.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

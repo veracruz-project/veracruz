@@ -10,7 +10,7 @@
 //!   (if within a TEE).  Note for `std` targets the random source is assumed to be
 //!   the random number generator of the host operating system.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

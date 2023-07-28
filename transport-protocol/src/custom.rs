@@ -142,7 +142,9 @@ pub fn parse_runtime_manager_request(
     buffer: &[u8],
 ) -> Result<transport_protocol::RuntimeManagerRequest> {
     let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
-    Ok(protobuf::Message::parse_from_bytes(&full_unprefixed_buffer)?)
+    Ok(protobuf::Message::parse_from_bytes(
+        &full_unprefixed_buffer,
+    )?)
 }
 
 /// Parse a response from the Runtime Manager.
@@ -151,7 +153,9 @@ pub fn parse_runtime_manager_response(
     buffer: &[u8],
 ) -> Result<transport_protocol::RuntimeManagerResponse> {
     let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
-    Ok(protobuf::Message::parse_from_bytes(&full_unprefixed_buffer)?)
+    Ok(protobuf::Message::parse_from_bytes(
+        &full_unprefixed_buffer,
+    )?)
 }
 
 pub fn parse_proxy_attestation_server_request(
@@ -159,7 +163,9 @@ pub fn parse_proxy_attestation_server_request(
     buffer: &[u8],
 ) -> Result<transport_protocol::ProxyAttestationServerRequest> {
     let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
-    Ok(protobuf::Message::parse_from_bytes(&full_unprefixed_buffer)?)
+    Ok(protobuf::Message::parse_from_bytes(
+        &full_unprefixed_buffer,
+    )?)
 }
 
 pub fn parse_proxy_attestation_server_response(
@@ -167,7 +173,9 @@ pub fn parse_proxy_attestation_server_response(
     buffer: &[u8],
 ) -> Result<transport_protocol::ProxyAttestationServerResponse> {
     let full_unprefixed_buffer = handle_protocol_buffer(session_id, buffer)?;
-    Ok(protobuf::Message::parse_from_bytes(&full_unprefixed_buffer)?)
+    Ok(protobuf::Message::parse_from_bytes(
+        &full_unprefixed_buffer,
+    )?)
 }
 
 /// Serialize a (static) data package and its package ID.
@@ -262,10 +270,7 @@ pub fn parse_request_proxy_psa_attestation_token(
 pub fn parse_cert_chain(
     chain: &transport_protocol::CertChain,
 ) -> (std::vec::Vec<u8>, std::vec::Vec<u8>) {
-    return (
-        chain.root_cert.to_vec(),
-        chain.enclave_cert.to_vec(),
-    );
+    return (chain.root_cert.to_vec(), chain.enclave_cert.to_vec());
 }
 
 pub fn serialize_proxy_psa_attestation_token(
@@ -313,11 +318,7 @@ pub fn serialize_certificate(cert: &[u8]) -> TransportProtocolResult {
 pub fn parse_proxy_psa_attestation_token(
     proto: &transport_protocol::ProxyPsaAttestationToken,
 ) -> (std::vec::Vec<u8>, std::vec::Vec<u8>, i32) {
-    (
-        proto.token.to_vec(),
-        proto.pubkey.to_vec(),
-        proto.device_id,
-    )
+    (proto.token.to_vec(), proto.pubkey.to_vec(), proto.device_id)
 }
 
 pub fn serialize_native_psa_attestation_token(
@@ -341,11 +342,7 @@ pub fn serialize_native_psa_attestation_token(
 pub fn parse_native_psa_attestation_token(
     proto: &transport_protocol::NativePsaAttestationToken,
 ) -> (std::vec::Vec<u8>, std::vec::Vec<u8>, i32) {
-    (
-        proto.token.to_vec(),
-        proto.csr.to_vec(),
-        proto.device_id,
-    )
+    (proto.token.to_vec(), proto.csr.to_vec(), proto.device_id)
 }
 
 pub fn parse_nitro_attestation_doc(

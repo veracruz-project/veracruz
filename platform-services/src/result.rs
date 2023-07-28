@@ -9,7 +9,7 @@
 //! 3. *UnknownError*: the service is available, but there was some error
 //!    raised during service execution.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

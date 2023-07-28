@@ -448,10 +448,7 @@ impl InodeTable {
     /// Assume `path` is an absolute path to a (special) file.
     /// NOTE: this function is intended to be called after the root filesystem (handler) is
     /// created.
-    fn install_services(
-        &mut self,
-        native_modules: Vec<NativeModule>,
-    ) -> FileSystemResult<()> {
+    fn install_services(&mut self, native_modules: Vec<NativeModule>) -> FileSystemResult<()> {
         for native_module in native_modules {
             let path = match native_module.r#type() {
                 NativeModuleType::Static { special_file } => Some(special_file),
@@ -550,7 +547,7 @@ impl InodeTable {
         let inode = self.get(inode);
         match inode.map(|i| i.is_dir()).unwrap_or(false) {
             true => Ok(inode?.read_dir(&self)?.iter().count() <= 2),
-            false => Ok(false)
+            false => Ok(false),
         }
     }
 
@@ -792,7 +789,10 @@ impl FileSystem {
     /// and similar with respect to the parameter `std_streams_table`.  Userspace
     /// Wasm programs are going to expect that this is true, so we need to
     /// preallocate some files corresponding to those, here.
-    pub fn new(rights_table: RightsTable, native_modules: Vec<NativeModule>) -> FileSystemResult<Self> {
+    pub fn new(
+        rights_table: RightsTable,
+        native_modules: Vec<NativeModule>,
+    ) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
             next_fd_candidate: Self::FIRST_FD,
@@ -964,10 +964,7 @@ impl FileSystem {
         Ok(())
     }
 
-    fn install_services(
-        &mut self,
-        native_modules: Vec<NativeModule>,
-    ) -> FileSystemResult<()> {
+    fn install_services(&mut self, native_modules: Vec<NativeModule>) -> FileSystemResult<()> {
         self.lock_inode_table()?.install_services(native_modules)
     }
 
@@ -1280,18 +1277,16 @@ impl FileSystem {
         // If it is a service, call it.
         // Warning: There is no input validity check performed here. It is the
         // native module's responsibility to implement that.
-        if is_service
-        {
+        if is_service {
             let (service, exec_config) = self
                 .lock_inode_table()?
                 .get_mut(&inode)?
                 .service_handler()?;
-            let native_module = service
-                .lock()
-                .map_err(|_| ErrNo::Busy)?;
+            let native_module = service.lock().map_err(|_| ErrNo::Busy)?;
 
             // Invoke native module manager
-            let mut native_module_manager = NativeModuleManager::new(*native_module.clone(), self.service_fs()?);
+            let mut native_module_manager =
+                NativeModuleManager::new(*native_module.clone(), self.service_fs()?);
             // Invoke native module with execution configuration
             native_module_manager.execute(exec_config)?;
         }
@@ -1918,7 +1913,10 @@ impl FileSystem {
         // Convert the absolute path to relative path and then find the inode
         let inode = self
             .lock_inode_table()?
-            .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash_path(path))?
+            .get_inode_by_inode_path(
+                &InodeTable::ROOT_DIRECTORY_INODE,
+                strip_root_slash_path(path),
+            )?
             .0;
         let mut rst = Vec::new();
         if self.lock_inode_table()?.is_dir(&inode) {
@@ -1979,7 +1977,10 @@ impl FileSystem {
         // Convert the absolute path to relative path and then find the inode
         let inode = self
             .lock_inode_table()?
-            .get_inode_by_inode_path(&InodeTable::ROOT_DIRECTORY_INODE, strip_root_slash_path(path))?
+            .get_inode_by_inode_path(
+                &InodeTable::ROOT_DIRECTORY_INODE,
+                strip_root_slash_path(path),
+            )?
             .0;
         let mut rst = Vec::new();
         let mut top_level_files = Vec::new();
@@ -1988,7 +1989,10 @@ impl FileSystem {
             let (all_dir, is_dir_empty) = {
                 let inode_table = self.lock_inode_table()?;
                 let inode_entry = inode_table.get(&inode)?;
-                (inode_entry.read_dir(&inode_table)?, inode_table.is_dir_empty(&inode))
+                (
+                    inode_entry.read_dir(&inode_table)?,
+                    inode_table.is_dir_empty(&inode),
+                )
             };
             if is_dir_empty? {
                 // Directory is empty (current and parent directories don't
@@ -2010,7 +2014,8 @@ impl FileSystem {
                     {
                         let mut sub_absolute_path = path.to_path_buf();
                         sub_absolute_path.push(sub_relative_path);
-                        let (mut list, _) = self.read_all_files_and_dirs_by_absolute_path(&sub_absolute_path)?;
+                        let (mut list, _) =
+                            self.read_all_files_and_dirs_by_absolute_path(&sub_absolute_path)?;
                         rst.append(&mut list);
                         if path == Path::new("/") {
                             top_level_files.push(sub_absolute_path);

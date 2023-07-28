@@ -1,6 +1,6 @@
 //! PSA Attestation library
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

@@ -1,6 +1,6 @@
 //! Data generator sdk/examples/image-processing
 //!
-//! # Authors
+//! # Authors
 //!
 //! The Veracruz Development Team.
 //!

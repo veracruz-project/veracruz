@@ -9,20 +9,17 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-
 mod server;
 
 use anyhow::anyhow;
 use env_logger;
 use log::info;
 use policy_utils::policy::Policy;
+use server::VeracruzServerNitro;
 use std::{fs, path, process};
 use structopt::StructOpt;
-use server::VeracruzServerNitro;
 use veracruz_server;
 use veracruz_server::VeracruzServer;
-
-
 
 #[derive(Debug, StructOpt)]
 #[structopt(rename_all = "kebab")]

@@ -1108,7 +1108,6 @@ impl WasmtimeRuntimeState {
         let mut vfs = lock_vfs!(caller_data);
         Self::convert_to_errno(vfs.fd_create(&mut caller, address))
     }
-
 }
 
 /// The `WasmtimeHostProvisioningState` implements everything needed to create a

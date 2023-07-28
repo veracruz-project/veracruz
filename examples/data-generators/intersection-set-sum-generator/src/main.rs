@@ -1,6 +1,6 @@
 //! Data generator sdk/examples/intersection-set-sum
 //!
-//! # Authors
+//! # Authors
 //!
 //! The Veracruz Development Team.
 //!

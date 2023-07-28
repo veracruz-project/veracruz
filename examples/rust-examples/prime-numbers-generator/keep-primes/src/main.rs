@@ -13,7 +13,6 @@
 //! See the file `LICENSING.markdown` in the Veracruz root directory for licensing and
 //! copyright information.
 
-
 use anyhow;
 use std::fs;
 

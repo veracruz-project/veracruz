@@ -78,7 +78,7 @@
 //! file cannot be encoded, then the utility will abort with no output file
 //! written.
 //!
-//! # Authors
+//! # Authors
 //!
 //! The Veracruz Development Team.
 //!

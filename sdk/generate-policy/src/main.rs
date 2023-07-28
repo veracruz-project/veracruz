@@ -18,7 +18,10 @@ use policy_utils::{
     expiry::Timepoint,
     parsers::{enforce_leading_slash, parse_renamable_paths},
     policy::Policy,
-    principal::{ExecutionStrategy, FileHash, FileRights, Identity, NativeModule, NativeModuleType, Pipeline, Program},
+    principal::{
+        ExecutionStrategy, FileHash, FileRights, Identity, NativeModule, NativeModuleType,
+        Pipeline, Program,
+    },
 };
 use regex::Regex;
 use serde_json::{json, to_string_pretty, Value};
@@ -365,9 +368,7 @@ impl Arguments {
         // Read all native module names
         let native_modules_names = matches
             .values_of("native-module-name")
-            .map_or(Vec::new(), |p| {
-                p.map(|s| s.to_string()).collect::<Vec<_>>()
-            });
+            .map_or(Vec::new(), |p| p.map(|s| s.to_string()).collect::<Vec<_>>());
 
         // Read all native module entry points
         let native_modules_entry_points = matches
@@ -583,8 +584,14 @@ impl Arguments {
     fn serialize_native_modules(&self) -> Result<Vec<NativeModule>> {
         info!("Serializing native modules.");
 
-        assert_eq!(self.native_modules_names.len(), self.native_modules_entry_points.len());
-        assert_eq!(self.native_modules_entry_points.len(), self.native_modules_special_files.len());
+        assert_eq!(
+            self.native_modules_names.len(),
+            self.native_modules_entry_points.len()
+        );
+        assert_eq!(
+            self.native_modules_entry_points.len(),
+            self.native_modules_special_files.len()
+        );
 
         let mut result = Vec::new();
         for ((name, entry_point_path), special_file) in self
@@ -594,15 +601,22 @@ impl Arguments {
             .zip(&self.native_modules_special_files)
         {
             // Add a backslash (VFS requirement)
-            let special_file = enforce_leading_slash(special_file.to_str()
-            .ok_or(
-                anyhow!("Fail to convert special_file to str."),
-            )?).into_owned();
+            let special_file = enforce_leading_slash(
+                special_file
+                    .to_str()
+                    .ok_or(anyhow!("Fail to convert special_file to str."))?,
+            )
+            .into_owned();
 
             let nm_type = if entry_point_path == &PathBuf::from("") {
-                NativeModuleType::Static { special_file: PathBuf::from(special_file) }
+                NativeModuleType::Static {
+                    special_file: PathBuf::from(special_file),
+                }
             } else {
-                NativeModuleType::Dynamic { special_file: PathBuf::from(special_file), entry_point: entry_point_path.to_path_buf() }
+                NativeModuleType::Dynamic {
+                    special_file: PathBuf::from(special_file),
+                    entry_point: entry_point_path.to_path_buf(),
+                }
             };
             result.push(NativeModule::new(name.to_string(), nm_type));
         }

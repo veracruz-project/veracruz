@@ -25,7 +25,7 @@ type EnclaveHandler<T> = Arc<Mutex<Option<T>>>;
 // copying a 100 MB file into the enclave on Linux:
 const BUFFER_SIZE: usize = 32768;
 
-fn handle_veracruz_server_request<T: VeracruzServer + Sync + Send> (
+fn handle_veracruz_server_request<T: VeracruzServer + Sync + Send>(
     enclave_handler: EnclaveHandler<T>,
     mut stream: TcpStream,
 ) -> Result<(), VeracruzServerError> {
@@ -59,7 +59,7 @@ fn handle_veracruz_server_request<T: VeracruzServer + Sync + Send> (
         }
 
         // Response this request
-        for x1 in output_data_option {
+        if let Some(x1) = output_data_option {
             for x in x1 {
                 stream.write_all(&x)?;
             }
@@ -69,7 +69,9 @@ fn handle_veracruz_server_request<T: VeracruzServer + Sync + Send> (
     Ok(())
 }
 
-pub fn new_tls_session<T: VeracruzServer + Send + Sync + ?Sized>(enclave: &mut T) -> Result<u32, VeracruzServerError> {
+pub fn new_tls_session<T: VeracruzServer + Send + Sync + ?Sized>(
+    enclave: &mut T,
+) -> Result<u32, VeracruzServerError> {
     let nls_message = RuntimeManagerRequest::NewTlsSession;
     let nls_buffer = bincode::serialize(&nls_message)?;
     enclave.send_buffer(&nls_buffer)?;
@@ -88,14 +90,12 @@ pub fn new_tls_session<T: VeracruzServer + Send + Sync + ?Sized>(enclave: &mut T
     Ok(session_id)
 }
 
-pub fn tls_data<T: VeracruzServer + Send + Sync + ?Sized> (
+pub fn tls_data<T: VeracruzServer + Send + Sync + ?Sized>(
     session_id: u32,
     input: Vec<u8>,
     enclave: &mut T,
 ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {
-
-    let std_message: RuntimeManagerRequest =
-        RuntimeManagerRequest::SendTlsData(session_id, input);
+    let std_message: RuntimeManagerRequest = RuntimeManagerRequest::SendTlsData(session_id, input);
     let std_buffer: Vec<u8> = bincode::serialize(&std_message)?;
 
     enclave.send_buffer(&std_buffer)?;
@@ -125,8 +125,7 @@ pub fn tls_data<T: VeracruzServer + Send + Sync + ?Sized> (
 
         let received_buffer: Vec<u8> = enclave.receive_buffer()?;
 
-        let received_message: RuntimeManagerResponse =
-            bincode::deserialize(&received_buffer)?;
+        let received_message: RuntimeManagerResponse = bincode::deserialize(&received_buffer)?;
         match received_message {
             RuntimeManagerResponse::TlsData(data, alive) => {
                 if !alive {
@@ -170,12 +169,13 @@ fn serve_veracruz_server_requests<T: VeracruzServer + Sync + Send + 'static>(
 
 /// A server that listens on one TCP port.
 /// This function returns when the spawned thread is listening.
-pub fn server<T: VeracruzServer + Send + Sync + 'static> (policy_json: &str, server: T) -> Result<(), VeracruzServerError> {
+pub fn server<T: VeracruzServer + Send + Sync + 'static>(
+    policy_json: &str,
+    server: T,
+) -> Result<(), VeracruzServerError> {
     let policy: Policy = serde_json::from_str(policy_json)?;
     #[allow(non_snake_case)]
-    let VERACRUZ_SERVER: EnclaveHandler<T> = Arc::new(Mutex::new(Some(
-        server,
-    )));
+    let VERACRUZ_SERVER: EnclaveHandler<T> = Arc::new(Mutex::new(Some(server)));
 
     serve_veracruz_server_requests(&policy.veracruz_server_url(), VERACRUZ_SERVER.clone())?;
     Ok(())

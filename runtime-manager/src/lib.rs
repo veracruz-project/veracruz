@@ -11,5 +11,5 @@
 
 pub mod common_runtime;
 pub mod managers;
-pub mod platforms;
 pub mod platform_runtime;
+pub mod platforms;

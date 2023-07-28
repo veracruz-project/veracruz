@@ -1,6 +1,6 @@
 //! Data generator for sdk/examples/linear-regression
 //!
-//! # Authors
+//! # Authors
 //!
 //! The Veracruz Development Team.
 //!

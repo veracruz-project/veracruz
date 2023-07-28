@@ -1,6 +1,6 @@
 //! Data generator sdk/examples/shamir-secret-sharing
 //!
-//! # Authors
+//! # Authors
 //!
 //! The Veracruz Development Team.
 //!
