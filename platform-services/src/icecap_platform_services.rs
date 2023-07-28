@@ -1,6 +1,6 @@
 //! IceCap-specific platform services
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

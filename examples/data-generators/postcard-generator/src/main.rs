@@ -1,6 +1,6 @@
 //! Data generator examples/rust-examples/postcard-native and postcard-wasm
 //!
-//! # Authors
+//! # Authors
 //!
 //! The Veracruz Development Team.
 //!

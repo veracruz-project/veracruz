@@ -3,7 +3,7 @@
 //! One of the main Veracruz integration tests, as lots of material is imported
 //! directly or indirectly, here.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

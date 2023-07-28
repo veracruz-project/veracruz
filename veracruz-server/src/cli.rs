@@ -1,6 +1,6 @@
 //! Veracruz Server command-line interface
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

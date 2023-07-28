@@ -1,6 +1,6 @@
 //! PSA Attestation library build script
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

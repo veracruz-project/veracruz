@@ -1,6 +1,6 @@
 //! Data generator sdk/examples/string-edit-distance
 //!
-//! # Authors
+//! # Authors
 //!
 //! The Veracruz Development Team.
 //!

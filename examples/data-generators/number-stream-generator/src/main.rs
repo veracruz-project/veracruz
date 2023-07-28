@@ -1,6 +1,6 @@
 //! Data generator sdk/examples/number-stream-accumulation
 //!
-//! # Authors
+//! # Authors
 //!
 //! The Veracruz Development Team.
 //!

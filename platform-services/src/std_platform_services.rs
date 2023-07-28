@@ -5,7 +5,7 @@
 //! Implements the `getclockres` and `getclocktime` platform services using
 //! functions provided by `nix::time`.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

@@ -12,7 +12,7 @@
 //! Assumed 'stream-2' : A Postcard-encoded Rust vector of  `f64` values.
 //! Ensured 'output'   : A Postcard-encoded pair of `u64` and `f64`.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!

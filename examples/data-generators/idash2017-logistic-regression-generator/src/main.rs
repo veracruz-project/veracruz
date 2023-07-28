@@ -1,6 +1,6 @@
 //! Data generator for sdk/examples/idash2017-logistic-regression
 //!
-//! # Authors
+//! # Authors
 //!
 //! The Veracruz Development Team.
 //!

@@ -1,6 +1,6 @@
 //! Data generator sdk/examples/moving-average-convergence-divergence
 //!
-//! # Authors
+//! # Authors
 //!
 //! The Veracruz Development Team.
 //!

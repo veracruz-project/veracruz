@@ -1,6 +1,6 @@
 //! Data generator sdk/examples/private-set-intersection-sum
 //!
-//! # Authors
+//! # Authors
 //!
 //! The Veracruz Development Team.
 //!

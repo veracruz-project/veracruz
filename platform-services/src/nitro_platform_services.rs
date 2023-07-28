@@ -3,7 +3,7 @@
 //! Implements the `getrandom` service using a trusted entropy source provided
 //! by the AWS Nitro Enclave environment.
 //!
-//! ## Authors
+//! ## Authors
 //!
 //! The Veracruz Development Team.
 //!
