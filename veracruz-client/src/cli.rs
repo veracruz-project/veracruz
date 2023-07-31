@@ -11,7 +11,7 @@
 
 use anyhow::anyhow;
 use policy_utils::{parsers, policy::Policy};
-use std::{fs, io, io::Read, io::Write, path, process};
+use std::{fs, io, io::Read, io::Write, path, process, time::Duration};
 use structopt::StructOpt;
 use veracruz_client::VeracruzClient;
 
@@ -171,8 +171,8 @@ fn main() {
     // create Veracruz Client instance
     qprintln!(opt, "Connecting to {}", policy.veracruz_server_url());
     let mut veracruz_client = match VeracruzClient::with_policy_and_hash(
-        opt.identity,
-        opt.key,
+        opt.identity.clone(),
+        opt.key.clone(),
         policy.clone(),
         policy.policy_hash().unwrap().to_string(),
     ) {
@@ -183,6 +183,24 @@ fn main() {
         }
     };
 
+    if !opt.compute.is_empty() {
+        let mut veracruz_client_stdout = match VeracruzClient::with_policy_and_hash(
+            opt.identity,
+            opt.key,
+            policy.clone(),
+            policy.policy_hash().unwrap().to_string(),
+        ) {
+            Ok(veracruz_client) => veracruz_client,
+            Err(err) => {
+                eprintln!("{}", err);
+                process::exit(1);
+            }
+        };
+        std::thread::spawn(move || {
+            veracruz_client_stdout.subscribe_stdout().unwrap();
+        });
+        std::thread::sleep(Duration::from_millis(100));
+    }
     let mut did_something = false;
 
     // send program(s)?

@@ -14,24 +14,22 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use runtime_manager::managers::RuntimeManagerError;
 use anyhow::{anyhow, Result};
 use clap::{App, Arg};
 use hex::decode_to_slice;
-use log::debug;
-use raw_fd::{ receive_buffer, send_buffer };
 use lazy_static::lazy_static;
-use log::{ error, info };
+use log::debug;
+use log::{error, info};
+use raw_fd::{receive_buffer, send_buffer};
+use runtime_manager::managers::session_manager::encrypt_raw_data;
+use runtime_manager::managers::RuntimeManagerError;
 use runtime_manager::{
-    common_runtime::CommonRuntime,
-    managers::session_manager::init_session_manager,
+    common_runtime::CommonRuntime, managers::session_manager::init_session_manager,
 };
-use std::{
-    net::TcpStream,
-    os::unix::io::AsRawFd,
-    os::unix::prelude::RawFd,
-    sync::Mutex,
-};
+use std::sync::mpsc;
+use std::thread;
+use std::{net::TcpStream, os::unix::io::AsRawFd, os::unix::prelude::RawFd, sync::Mutex};
+use veracruz_utils::runtime_manager_message::RuntimeManagerBroadcast;
 
 mod linux_runtime;
 
@@ -43,7 +41,12 @@ lazy_static! {
 ////////////////////////////////////////////////////////////////////////////////
 
 fn main() -> Result<(), String> {
-    linux_main().map_err(|err| format!("Linux Enclave Runtime Manager::main encap returned error:{:?}", err))
+    linux_main().map_err(|err| {
+        format!(
+            "Linux Enclave Runtime Manager::main encap returned error:{:?}",
+            err
+        )
+    })
 }
 
 /// Main entry point for Linux: parses command line arguments to find the port
@@ -90,7 +93,6 @@ pub fn linux_main() -> Result<()> {
         return Err(anyhow!(RuntimeManagerError::CommandLineArguments));
     };
 
-
     let mut measurement_bytes = vec![0u8; 32];
 
     if let Err(err) = decode_to_slice(measurement, &mut measurement_bytes) {
@@ -106,31 +108,61 @@ pub fn linux_main() -> Result<()> {
         *rmm = measurement_bytes;
     }
 
+    let stream = TcpStream::connect(&address).map_err(|e| {
+        error!("Could not connect to Veracruz Server on {}: {}", address, e);
+        anyhow!(e)
+    })?;
+    info!("Connected to Veracruz Server on {}.", address);
 
-    let linux_runtime = linux_runtime::LinuxRuntime{};
+    // Configure TCP to flush outgoing buffers immediately. This reduces latency
+    // when dealing with small packets
+    let _ = stream.set_nodelay(true);
+    let data_stream = TcpStream::connect(&address).map_err(|e| {
+        error!("Could not connect to Veracruz Server on {}: {}", address, e);
+        anyhow!(e)
+    })?;
+    info!("Connected to Veracruz Server on {}.", address);
 
-    debug!("linux_runtime_manager::linux_main accept succeeded. looping");
-    let runtime = CommonRuntime::new(&linux_runtime);
-    loop {
-        let stream = TcpStream::connect(&address).map_err(|e| {
-            error!("Could not connect to Veracruz Server on {}: {}", address, e);
-            anyhow!(e)
-        })?;
-        info!("Connected to Veracruz Server on {}.", address);
+    // Configure TCP to flush outgoing buffers immediately. This reduces latency
+    // when dealing with small packets
+    let _ = data_stream.set_nodelay(true);
+    let (tx, rx) = mpsc::channel();
 
-        // Configure TCP to flush outgoing buffers immediately. This reduces latency
-        // when dealing with small packets
-        let _ = stream.set_nodelay(true);
+    let linux_runtime = linux_runtime::LinuxRuntime { tx };
 
+    info!("linux_runtime_manager::linux_main accept succeeded. looping");
+    let runtime = CommonRuntime::new(Box::new(linux_runtime));
+    info!("linux_rutnime 2");
+    let t1 = thread::spawn(move || -> Result<()> {
         let fd: RawFd = stream.as_raw_fd();
-
-        debug!("Linux Runtime Manager::main accept succeeded. Looping");
+        info!("Linux Runtime Manager::main accept succeeded. Looping");
         loop {
             let received_buffer = receive_buffer(fd)?;
             let response_buffer = runtime.decode_dispatch(&received_buffer)?;
-            debug!("Linux Runtime Manager::main_loop received:{:02x?}", response_buffer);
+            debug!(
+                "Linux Runtime Manager::main_loop received:{:02x?}",
+                &response_buffer[..8]
+            );
             send_buffer(fd, &response_buffer)?;
         }
-    }
-}
+    });
 
+    let t2 = thread::spawn(move || -> Result<()> {
+        while let Ok(event) = rx.recv() {
+            let fd: RawFd = data_stream.as_raw_fd();
+            let encrypted = encrypt_raw_data(event.subscriber, &event.change).unwrap();
+            let response_buffer = bincode::serialize(&RuntimeManagerBroadcast {
+                subscriber: event.subscriber,
+                message: encrypted,
+            })
+            .unwrap();
+            send_buffer(fd, &response_buffer)?;
+        }
+        Ok(())
+    });
+
+    t1.join().unwrap()?;
+    t2.join().unwrap()?;
+
+    Ok(())
+}

@@ -31,7 +31,7 @@ use std::{
     os::unix::net::UnixStream,
     path::{Component, Path, PathBuf},
     string::String,
-    sync::{Arc, Mutex, MutexGuard},
+    sync::{mpsc::Sender, Arc, Mutex, MutexGuard},
     vec::Vec,
 };
 // TODO: wait for icecap to support direct conversion between bytes and os_str, bypassing
@@ -870,6 +870,9 @@ pub struct FileSystem {
     prestat_table: HashMap<Fd, PathBuf>,
     /// A list of native modules available for the computation.
     native_modules: Vec<NativeModule>,
+
+    sender: Option<Sender<BroadcastEvent>>,
+    subscribers: HashMap<PathBuf, Vec<u32>>,
 }
 
 impl Debug for FileSystem {
@@ -906,6 +909,7 @@ impl FileSystem {
     pub fn new(
         rights_table: RightsTable,
         native_modules: Vec<NativeModule>,
+        sender: Option<Sender<BroadcastEvent>>,
     ) -> FileSystemResult<Self> {
         let mut rst = Self {
             fd_table: HashMap::new(),
@@ -913,6 +917,8 @@ impl FileSystem {
             inode_table: Arc::new(Mutex::new(InodeTable::new(rights_table)?)),
             prestat_table: HashMap::new(),
             native_modules: native_modules.to_vec(),
+            sender,
+            subscribers: HashMap::new(),
         };
 
         let mut all_rights = HashMap::new();
@@ -928,6 +934,48 @@ impl FileSystem {
         Ok(rst)
     }
 
+    pub fn register_subscriber<T>(&mut self, id: u32, file_name: T) -> Result<(), ErrNo>
+    where
+        T: AsRef<Path>,
+    {
+        let expected_rights = Rights::FD_SEEK | Rights::FD_READ;
+        let file_name = file_name.as_ref();
+        if file_name == Path::new("stdout") {
+            self.subscribers
+                .entry(file_name.to_owned())
+                .or_default()
+                .push(id);
+            return Ok(());
+        }
+        let (fd, file_name) = self.find_prestat(file_name)?;
+        let fd = self.path_open(
+            fd,
+            LookupFlags::empty(),
+            &file_name,
+            OpenFlags::empty(),
+            FileSystem::DEFAULT_RIGHTS,
+            FileSystem::DEFAULT_RIGHTS,
+            FdFlags::empty(),
+        )?;
+        if !self
+            .fd_table
+            .get(&fd)
+            .ok_or(ErrNo::BadF)?
+            .fd_stat
+            .rights_base
+            .contains(expected_rights)
+        {
+            error!(
+                "internal read denies, expected rights {:?}",
+                expected_rights
+            );
+            return Err(ErrNo::Access);
+        }
+        self.fd_close(fd)?;
+        self.subscribers.entry(file_name).or_default().push(id);
+        Ok(())
+    }
+
     /// This is the *only* public API to create a new `FileSystem` (handler).
     /// It returns a `FileSystem` where directories are pre-opened with appropriate
     /// capabilities in relation to a principal, `principal`. Native modules are
@@ -939,6 +987,8 @@ impl FileSystem {
             inode_table: self.inode_table.clone(),
             prestat_table: HashMap::new(),
             native_modules: self.native_modules.to_vec(),
+            sender: self.sender.clone(),
+            subscribers: self.subscribers.clone(),
         };
 
         // Must clone as `install_prestat` needs to lock the `inode_table` too
@@ -964,6 +1014,8 @@ impl FileSystem {
             inode_table: Arc::new(Mutex::new(InodeTable::new(rights_table).unwrap())),
             prestat_table: HashMap::new(),
             native_modules: Vec::new(),
+            sender: None,
+            subscribers: HashMap::new(),
         }
     }
 
@@ -1381,6 +1433,24 @@ impl FileSystem {
     ) -> FileSystemResult<usize> {
         self.check_right(&fd, Rights::FD_WRITE)?;
         let inode = self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.inode;
+        if fd.0 == 1 {
+            let empty = vec![];
+            let mut data = vec![];
+            for b in bufs {
+                data.extend(b.as_ref());
+            }
+            if let Some(sender) = &self.sender {
+                for &subscriber in self.subscribers.get(Path::new("stdout")).unwrap_or(&empty) {
+                    sender
+                        .send(BroadcastEvent {
+                            file: "stdout".to_owned(),
+                            subscriber,
+                            change: data.clone(),
+                        })
+                        .unwrap();
+                }
+            }
+        }
 
         //// NOTE: Careful about the lock scope.,as a service may need to lock
         //// the inode_table internally.
@@ -2275,4 +2345,10 @@ pub(crate) fn strip_root_slash_str(path: &str) -> &str {
         "/" => &path[1..],
         _ => path,
     }
+}
+#[derive(Clone, Debug)]
+pub struct BroadcastEvent {
+    pub file: String,
+    pub subscriber: u32,
+    pub change: Vec<u8>,
 }

@@ -38,7 +38,6 @@ use veracruz_utils::sha256::sha256;
 // Constants.
 ////////////////////////////////////////////////////////////////////////////
 
-
 lazy_static! {
     /// The Runtime Manager path
     static ref RUNTIME_ENCLAVE_BINARY_PATH: String = {
@@ -65,6 +64,8 @@ pub struct VeracruzServerLinux {
     runtime_manager_process: Child,
     /// The socket used to communicate with the Runtime Manager enclave.
     runtime_manager_socket: TcpStream,
+    /// The socket used by runtime manager to broadcast data.
+    runtime_manager_data_socket: TcpStream,
 }
 
 impl VeracruzServerLinux {
@@ -120,7 +121,10 @@ impl VeracruzServer for VeracruzServerLinux {
             e
         })?;
 
-        println!("Looking at *RUNTIME_ENCLAVE_BINARY_PATH:{:?}", *RUNTIME_ENCLAVE_BINARY_PATH);
+        println!(
+            "Looking at *RUNTIME_ENCLAVE_BINARY_PATH:{:?}",
+            *RUNTIME_ENCLAVE_BINARY_PATH
+        );
         // make sure our image is executable
         let mut runtime_enclave_binary_permissions =
             fs::metadata(&*RUNTIME_ENCLAVE_BINARY_PATH)?.permissions();
@@ -210,7 +214,7 @@ impl VeracruzServer for VeracruzServerLinux {
 
         // Use a closure here so that we can catch any error and
         // terminate the runtime manager.
-        let (received, runtime_manager_socket) = (|| {
+        let (received, runtime_manager_socket, runtime_manager_data_socket) = (|| {
 
             // Request SIGALRM after the specified time has elapsed.
             alarm::set(RUNTIME_ENCLAVE_STARTUP_TIMEOUT);
@@ -226,10 +230,26 @@ impl VeracruzServer for VeracruzServerLinux {
 
             // Cancel the alarm.
             alarm::cancel();
+            alarm::set(RUNTIME_ENCLAVE_STARTUP_TIMEOUT);
+
+            let (runtime_manager_data_socket, _) = listener.accept().map_err(|ioerr| {
+                error!(
+                    "Failed to accept any incoming TCP connection.  Error produced: {}.",
+                    ioerr
+                );
+                VeracruzServerError::IOError(ioerr)
+            })?;
+            info!("Accepted data connection from Runtime Manager.");
+
+            // Cancel the alarm.
+            alarm::cancel();
 
             // Configure TCP to flush outgoing buffers immediately. This reduces
             // latency when dealing with small packets
+            let _ = runtime_manager_data_socket.set_nodelay(true);
+            let _ = runtime_manager_data_socket.set_nonblocking(true);
             let _ = runtime_manager_socket.set_nodelay(true);
+            let _ = runtime_manager_socket.set_nonblocking(true);
 
             info!("Sending proxy attestation 'start' message.");
 
@@ -303,7 +323,7 @@ impl VeracruzServer for VeracruzServerLinux {
                 e
             })?;
 
-            Ok((received, runtime_manager_socket))
+            Ok((received, runtime_manager_socket, runtime_manager_data_socket))
         })().map_err(|e| {
             info!("Error in parent: Killing Runtime Manager process...");
             let _ = runtime_manager_process.kill();
@@ -318,6 +338,7 @@ impl VeracruzServer for VeracruzServerLinux {
                 Ok(Self {
                     runtime_manager_process,
                     runtime_manager_socket,
+                    runtime_manager_data_socket,
                 })
             }
             RuntimeManagerResponse::Status(otherwise) => {
@@ -341,16 +362,23 @@ impl VeracruzServer for VeracruzServerLinux {
         };
     }
 
-    fn send_buffer(&mut self, buffer: &[u8])-> Result<(), VeracruzServerError> {
+    fn send_buffer(&mut self, buffer: &[u8]) -> Result<(), VeracruzServerError> {
         io_utils::fd::send_buffer(&self.runtime_manager_socket, buffer)?;
-        return Ok(())
+        return Ok(());
     }
 
     fn receive_buffer(&mut self) -> Result<Vec<u8>, VeracruzServerError> {
         io_utils::fd::receive_buffer(&self.runtime_manager_socket)
-            .map_err(|err| {
-                VeracruzServerError::Anyhow(anyhow!(err))
-            })
+            .map_err(|err| VeracruzServerError::Anyhow(anyhow!(err)))
     }
 
+    fn receive_data_buffer(&mut self) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        io_utils::fd::try_receive_buffer(&self.runtime_manager_data_socket)
+            .map_err(|err| VeracruzServerError::Anyhow(anyhow!(err)))
+    }
+
+    fn try_receive_buffer(&mut self) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        io_utils::fd::try_receive_buffer(&self.runtime_manager_socket)
+            .map_err(|err| VeracruzServerError::Anyhow(anyhow!(err)))
+    }
 }

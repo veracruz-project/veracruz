@@ -9,6 +9,8 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for copyright
 //! and licensing information.
 
+use std::io::ErrorKind;
+
 use anyhow::Result;
 use byteorder::{ByteOrder, LittleEndian};
 
@@ -42,13 +44,50 @@ where
     // 1. First read and decode the length of the data proper.
     let length = {
         let mut buff = [0u8; 9];
-        fd.read_exact(&mut buff)?;
+        while let Err(e) = fd.read_exact(&mut buff) {
+            if e.kind() != ErrorKind::WouldBlock {
+                Err(e)?
+            }
+        }
         LittleEndian::read_u64(&buff) as usize
     };
 
     // 2. Next, read the data proper.
     let mut buffer = vec![0u8; length];
-    fd.read_exact(&mut buffer)?;
+    while let Err(e) = fd.read_exact(&mut buffer) {
+        if e.kind() != ErrorKind::WouldBlock {
+            Err(e)?
+        }
+    }
 
     Ok(buffer)
+}
+
+/// Returns None if read blocks
+pub fn try_receive_buffer<T>(mut fd: T) -> Result<Option<Vec<u8>>>
+where
+    T: std::io::Read,
+{
+    // 1. First read and decode the length of the data proper.
+    let length = {
+        let mut buff = [0u8; 9];
+        match fd.read_exact(&mut buff) {
+            Err(e) if e.kind() == ErrorKind::WouldBlock => return Ok(None),
+            x => x?,
+        };
+
+        LittleEndian::read_u64(&buff) as usize
+    };
+
+    // 2. Next, read the data proper.
+    let mut buffer = vec![0u8; length];
+    loop {
+        match fd.read_exact(&mut buffer) {
+            Err(e) if e.kind() == ErrorKind::WouldBlock => continue,
+            Ok(_) => break,
+            Err(e) => Err(e)?,
+        };
+    }
+
+    Ok(Some(buffer))
 }

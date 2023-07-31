@@ -11,8 +11,10 @@
 
 use crate::managers::{ProtocolState, RuntimeManagerError, MY_SESSION_MANAGER};
 use anyhow::{anyhow, Result};
+use execution_engine::fs::BroadcastEvent;
 use policy_utils::policy::Policy;
 use session_manager::SessionContext;
+use std::sync::mpsc::Sender;
 use std::{sync::atomic::Ordering, vec::Vec};
 use veracruz_utils::csr;
 use veracruz_utils::sha256::sha256;
@@ -27,7 +29,7 @@ pub fn init_session_manager() -> Result<()> {
     Ok(())
 }
 
-pub fn load_policy(policy_json: &str) -> Result<()> {
+pub fn load_policy(policy_json: &str, sender: Sender<BroadcastEvent>) -> Result<()> {
     let policy_hash = sha256(&policy_json.as_bytes());
     let policy = Policy::from_json(policy_json)?;
 
@@ -35,7 +37,7 @@ pub fn load_policy(policy_json: &str) -> Result<()> {
         super::DEBUG_FLAG.store(true, Ordering::SeqCst);
     }
 
-    let state = ProtocolState::new(policy.clone(), hex::encode(policy_hash))?;
+    let state = ProtocolState::new(policy.clone(), hex::encode(policy_hash), sender)?;
     *super::PROTOCOL_STATE
         .lock()
         .map_err(|_| anyhow!(RuntimeManagerError::LockProtocolState))? = Some(state);
@@ -90,7 +92,19 @@ pub fn close_session(session_id: u32) -> Result<()> {
     Ok(())
 }
 
-pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<()> {
+pub fn encrypt_raw_data(session_id: u32, input_data: &[u8]) -> Result<Vec<u8>> {
+    let mut sessions = super::SESSIONS
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockSessionTable))?;
+    let this_session = sessions.get_mut(&session_id).ok_or(anyhow!(
+        RuntimeManagerError::UnavailableSessionError(session_id as u64,)
+    ))?;
+    this_session.write_plaintext_data(input_data)?;
+    let encrypted = this_session.read_tls_data()?.unwrap();
+    Ok(encrypted)
+}
+
+pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<bool> {
     let mut sessions = super::SESSIONS
         .lock()
         .map_err(|_| anyhow!(RuntimeManagerError::LockSessionTable))?;
@@ -98,10 +112,10 @@ pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<()> {
         RuntimeManagerError::UnavailableSessionError(session_id as u64,)
     ))?;
     this_session.send_tls_data(&mut input_data.to_vec())?;
-
     let plaintext_option = this_session.read_plaintext_data()?;
+    drop(sessions);
 
-    let proc_ret: super::ProvisioningResponse = match plaintext_option {
+    let (proc_ret, upgrade_async) = match plaintext_option {
         Some((client_id, plaintext_data)) => {
             super::execution_engine_manager::dispatch_on_incoming_data(
                 session_id,
@@ -110,14 +124,24 @@ pub fn send_data(session_id: u32, input_data: &[u8]) -> Result<()> {
             )?
         }
         // We need to wait longer for this to arrive.
-        None => return Ok(()),
+        None => return Ok(false),
     };
+
+    let mut sessions = super::SESSIONS
+        .lock()
+        .map_err(|_| anyhow!(RuntimeManagerError::LockSessionTable))?;
+    let this_session = sessions.get_mut(&session_id).ok_or(anyhow!(
+        RuntimeManagerError::UnavailableSessionError(session_id as u64,)
+    ))?;
 
     match proc_ret {
         // The incoming buffer is not full, so we cannot parse a complete protobuf
         // message.  We need to wait longer for this to arrive.
-        None => Ok(()),
-        Some(response) => Ok(this_session.write_plaintext_data(&response)?),
+        None => Ok(upgrade_async),
+        Some(response) => Ok({
+            this_session.write_plaintext_data(&response)?;
+            upgrade_async
+        }),
     }
 }
 

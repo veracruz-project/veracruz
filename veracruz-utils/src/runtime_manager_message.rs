@@ -91,4 +91,13 @@ pub enum RuntimeManagerResponse {
     /// The response to the `NewTLSSession` message.  Parameters in order are:
     /// - The Session ID of the created TLS session.
     TlsSession(u32),
+    /// Response to `Subscribe`. Tells vc-server to make the connection async,
+    /// so future data will be sent async by the runtime to the client
+    UpgradeAsync,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RuntimeManagerBroadcast {
+    pub subscriber: u32,
+    pub message: Vec<u8>,
 }

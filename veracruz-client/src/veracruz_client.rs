@@ -12,7 +12,12 @@
 use crate::error::VeracruzClientError;
 use anyhow::{anyhow, Result};
 use log::{error, info};
-use mbedtls::{alloc::List, pk::Pk, ssl::Context, x509::Certificate};
+use mbedtls::{
+    alloc::List,
+    pk::Pk,
+    ssl::{io::IoCallback, Context},
+    x509::Certificate,
+};
 use policy_utils::{parsers::enforce_leading_slash, policy::Policy, Platform};
 use std::{
     io::{Read, Write},
@@ -225,6 +230,22 @@ impl VeracruzClient {
             return Err(anyhow!(VeracruzClientError::ResponseNoResult));
         }
         Ok(parsed_response.result().data.clone())
+    }
+
+    pub fn subscribe_stdout(&mut self) -> Result<()> {
+        let req = transport_protocol::serialize_subscribe("stdout")?;
+        self.tls_context.send(&req)?;
+        loop {
+            let mut buf = [0u8; 32];
+            let len = self.tls_context.read(&mut buf)?;
+            if len == 0 {
+                break;
+            } else {
+                print!("{}", String::from_utf8_lossy(&buf[..len]));
+            }
+        }
+        println!("Closing stdout channel");
+        Ok(())
     }
 
     /// Request the veracruz to execute the program at the remote `path`.

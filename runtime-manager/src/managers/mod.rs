@@ -22,6 +22,7 @@ use std::{
     string::String,
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
+        mpsc::Sender,
         Mutex,
     },
     vec::Vec,
@@ -58,7 +59,7 @@ lazy_static! {
 type ProvisioningResponse = Option<Vec<u8>>;
 
 /// Result type of provisioning functions.
-pub type ProvisioningResult = Result<ProvisioningResponse>;
+pub type ProvisioningResult = Result<(ProvisioningResponse, bool)>;
 
 /// The configuration details for the ongoing provisioning of secrets into the
 /// Veracruz platform, containing information that must be persisted across the
@@ -83,7 +84,11 @@ impl ProtocolState {
     /// Constructs a new `ProtocolState` from a global policy.  The selected
     /// execution strategy is extracted from the global policy and a suitable
     /// Veracruz execution strategy is selected based on that.
-    pub fn new(global_policy: Policy, global_policy_hash: String) -> Result<Self> {
+    pub fn new(
+        global_policy: Policy,
+        global_policy_hash: String,
+        sender: Sender<execution_engine::fs::BroadcastEvent>,
+    ) -> Result<Self> {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
         let mut rights_table = global_policy.get_rights_table();
@@ -96,7 +101,7 @@ impl ProtocolState {
 
         let digest_table = global_policy.get_file_hash_table()?;
         let native_modules = global_policy.native_modules();
-        let vfs = FileSystem::new(rights_table, native_modules.to_vec())?;
+        let vfs = FileSystem::new(rights_table, native_modules.to_vec(), Some(sender))?;
 
         Ok(ProtocolState {
             global_policy,
@@ -184,6 +189,17 @@ impl ProtocolState {
         }
         Ok(Some(rst))
     }
+    /// Check if a client has capability to subscribe to a file
+    pub(crate) fn register_subscriber(
+        &mut self,
+        client_id: &Principal,
+        session_id: u32,
+        file_name: &str,
+    ) -> Result<()> {
+        info!("Register subscriber session {}", session_id);
+        self.vfs.register_subscriber(session_id, file_name)?;
+        Ok(())
+    }
 
     pub(crate) fn read_pipeline_script(&self, pipeline_id: usize) -> Result<Box<Expr>> {
         info!("try tp read pipeline_id {}.", pipeline_id);
@@ -233,7 +249,7 @@ impl ProtocolState {
         )?;
 
         let response = Self::response_error_code_returned(return_code);
-        Ok(Some(response))
+        Ok((Some(response), false))
     }
 
     /// Internal function converts error code to response message.

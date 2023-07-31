@@ -109,6 +109,9 @@ message Cert {
   bytes data = 1;
 }
 
+message Subscribe {
+  string file_name = 1;
+}
 
 message ProxyAttestationServerRequest {
   oneof message_oneof {
@@ -145,6 +148,7 @@ message RuntimeManagerRequest {
     RequestPolicyHash request_policy_hash = 10;
     Read read_file = 11;
     RequestResult request_pipeline = 12;
+    Subscribe subscribe = 13;
   }
   uint32 context = 1;
 }

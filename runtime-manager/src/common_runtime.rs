@@ -9,21 +9,24 @@
 //! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use std::sync::mpsc::Sender;
+
 use anyhow::Result;
+use execution_engine::fs::BroadcastEvent;
 use log::debug;
-use veracruz_utils::{
-    runtime_manager_message::{ RuntimeManagerRequest, RuntimeManagerResponse, Status},
+use veracruz_utils::runtime_manager_message::{
+    RuntimeManagerRequest, RuntimeManagerResponse, Status,
 };
 
-use crate::platform_runtime::PlatformRuntime;
 use crate::managers;
+use crate::platform_runtime::PlatformRuntime;
 
-pub struct CommonRuntime<'a> {
-    platform_runtime: &'a (dyn PlatformRuntime + 'a),
+pub struct CommonRuntime {
+    platform_runtime: Box<dyn PlatformRuntime + Send>,
 }
- 
-impl<'a> CommonRuntime<'a> {
-    pub fn new(pr: &'a dyn PlatformRuntime) -> CommonRuntime {
+
+impl CommonRuntime {
+    pub fn new(pr: Box<dyn PlatformRuntime + Send>) -> CommonRuntime {
         return CommonRuntime {
             platform_runtime: pr,
         };
@@ -35,12 +38,17 @@ impl<'a> CommonRuntime<'a> {
             RuntimeManagerRequest::Attestation(challenge, _challenge_id) => {
                 debug!("common_runtime::decode_dispatch Attestation");
                 let ret = self.platform_runtime.attestation(&challenge)?;
-                debug!("common_runtime::decode_dispatch Attestation complete with ret:{:?}\n", ret);
+                debug!(
+                    "common_runtime::decode_dispatch Attestation complete with ret:{:?}\n",
+                    ret
+                );
                 ret
             }
-            RuntimeManagerRequest::Initialize(policy_json, certificate_chain) => {
-                initialize(&policy_json, &certificate_chain)?
-            }
+            RuntimeManagerRequest::Initialize(policy_json, certificate_chain) => initialize(
+                &policy_json,
+                &certificate_chain,
+                self.platform_runtime.sender(),
+            )?,
             RuntimeManagerRequest::NewTlsSession => {
                 debug!("common_runtime::decode_dispatch NewTlsSession");
                 let ns_result = managers::session_manager::new_session();
@@ -63,7 +71,8 @@ impl<'a> CommonRuntime<'a> {
                 debug!("common_runtime::decode_dispatch SendTlsData");
                 let return_message =
                     match managers::session_manager::send_data(session_id, &tls_data) {
-                        Ok(_) => RuntimeManagerResponse::Status(Status::Success),
+                        Ok(false) => RuntimeManagerResponse::Status(Status::Success),
+                        Ok(true) => RuntimeManagerResponse::UpgradeAsync,
                         Err(_) => RuntimeManagerResponse::Status(Status::Fail),
                     };
                 return_message
@@ -89,8 +98,12 @@ impl<'a> CommonRuntime<'a> {
 }
 
 /// Handler for the RuntimeManagerRequest::Initialize message
-fn initialize(policy_json: &str, cert_chain: &Vec<u8>) -> Result<RuntimeManagerResponse> {
-    managers::session_manager::load_policy(policy_json)?;
+fn initialize(
+    policy_json: &str,
+    cert_chain: &Vec<u8>,
+    sender: Sender<BroadcastEvent>,
+) -> Result<RuntimeManagerResponse> {
+    managers::session_manager::load_policy(policy_json, sender)?;
     managers::session_manager::load_cert_chain(cert_chain)?;
 
     return Ok(RuntimeManagerResponse::Status(Status::Success));

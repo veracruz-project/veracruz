@@ -130,6 +130,14 @@ impl VeracruzServer for VeracruzServerNitro {
         let ret = self.enclave.receive_buffer()?;
         return Ok(ret);
     }
+
+    fn receive_data_buffer(&mut self) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        todo!()
+    }
+
+    fn try_receive_buffer(&mut self) -> Result<Option<Vec<u8>>, VeracruzServerError> {
+        todo!()
+    }
 }
 
 impl Drop for VeracruzServerNitro {

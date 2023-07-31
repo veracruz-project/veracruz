@@ -99,4 +99,8 @@ pub trait VeracruzServer {
 
     /// receive a buffer of data from the enclave
     fn receive_buffer(&mut self) -> Result<Vec<u8>, VeracruzServerError>;
+
+    fn try_receive_buffer(&mut self) -> Result<Option<Vec<u8>>, VeracruzServerError>;
+
+    fn receive_data_buffer(&mut self) -> Result<Option<Vec<u8>>, VeracruzServerError>;
 }

@@ -454,7 +454,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         native_modules.push(NativeModule::new(name.to_string(), nm_type));
     }
 
-    let mut vfs = FileSystem::new(right_table, native_modules)?;
+    let mut vfs = FileSystem::new(right_table, native_modules, None)?;
     load_input_sources(&cmdline.input_sources, &mut vfs)?;
 
     info!("Data sources loaded.");

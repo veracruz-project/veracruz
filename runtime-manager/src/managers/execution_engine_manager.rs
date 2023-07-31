@@ -40,7 +40,7 @@ fn response_invalid_request() -> ProvisioningResult {
         transport_protocol::ResponseStatus::FAILED_INVALID_REQUEST as i32,
         None,
     )?;
-    Ok(Some(rst))
+    Ok((Some(rst), false))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +51,7 @@ fn response_invalid_request() -> ProvisioningResult {
 fn dispatch_on_policy_hash(protocol_state: &ProtocolState) -> ProvisioningResult {
     let hash = protocol_state.get_policy_hash();
     let response = transport_protocol::serialize_policy_hash(hash.as_bytes())?;
-    Ok(Some(response))
+    Ok((Some(response), false))
 }
 
 /// Request to execute the file at `file_path`.
@@ -97,7 +97,7 @@ fn dispatch_on_write(
         transport_protocol::ResponseStatus::SUCCESS as i32,
         None,
     )?;
-    Ok(Some(response))
+    Ok((Some(response), false))
 }
 
 /// Append a file in the VFS. Fails if the client has no permission.
@@ -113,7 +113,7 @@ fn dispatch_on_append(
         transport_protocol::ResponseStatus::SUCCESS as i32,
         None,
     )?;
-    Ok(Some(response))
+    Ok((Some(response), false))
 }
 
 /// Read a file from the VFS. Fails if the client has no permission.
@@ -125,7 +125,21 @@ fn dispatch_on_read(
     let result =
         protocol_state.read_file(&Principal::Participant(client_id), file_name.as_str())?;
     let response = response_success(result);
-    Ok(Some(response))
+    Ok((Some(response), false))
+}
+// Subscribe to a file path on the VFS. Fails if the client has no permission.
+fn dispatch_on_subscribe(
+    protocol_state: &mut ProtocolState,
+    transport_protocol::Subscribe { file_name, .. }: transport_protocol::Subscribe,
+    client_id: u64,
+    session_id: u32,
+) -> ProvisioningResult {
+    protocol_state.register_subscriber(
+        &Principal::Participant(client_id),
+        session_id,
+        &file_name,
+    )?;
+    Ok((Some(response_success(None)), true))
 }
 
 /// Branches on a decoded protobuf message, `request`, and invokes appropriate
@@ -135,7 +149,11 @@ fn dispatch_on_read(
 /// operation? There's no guarantee of a timely shutdown, so it doesn't really
 /// guarantee better security, but if a client detects something's wrong, they
 /// may want the ability.
-fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
+fn dispatch_on_request(
+    client_id: u64,
+    tls_session_id: u32,
+    request: MESSAGE,
+) -> ProvisioningResult {
     let mut protocol_state_guard = super::PROTOCOL_STATE
         .lock()
         .map_err(|_| anyhow!(RuntimeManagerError::LockProtocolState))?;
@@ -158,9 +176,12 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
             if is_dead {
                 *protocol_state_guard = None;
             }
-            Ok(Some(response_success(None)))
+            Ok((Some(response_success(None)), false))
         }
         MESSAGE::ReadFile(read) => dispatch_on_read(protocol_state, read, client_id),
+        MESSAGE::Subscribe(subscribe) => {
+            dispatch_on_subscribe(protocol_state, subscribe, client_id, tls_session_id)
+        }
         _otherwise => response_invalid_request(),
     }
 }
@@ -193,7 +214,7 @@ pub fn dispatch_on_incoming_data(
     input: &Vec<u8>,
 ) -> ProvisioningResult {
     match parse_incoming_buffer(tls_session_id, input.clone())? {
-        None => Ok(None),
+        None => Ok((None, false)),
         Some(REQUEST {
             message_oneof: None,
             ..
@@ -201,6 +222,8 @@ pub fn dispatch_on_incoming_data(
         Some(REQUEST {
             message_oneof: Some(request),
             ..
-        }) => dispatch_on_request(client_id, request).or(response_invalid_request()),
+        }) => {
+            dispatch_on_request(client_id, tls_session_id, request).or(response_invalid_request())
+        }
     }
 }
