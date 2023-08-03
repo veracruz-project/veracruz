@@ -24,7 +24,7 @@ To learn more about Veracruz, the motivation, design, use-cases, and so on, plea
 The latest project news is available on the [Veracruz project homepage](https://veracruz-project.github.io).
 
 To jump straight into the codebase, please read the growing number of guides we have on how to get started with Veracruz:
-- [BUILD_INSTRUCTIONS.markdown](BUILD_INSTRUCTIONS.markdown) - Set up a build environment for Veracruz
+- [BUILD INSTRUCTIONS](docker/README.md) - Set up a build environment for Veracruz
 - [CLI_QUICKSTART.markdown](CLI_QUICKSTART.markdown) - Quickly run Veracruz with a prepared demo program
 
 ## News
