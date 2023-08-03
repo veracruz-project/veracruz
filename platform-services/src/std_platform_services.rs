@@ -33,10 +33,8 @@ pub fn platform_getclockres(clock_id: u8) -> result::Result<u64> {
     let timespec = match time::clock_getres(clock_id) {
         Ok(t) => t,
         Err(errno) => {
-            if let nix::Error::Sys(e) = errno {
-                if e == Errno::EINVAL {
-                    return result::Result::Unavailable;
-                }
+            if errno == Errno::EINVAL {
+                return result::Result::Unavailable;
             }
             return result::Result::UnknownError;
         }
@@ -50,10 +48,8 @@ pub fn platform_getclocktime(clock_id: u8) -> result::Result<u64> {
     let timespec = match time::clock_gettime(clock_id) {
         Ok(t) => t,
         Err(errno) => {
-            if let nix::Error::Sys(e) = errno {
-                if e == Errno::EINVAL {
-                    return result::Result::Unavailable;
-                }
+            if errno == Errno::EINVAL {
+                return result::Result::Unavailable;
             }
             return result::Result::UnknownError;
         }

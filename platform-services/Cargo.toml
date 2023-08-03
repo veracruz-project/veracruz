@@ -12,5 +12,5 @@ std = ["getrandom", "nix"]
 
 [dependencies]
 getrandom = { version = "0.2", optional = true }
-nix = { version = "0.20.2", optional = true }
-nsm_api = { package = "aws-nitro-enclaves-nsm-api", version = "0.2.1", optional = true }
+nix = { version = "0.26", optional = true }
+nsm_api = { package = "aws-nitro-enclaves-nsm-api", version = "0.3.0", optional = true }

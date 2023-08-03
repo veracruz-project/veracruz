@@ -12,7 +12,7 @@
 use anyhow::Result;
 use log::debug;
 use nix::sys::socket::{
-    accept, bind, listen as listen_vsock, socket, AddressFamily, SockAddr, SockFlag, SockType,
+    accept, bind, listen as listen_vsock, socket, AddressFamily, VsockAddr, SockFlag, SockType,
 };
 use raw_fd::{receive_buffer, send_buffer};
 use runtime_manager::common_runtime::CommonRuntime;
@@ -47,7 +47,7 @@ fn encap() -> Result<()> {
         "runtime_manager_nitro::nitro_main creating SockAddr, CID:{:?}, PORT:{:?}",
         CID, PORT
     );
-    let sockaddr = SockAddr::new_vsock(CID, PORT);
+    let sockaddr = VsockAddr::new(CID, PORT);
 
     bind(socket_fd, &sockaddr)?;
     debug!("runtime_manager_nitro::nitro_main calling accept");
