@@ -1,12 +1,12 @@
 [submodule "psa_attestation/lib/QCBOR"]
-	path = psa-attestation/lib/QCBOR
+	path = crates/psa-attestation/lib/QCBOR
 	url = https://github.com/veracruz-project/QCBOR.git
 	branch = master
 [submodule "psa_attestation/lib/t_cose"]
-	path = psa-attestation/lib/t_cose
+	path = crates/psa-attestation/lib/t_cose
 	url = https://github.com/veracruz-project/t_cose.git
 [submodule "veracruz-mcu-client/nanopb"]
-	path = veracruz-mcu-client/nanopb
+	path = sdk/veracruz-mcu-client/nanopb
 	url = https://github.com/nanopb/nanopb
 [submodule "third-party/nitro-enclave-attestation-document"]
 	path = third-party/nitro-enclave-attestation-document
