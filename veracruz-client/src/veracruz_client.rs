@@ -275,7 +275,7 @@ impl VeracruzClient {
 
     /// Check if the hash `received` matches those in the policy.
     fn compare_runtime_hash(&self, received: &[u8]) -> Result<()> {
-        let platforms = vec![Platform::Linux, Platform::Nitro, Platform::IceCap];
+        let platforms = vec![Platform::Linux, Platform::Nitro];
         for platform in platforms {
             let expected = match self.policy.runtime_manager_hash(&platform) {
                 Err(_) => continue, // no hash found for this platform

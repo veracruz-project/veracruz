@@ -70,8 +70,6 @@ pub enum Platform {
     Linux,
     /// The enclave is running under AWS Nitro enclaves.
     Nitro,
-    /// The enclave is running under IceCap.
-    IceCap,
     /// The mock platform for unit testing (client unit tests, at the moment).
     Mock,
 }
@@ -82,7 +80,6 @@ impl FromStr for Platform {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "nitro" => Ok(Platform::Nitro),
-            "icecap" => Ok(Platform::IceCap),
             "linux" => Ok(Platform::Linux),
             _ => Err(PlatformError::InvalidPlatform(String::from(s))),
         }
@@ -95,7 +92,6 @@ impl fmt::Display for Platform {
         match self {
             Platform::Linux => write!(f, "linux"),
             Platform::Nitro => write!(f, "nitro"),
-            Platform::IceCap => write!(f, "icecap"),
             Platform::Mock => write!(f, "mock"),
         }
     }

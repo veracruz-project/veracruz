@@ -23,7 +23,7 @@ Veracruz Client               Veracruz Server                        Runtime Man
 +------------+      +------------+  +------------------+      +----------------------------+
 |    TCP     |      | TCP (3011) |  |   TCP (Linux)    |      |     TCP (6000) (Linux)     |
 +------------+      +------------+  |   Unix socket    |      | Unix socket (5005) (Nitro) |
-                                    | (Icecap & Nitro) |      |  VirtIO console (IceCap)   |
+                                    |     (Nitro)      |      |                            |
                                     +------------------+      +----------------------------+
 ```
 

@@ -19,8 +19,6 @@ use common::event::TestEvent;
 use common::proxy_attestation_server::*;
 use common::util::*;
 use env_logger;
-#[cfg(any(feature = "icecap-qemu", feature = "icecap"))]
-use icecap_veracruz_server::server::VeracruzServerIceCap as VeracruzServerEnclave;
 #[cfg(feature = "linux")]
 use linux_veracruz_server::server::VeracruzServerLinux as VeracruzServerEnclave;
 use log::{error, info};
@@ -935,8 +933,6 @@ impl TestExecutor {
             Platform::Linux
         } else if cfg!(feature = "nitro") {
             Platform::Nitro
-        } else if cfg!(feature = "icecap") {
-            Platform::IceCap
         } else {
             panic!("Unknown platform.");
         };

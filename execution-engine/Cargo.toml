@@ -7,11 +7,6 @@ version = "0.3.0"
 
 [features]
 default = []
-icecap = [
-  "mbedtls/icecap",
-  "platform-services/icecap",
-  "policy-utils/icecap",
-]
 nitro = [
   "mbedtls/monitor_getrandom",
   "platform-services/nitro",
@@ -30,9 +25,6 @@ log = "0.4.13"
 anyhow = "1"
 byteorder = "1.4.3"
 cfg-if = "1"
-# ctor is not used by this crate, but we must prevent other crates from
-# picking up a newer version of this crate which does not work with IceCap:
-ctor = "=0.1.16"
 err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls", default-features = false, features = ["std", "aesni", "padlock", "tls13"] }

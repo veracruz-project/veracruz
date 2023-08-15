@@ -8,13 +8,6 @@
 [submodule "veracruz-mcu-client/nanopb"]
 	path = veracruz-mcu-client/nanopb
 	url = https://github.com/nanopb/nanopb
-[submodule "icecap/icecap"]
-	path = icecap/icecap
-	url = https://gitlab.com/icecap-project/icecap.git
-	branch = realmos
-[submodule "icecap/sysroot/rust"]
-	path = icecap/sysroot/rust
-	url = https://gitlab.com/icecap-project/rust.git
 [submodule "third-party/nitro-enclave-attestation-document"]
 	path = third-party/nitro-enclave-attestation-document
 	url = https://github.com/veracruz-project/nitro-enclave-attestation-document.git
@@ -27,21 +20,6 @@
 	path = third-party/wasmi
 	url = https://github.com/veracruz-project/wasmi.git
 	branch = veracruz
-[submodule "workspaces/icecap-runtime/deps/seL4"]
-	path = workspaces/icecap-runtime/deps/seL4
-	url = https://gitlab.com/icecap-project/seL4.git
-	branch = realmos
-[submodule "workspaces/icecap-runtime/deps/seL4_tools"]
-	path = workspaces/icecap-runtime/deps/seL4_tools
-	url = https://gitlab.com/icecap-project/seL4_tools.git
-	branch = realmos
-[submodule "workspaces/icecap-runtime/deps/capdl"]
-	path = workspaces/icecap-runtime/deps/capdl
-	url = https://gitlab.com/icecap-project/capdl.git
-[submodule "icecap/sysroot/libc"]
-	path = icecap/sysroot/libc
-	url = https://gitlab.com/icecap-project/rust-libc.git
-	branch = icecap
 [submodule "third-party/rust-mbedtls"]
 	path = third-party/rust-mbedtls
 	url = https://github.com/veracruz-project/rust-mbedtls.git

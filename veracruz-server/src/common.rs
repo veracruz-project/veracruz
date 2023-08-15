@@ -49,9 +49,6 @@ pub enum VeracruzServerError {
     #[cfg(feature = "nitro")]
     #[error(display = "VeracruzServer: Nitro Error:{:?}", _0)]
     NitroError(#[error(source)] NitroError),
-    #[cfg(feature = "icecap")]
-    #[error(display = "VeracruzServer: TransportProtocolError: {:?}.", _0)]
-    TransportProtocolError(#[error(source)] transport_protocol::TransportProtocolError),
     #[error(display = "VeracruzServer: Join Error: {:?}.", _0)]
     JoinError(std::boxed::Box<dyn std::any::Any + Send + 'static>),
     #[error(display = "VeracruzServer: Uninitialized enclave.")]

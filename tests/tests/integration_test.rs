@@ -281,9 +281,6 @@ fn server_tls_loop(policy_json: String) {
     #[cfg(feature = "linux")]
     let platform_veracruz_server =
         linux_veracruz_server::server::VeracruzServerLinux::new(&policy_json).unwrap();
-    #[cfg(feature = "icecap")]
-    let platform_veracruz_server =
-        icecap_veracruz_server::server::VeracruzServerIceCap::new(&policy_json).unwrap();
     #[cfg(feature = "nitro")]
     let platform_veracruz_server =
         nitro_veracruz_server::server::VeracruzServerNitro::new(&policy_json).unwrap();

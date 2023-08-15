@@ -508,7 +508,6 @@ impl Arguments {
             POLICY_CIPHERSUITE.to_string(),
             self.compute_linux_enclave_hash()?,
             self.compute_nitro_enclave_hash()?,
-            self.compute_icecap_enclave_hash()?,
             format!("{}", self.proxy_attestation_server_ip),
             self.serialize_proxy_service_certificate()?,
             self.enclave_debug_mode,
@@ -712,14 +711,6 @@ impl Arguments {
         info!("Hash successfully computed, {}.", content);
 
         Ok(Some(content))
-    }
-
-    // HACK attestation not yet implemented for IceCap
-    #[inline]
-    fn compute_icecap_enclave_hash(&self) -> Result<Option<String>> {
-        Ok(Some(
-            "deadbeefdeadbeefdeadbeefdeadbeeff00dcafef00dcafef00dcafef00dcafe".to_string(),
-        ))
     }
 
     /// Serializes the proxy attestation service certificate (basically reads the

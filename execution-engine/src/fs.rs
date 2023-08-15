@@ -32,10 +32,7 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
     vec::Vec,
 };
-// TODO: wait for icecap to support direct conversion between bytes and os_str, bypassing
-// potential utf-8 encoding check
 use log::error;
-#[cfg(not(feature = "icecap"))]
 use std::{
     ffi::OsString,
     os::unix::ffi::{OsStrExt, OsStringExt},
@@ -363,11 +360,6 @@ impl InodeImpl {
         };
         let mut rst = Vec::new();
         for (index, (path, inode)) in dir.iter().enumerate() {
-            // TODO: wait for icecap support direct conversion from os_str to bytes, bypassing
-            // potential utf-8 encoding check when calling to_str
-            #[cfg(feature = "icecap")]
-            let path_byte = path.as_os_str().to_str().unwrap().as_bytes().to_vec();
-            #[cfg(not(feature = "icecap"))]
             let path_byte = path.as_os_str().as_bytes().to_vec();
             let dir_ent = DirEnt {
                 next: (u64::try_from_or_errno(index)? + 1u64).into(),
@@ -1926,12 +1918,6 @@ impl FileSystem {
                 inode_table.get(&inode)?.read_dir(&inode_table)?
             };
             for (_, sub_relative_path) in all_dir.iter() {
-                // TODO: wait for icecap support direct conversion from bytes to os_str, bypassing
-                // potential utf-8 encoding check
-                #[cfg(feature = "icecap")]
-                let sub_relative_path =
-                    PathBuf::from(String::from_utf8(sub_relative_path.to_vec()).unwrap());
-                #[cfg(not(feature = "icecap"))]
                 let sub_relative_path =
                     PathBuf::from(OsString::from_vec(sub_relative_path.to_vec()));
                 // Ignore the path for current and parent directories.
@@ -2000,12 +1986,6 @@ impl FileSystem {
                 rst.push((path.to_path_buf(), None));
             } else {
                 for (_, sub_relative_path) in all_dir.iter() {
-                    // TODO: wait for icecap support direct conversion from bytes to os_str, bypassing
-                    // potential utf-8 encoding check
-                    #[cfg(feature = "icecap")]
-                    let sub_relative_path =
-                        PathBuf::from(String::from_utf8(sub_relative_path.to_vec()).unwrap());
-                    #[cfg(not(feature = "icecap"))]
                     let sub_relative_path =
                         PathBuf::from(OsString::from_vec(sub_relative_path.to_vec()));
                     // Ignore the path for current and parent directories.

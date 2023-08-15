@@ -1,4 +1,0 @@
-[env]
-CC_x86_64_unknown_linux_gnu = "gcc"
-CC_aarch64_unknown_linux_gnu = "gcc"
-VERACRUZ_ICECAP_QEMU_IMAGE = { value = "../icecap-runtime/build/qemu/disposable/cmake/elfloader/build/elfloader", relative = true }

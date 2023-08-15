@@ -18,16 +18,6 @@ cli = [
   "structopt",
 ]
 debug = []
-icecap = [
-  "io-utils/icecap",
-  "policy-utils/icecap",
-  "psa-attestation",
-  "signal-hook",
-  "tempfile",
-  "veracruz-utils/icecap",
-]
-icecap-lkvm = []
-icecap-qemu = []
 linux = [
   "data-encoding",
   "io-utils/linux",
