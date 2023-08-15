@@ -17,11 +17,8 @@ ARG VERSION="latest"
 FROM veracruz/ci-base:${VERSION} as final
 
 ARG ARCH=x86_64
-ARG ICECAP_RUST_VERSION=1.60.0
 
 RUN rustup target add ${ARCH}-unknown-linux-musl wasm32-wasi && \
-    rustup toolchain install ${ICECAP_RUST_VERSION} --target aarch64-unknown-linux-gnu && \
-    rustup component add rustfmt && \
-    rustup component add --toolchain ${ICECAP_RUST_VERSION} rustfmt
+    rustup component add rustfmt
 
 WORKDIR /work

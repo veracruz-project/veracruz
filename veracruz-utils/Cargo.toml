@@ -6,11 +6,6 @@ name = "veracruz-utils"
 version = "0.3.0"
 
 [features]
-icecap = [
-  "mbedtls/icecap",
-  "platform-services/icecap",
-  "serde/derive",
-]
 linux = [
   "platform-services/std",
   "serde/derive",

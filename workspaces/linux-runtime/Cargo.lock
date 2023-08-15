@@ -666,7 +666,6 @@ dependencies = [
  "anyhow",
  "byteorder",
  "cfg-if",
- "ctor",
  "err-derive",
  "lazy_static",
  "log",

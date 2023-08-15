@@ -88,8 +88,6 @@ pub struct Policy {
     runtime_manager_hash_linux: Option<String>,
     /// The hash of the Veracruz trusted runtime for AWS Nitro Enclaves.
     runtime_manager_hash_nitro: Option<String>,
-    /// The hash of the Veracruz trusted runtime for IceCap.
-    runtime_manager_hash_icecap: Option<String>,
     /// The URL of the proxy attestation service.
     proxy_attestation_server_url: String,
     /// The PEM encoded certificate for the proxy service that matches the chosen
@@ -127,7 +125,6 @@ impl Policy {
         ciphersuite: String,
         runtime_manager_hash_linux: Option<String>,
         runtime_manager_hash_nitro: Option<String>,
-        runtime_manager_hash_icecap: Option<String>,
         proxy_attestation_server_url: String,
         proxy_service_cert: String,
         debug: bool,
@@ -151,7 +148,6 @@ impl Policy {
             ciphersuite,
             runtime_manager_hash_linux,
             runtime_manager_hash_nitro,
-            runtime_manager_hash_icecap,
             proxy_attestation_server_url,
             debug,
             execution_strategy,
@@ -233,10 +229,6 @@ impl Policy {
                 .ok_or(anyhow!(PolicyError::InvalidPlatform))?,
             Platform::Nitro => self
                 .runtime_manager_hash_nitro
-                .as_ref()
-                .ok_or(anyhow!(PolicyError::InvalidPlatform))?,
-            Platform::IceCap => self
-                .runtime_manager_hash_icecap
                 .as_ref()
                 .ok_or(anyhow!(PolicyError::InvalidPlatform))?,
             Platform::Mock => self

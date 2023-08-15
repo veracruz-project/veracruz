@@ -14,7 +14,6 @@ cargo-features = ["resolver"]
 
 [workspace]
 exclude = [
-  "crates/icecap-veracruz-server",
   "crates/nitro-veracruz-server",
   "crates/third-party/rust-mbedtls",
 ]

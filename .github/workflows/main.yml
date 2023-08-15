@@ -252,44 +252,6 @@ jobs:
           name: nitro
           path: workspaces/**/Cargo.lock
 
-  icecap:
-    runs-on: ubuntu-latest
-    needs: [check]
-    outputs:
-      output: ${{ steps.check-diff.outputs.cargo-lock }}
-    container:
-      image: ghcr.io/veracruz-project/veracruz/ci@sha256:dd434df33153bd8915859eb0f280270d2cdf07d6100ef4332bcd18c5e8525068
-      volumes:
-        - ${{ github.workspace }}:/work/veracruz
-    steps:
-      - name: Check out the Veracruz repository
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-      - name: add the GITHUB_WORKSPACE into git config
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - name: Running IceCap test script
-        id: icecap-build
-        run: |
-            VERACRUZ_TEST_TIMEOUT=2400 make -C /work/veracruz/workspaces icecap-tests PROFILE=release
-      - name: Check modification to Cargo.lock
-        id: check-diff
-        run: |
-          file_changed=$(git diff --diff-filter=ACMUXTRD --name-only -- '**Cargo.lock' | tr '\n' ' ' | xargs)
-          echo "cargo-lock=$file_changed" >> $GITHUB_OUTPUT
-          if [ -n "$file_changed" ] ; then
-              echo "::warning::Cargo.lock files modified";
-              echo "::warning::Cargo.lock change list: ${{ steps.check-diff.outputs.cargo-lock }}";
-          fi
-      - name: Upload Cargo.lock files
-        id: upload-changed-cargo-lock
-        if: steps.check-diff.outputs.cargo-lock != ''
-        uses: actions/upload-artifact@v3
-        with:
-          name: icecap
-          path: workspaces/**/Cargo.lock
-
   # tests that the CLI_QUICKSTART.markdown is still up to date
   quickstart:
     runs-on: ubuntu-latest
@@ -344,7 +306,7 @@ jobs:
           path: workspaces/**/Cargo.lock
 
   cargo-lock-check:
-    needs: [linux, nitro, icecap, quickstart]
+    needs: [linux, nitro, quickstart]
     runs-on: ubuntu-latest
     steps:
       - name: linux
@@ -356,11 +318,6 @@ jobs:
         if: needs.nitro.outputs.output != ''
         run: |
           echo "::warning:: nitro Cargo.lock change list: ${{ needs.nitro.outputs.output }}"
-          exit 1
-      - name: icecap
-        if: needs.icecap.outputs.output != ''
-        run: |
-          echo "::warning:: icecap Cargo.lock change list: ${{ needs.icecap.outputs.output }}"
           exit 1
       - name: quickstart
         if: needs.quickstart.outputs.output != ''

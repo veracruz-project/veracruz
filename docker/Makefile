@@ -54,7 +54,7 @@ base: base/Dockerfile
 		-t $(IMAGE)/$*/$(USER):$(VERSION) -f $< .
 
 .PHONY: all-base
-all-base: base linux-base nitro-base icecap-base
+all-base: base linux-base nitro-base
 	echo 'All base docker images re-built from scratch'
 
 # Make sure the cargo registry directory exists to avoid permission issues
@@ -110,23 +110,6 @@ localci-base: ci/Dockerfile.local ci-base
 .PHONY: all-ci
 all-ci: ci-image localci-base
 	echo 'All CI docker images re-built from scratch'
-
-#####################################################################
-# IceCap-related targets
-
-.PHONY:
-icecap-run: | $(HOME)/.cargo/registry
-	docker run --init --privileged --rm -d $(DOCKER_RUN_PARAMS) \
-		--name $(CONTAINER)-icecap-$(USER)-$(VERSION) \
-		$(IMAGE)/icecap/$(USER):$(VERSION) sleep inf
-
-.PHONY:
-icecap-exec:
-	docker exec -i -t $(CONTAINER)-icecap-$(USER)-$(VERSION) /bin/bash || true
-
-.PHONY: icecap-base
-icecap-base: icecap/Dockerfile base
-	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/icecap/$(USER):$(VERSION) -f $< .
 
 #####################################################################
 # Linux-related targets

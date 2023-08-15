@@ -6,11 +6,6 @@ name = "session-manager"
 version = "0.3.0"
 
 [features]
-icecap = [
-  "mbedtls/icecap",
-  "policy-utils/icecap",
-  "veracruz-utils/icecap",
-]
 nitro = [
   "mbedtls/monitor_getrandom",
   "policy-utils/std",

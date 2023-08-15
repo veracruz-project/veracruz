@@ -8,18 +8,6 @@ resolver = "2"
 
 [features]
 default = []
-icecap = [
-  "bincode",
-  "execution-engine/icecap",
-  "policy-utils/icecap",
-  "psa-attestation/icecap",
-  "serde",
-  "session-manager/icecap",
-  "transport-protocol/icecap",
-  "veracruz-utils/icecap",
-]
-icecap-lkvm = []
-icecap-qemu = []
 linux = [
   "bincode",
   "execution-engine/std",

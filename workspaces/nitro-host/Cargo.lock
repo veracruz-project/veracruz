@@ -656,25 +656,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "icecap-veracruz-server"
-version = "0.3.0"
-dependencies = [
- "anyhow",
- "bincode",
- "env_logger",
- "err-derive",
- "lazy_static",
- "log",
- "policy-utils",
- "proxy-attestation-client",
- "signal-hook",
- "structopt",
- "tempfile",
- "veracruz-server",
- "veracruz-utils",
-]
-
-[[package]]
 name = "idna"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1899,7 +1880,6 @@ dependencies = [
  "either",
  "env_logger",
  "hex",
- "icecap-veracruz-server",
  "lazy_static",
  "linux-veracruz-server",
  "log",

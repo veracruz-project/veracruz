@@ -6,10 +6,6 @@ name = "policy-utils"
 version = "0.3.0"
 
 [features]
-icecap = [
-  "mbedtls/icecap",
-  "veracruz-utils/icecap",
-]
 nitro = [
   "mbedtls/monitor_getrandom",
   "veracruz-utils/nitro",

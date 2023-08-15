@@ -7,7 +7,6 @@ version = "0.3.0"
 
 [features]
 default = []
-icecap = []
 nitro = ["nix", "nsm_api"]
 std = ["getrandom", "nix"]
 
