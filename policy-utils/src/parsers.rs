@@ -20,7 +20,7 @@ use super::{CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STD
 use crate::pipeline::Expr;
 use lalrpop_util::lalrpop_mod;
 #[cfg(feature = "std")]
-use std::{borrow::Cow, ffi, path};
+use std::{borrow::Cow, path};
 
 lalrpop_mod!(pipeline);
 
@@ -33,11 +33,7 @@ lalrpop_mod!(pipeline);
 /// sort of mistakes should still be caught by a later
 /// "file-not-found" error.
 #[cfg(feature = "std")]
-pub fn parse_renamable_path(s: &ffi::OsStr) -> Result<(String, path::PathBuf), ffi::OsString> {
-    let s = s
-        .to_str()
-        .ok_or(ffi::OsString::from(format!("invalid path: {:?}", s)))?;
-
+pub fn parse_renamable_path(s: &str) -> Result<(String, path::PathBuf), &'static str> {
     match s.splitn(2, '=').collect::<Vec<_>>().as_slice() {
         [name, path] => Ok((String::from(*name), path::PathBuf::from(*path))),
         [path] => Ok((String::from(*path), path::PathBuf::from(*path))),
@@ -56,13 +52,7 @@ pub fn parse_renamable_path(s: &ffi::OsStr) -> Result<(String, path::PathBuf), f
 /// sort of mistakes should still be caught by a later
 /// "file-not-found" error.
 #[cfg(feature = "std")]
-pub fn parse_renamable_paths(
-    s: &ffi::OsStr,
-) -> Result<Vec<(String, path::PathBuf)>, ffi::OsString> {
-    let s = s
-        .to_str()
-        .ok_or(ffi::OsString::from(format!("invalid path: {:?}", s)))?;
-
+pub fn parse_renamable_paths(s: &str) -> Result<Vec<(String, path::PathBuf)>, &'static str> {
     s.split(',')
         .map(|s| parse_renamable_path(s.as_ref()))
         .collect::<Result<Vec<_>, _>>()

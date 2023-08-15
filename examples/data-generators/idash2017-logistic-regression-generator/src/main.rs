@@ -9,190 +9,176 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use clap::{App, Arg};
+use clap::Arg;
 use rand::{prelude::*, rngs::StdRng, SeedableRng};
 use rand_distr::{Distribution, Normal};
 use std::{error::Error, fs::File, io::prelude::*};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let matches = App::new("Data generator for logistic regression")
+    let matches = clap::Command::new("Data generator for logistic regression")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
         .about("Generate datasets for logistic regression. Each dataset contains a training set with the configuration and a testing set. In `generate` mode, it generates random raw data and then datasets. In `external` mode, it generates datasets from an external data source.")
         // common configuration for all subcommand
         .arg(
-            Arg::with_name("fold")
-                .short("o")
+            Arg::new("fold")
+                .short('o')
                 .long("fold")
                 .value_name("NUBMER")
                 .help("Divide the data into several folds, one of which is the testing set and the rest are the training set. This parameter also determines the number of datasets.")
-                .takes_value(true)
-                .validator(is_u64)
+                .num_args(1)
+                .value_parser(clap::value_parser!(u64))
                 .default_value("5"),
         )
         .arg(
-            Arg::with_name("number_of_iteration")
-                .short("n")
+            Arg::new("number_of_iteration")
+                .short('n')
                 .long("num_of_iter")
                 .value_name("NUBMER")
                 .help("The number of interation in the training.")
-                .takes_value(true)
-                .validator(is_u64)
+                .num_args(1)
+                .value_parser(clap::value_parser!(u64))
                 .default_value("7")
         )
         .arg(
-            Arg::with_name("sigmoid")
-                .short("g")
+            Arg::new("sigmoid")
+                .short('g')
                 .long("sigmoid")
                 .value_name("NUBMER")
                 .help("The degree of sigmoid in the training.")
-                .takes_value(true)
-                .validator(is_3_5_7)
+                .num_args(1)
+                .value_parser(["3", "5", "7"])
                 .default_value("5")
         )
         .arg(
-            Arg::with_name("gamma_up")
-                .short("u")
+            Arg::new("gamma_up")
+                .short('u')
                 .long("gamma_up")
                 .value_name("NUBMER")
                 .help("Gamma up.")
-                .takes_value(true)
-                .validator(is_i64)
+                .num_args(1)
+                .value_parser(clap::value_parser!(i64))
                 .default_value("1")
         )
         .arg(
-            Arg::with_name("gamma_down")
-                .short("d")
+            Arg::new("gamma_down")
+                .short('d')
                 .long("gamma_down")
                 .value_name("NUBMER")
                 .help("Gamma down.")
-                .takes_value(true)
-                .validator(is_i64)
+                .num_args(1)
+                .value_parser(clap::value_parser!(i64))
                 .default_value("-1")
         )
         .arg(
-            Arg::with_name("seed")
-                .short("e")
+            Arg::new("seed")
+                .short('e')
                 .long("seed")
                 .value_name("NUBMER")
                 .help("The seed for the random number generator.")
-                .takes_value(true)
-                .validator(is_u64)
+                .num_args(1)
+                .value_parser(clap::value_parser!(u64))
                 .default_value("0"),
         )
         // Command for generate random data
         .subcommand(
-            App::new("generate")
+            clap::Command::new("generate")
                .about("Generate random raw data and shuffle it into [FOLD] datasets. Each dataset contains postcard encode of a training set with the configuration and a testing set.")
                .version("pre-alpha")
                .author("The Veracruz Development Team")
                .arg(
-                   Arg::with_name("file_prefix")
-                       .short("f")
+                   Arg::new("file_prefix")
+                       .short('f')
                        .long("file_prefix")
                        .value_name("STRING")
                        .help("The prefix for the output file")
-                       .takes_value(true)
+                       .num_args(1)
                        .required(true)
                )
                .arg(
-                   Arg::with_name("row")
-                       .short("r")
+                   Arg::new("row")
+                       .short('r')
                        .long("row")
                        .value_name("NUMBER")
                        .help("The number of rows, or entries, in the generated raw data")
-                       .takes_value(true)
-                       .validator(is_u64)
+                       .num_args(1)
+                       .value_parser(clap::value_parser!(u64))
                        .default_value("20000")
                )
                .arg(
-                   Arg::with_name("column")
-                       .short("c")
+                   Arg::new("column")
+                       .short('c')
                        .long("column")
                        .value_name("NUMBER")
                        .help("The number of column, or dimension, in the generated raw data")
-                       .takes_value(true)
-                       .validator(is_u64)
+                       .num_args(1)
+                       .value_parser(clap::value_parser!(u64))
                        .default_value("20")
                )
         )
         // Command for generate data from external resource.
         .subcommand(
-            App::new("external")
+            clap::Command::new("external")
                .about("Generate [FOLD] dataset from external resource. Each dataset contains postcard encode of a training set with the configuration and a testing set.")
                .version("pre-alpha")
                .author("The Veracruz Development Team")
                .arg(
-                   Arg::with_name("input_file")
-                       .short("i")
+                   Arg::new("input_file")
+                       .short('i')
                        .long("input_file")
                        .value_name("STRING")
                        .help("The data source")
-                       .takes_value(true)
+                       .num_args(1)
                        .required(true)
                )
                .arg(
-                   Arg::with_name("is_label_first")
-                       .short("l")
+                   Arg::new("is_label_first")
+                       .short('l')
                        .long("is_label_first")
                        .value_name("BOOLEAN")
                        .help("If the label is the first column (true) or the last (false)")
-                       .takes_value(true)
-                       .validator(is_bool)
+                       .num_args(1)
+                       .value_parser(clap::value_parser!(bool))
                        .default_value("false")
                )
         )
         .get_matches();
 
-    let fold = matches
-        .value_of("fold")
-        .ok_or("Failed to read the number of fold.")?
-        .parse::<u64>()
-        .map_err(|_| "Failed to parse the number of fold.")?;
-    let num_of_iter = matches
-        .value_of("number_of_iteration")
-        .ok_or("Failed to read the number of interation.")?
-        .parse::<u64>()
-        .map_err(|_| "Failed to parse the number of interation.")?;
-    let degree_of_sigmoid = matches
-        .value_of("sigmoid")
-        .ok_or("Failed to read the degree of sigmoid.")?
-        .parse::<u64>()
-        .map_err(|_| "Failed to parse the degree of sigmoid.")?;
-    let gamma_up = matches
-        .value_of("gamma_up")
-        .ok_or("Failed to read the gamma-up value.")?
-        .parse::<i64>()
-        .map_err(|_| "Failed to parse the gamma-up value.")?;
-    let gamma_down = matches
-        .value_of("gamma_down")
-        .ok_or("Failed to read the gamma-down value.")?
-        .parse::<i64>()
-        .map_err(|_| "Failed to parse the gamma-down value.")?;
-    let seed = matches
-        .value_of("seed")
-        .ok_or("Failed to read the seed")?
-        .parse::<u64>()
-        .map_err(|_| "Cannot parse seed")?;
+    let fold = *matches
+        .get_one::<u64>("fold")
+        .expect("Failed to read the number of fold.");
+    let num_of_iter = *matches
+        .get_one::<u64>("number_of_iteration")
+        .expect("Failed to read the number of interation.");
+    let s: String = matches
+        .get_one::<String>("sigmoid")
+        .expect("Failed to read the degree of sigmoid.")
+        .to_string();
+    let degree_of_sigmoid: u64 = s.parse::<u64>()?;
+    let gamma_up = *matches
+        .get_one::<i64>("gamma_up")
+        .expect("Failed to read the gamma-up value.");
+    let gamma_down = *matches
+        .get_one::<i64>("gamma_down")
+        .expect("Failed to read the gamma-down value.");
+    let seed = *matches
+        .get_one::<u64>("seed")
+        .expect("Failed to read the seed.");
 
     let mut rng = StdRng::seed_from_u64(seed);
 
     // Read the data or generate data depending on the subcommand
     let (file_prefix, header, mut dataset) = match matches.subcommand() {
-        ("generate", Some(sub_args)) => {
+        Some(("generate", sub_args)) => {
             let file_prefix = sub_args
-                .value_of("file_prefix")
-                .ok_or("Failed to read the prefix name of the output file.")?;
-            let row = sub_args
-                .value_of("row")
-                .ok_or("Failed to read the number of rows.")?
-                .parse::<u64>()
-                .map_err(|_| "Failed to parse the number of rows.")?;
-            let column = sub_args
-                .value_of("column")
-                .ok_or("Failed to read the number of columns.")?
-                .parse::<u64>()
-                .map_err(|_| "Failed to parse the number of columns.")?;
+                .get_one::<String>("file_prefix")
+                .expect("Failed to read the prefix name of the output file.");
+            let row = *sub_args
+                .get_one::<u64>("row")
+                .expect("Failed to read the number of rows.");
+            let column = *sub_args
+                .get_one::<u64>("column")
+                .expect("Failed to read the number of columns.");
 
             let normal =
                 Normal::new(0.0, 100.0).map_err(|_| "Failed to generate a normal distribution")?;
@@ -210,15 +196,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             header[0] = String::from("Y");
             (file_prefix.to_string(), header, dataset)
         }
-        ("external", Some(sub_args)) => {
-            let is_y_first = sub_args
-                .value_of("is_label_first")
-                .ok_or("Failed to read the value of is-label-first.")?
-                .parse::<bool>()
-                .map_err(|_| "Failed to parse the value of is-label-first.")?;
+        Some(("external", sub_args)) => {
+            let is_y_first = *sub_args
+                .get_one::<bool>("is_label_first")
+                .expect("Failed to read the value of is-label-first.");
             let input_file = sub_args
-                .value_of("input_file")
-                .ok_or("Failed to read the input filename.")?;
+                .get_one::<String>("input_file")
+                .expect("Failed to read the input filename.");
             let file_prefix: Vec<&str> = input_file.split('.').collect();
             let file_prefix = file_prefix.first().ok_or("filename error")?;
             let (header, dataset) = read_csv(&input_file, is_y_first)?;
@@ -254,40 +238,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
-}
-
-fn is_u64(v: String) -> Result<(), String> {
-    match v.parse::<u64>() {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("Cannot parse {} to u64, with error {:?}", v, e)),
-    }
-}
-
-fn is_i64(v: String) -> Result<(), String> {
-    match v.parse::<i64>() {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("Cannot parse {} to i64, with error {:?}", v, e)),
-    }
-}
-
-fn is_3_5_7(v: String) -> Result<(), String> {
-    match v.parse::<u64>() {
-        Ok(o) => {
-            if o == 3 || o == 5 || o == 7 {
-                Ok(())
-            } else {
-                Err(format!("Value {} must be 3, 5or 7", o))
-            }
-        }
-        Err(e) => Err(format!("Cannot parse {} to u64, with error {:?}", v, e)),
-    }
-}
-
-fn is_bool(v: String) -> Result<(), String> {
-    match v.parse::<bool>() {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("Cannot parse {} to bool, with error {:?}", v, e)),
-    }
 }
 
 type Dataset = Vec<Vec<f64>>;

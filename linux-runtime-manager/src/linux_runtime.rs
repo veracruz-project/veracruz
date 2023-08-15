@@ -73,7 +73,7 @@ impl PlatformRuntime for LinuxRuntime {
         let ret = unsafe {
             psa_initial_attest_load_key(
                 TOTALLY_INSECURE_ROOT_PRIVATE_KEY.as_ptr(),
-                TOTALLY_INSECURE_ROOT_PRIVATE_KEY.len() as u64,
+                TOTALLY_INSECURE_ROOT_PRIVATE_KEY.len(),
                 &mut root_key_handle,
             )
         };
@@ -86,7 +86,7 @@ impl PlatformRuntime for LinuxRuntime {
         }
 
         let mut token = Vec::with_capacity(2048);
-        let mut token_len: u64 = 0;
+        let mut token_len: usize = 0;
 
         // Section 3.2.1 of https://www.ietf.org/archive/id/draft-tschofenig-rats-psa-token-09.txt
         // EAT UEID of type RAND.
@@ -107,16 +107,16 @@ impl PlatformRuntime for LinuxRuntime {
         let ret = unsafe {
             psa_initial_attest_get_token(
                 runtime_manager_hash.as_ptr(),
-                runtime_manager_hash.len() as u64,
+                runtime_manager_hash.len(),
                 csr_hash.as_ptr() as *const u8,
-                csr_hash.len() as u64,
+                csr_hash.len(),
                 enclave_name.as_ptr() as *const c_char,
-                enclave_name.len() as u64,
+                enclave_name.len(),
                 challenge.as_ptr() as *const u8,
-                challenge.len() as u64,
+                challenge.len(),
                 token.as_mut_ptr() as *mut u8,
-                token.capacity() as u64,
-                &mut token_len as *mut u64,
+                token.capacity(),
+                &mut token_len,
             )
         };
 

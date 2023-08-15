@@ -13,9 +13,9 @@ path = "src/lib.rs"
 # a feature to enable CLI-only dependencies
 # https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
 cli = [
+  "clap",
   "env_logger",
   "policy-utils/std",
-  "structopt",
 ]
 debug = []
 linux = [
@@ -38,15 +38,16 @@ nitro = [
 anyhow = "1"
 base64 = "0.13.0"
 bincode = { version = "1.2.1", default-features = false }
+clap = { version = "4", features = ["derive"], optional = true}
 data-encoding = { version = "2.3.2", optional = true }
-env_logger = { version = "0.9.0", optional = true }
+env_logger = { version = "0.10.0", optional = true }
 err-derive = "0.2"
 hex = "0.4.2"
 io-utils = { path = "../io-utils", optional = true }
 lazy_static = "1.4"
 log = "0.4.13"
-nitro-enclave = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.1", optional = true}
-nix = { version = "0.20.2", optional = true }
+nitro-enclave = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.2", optional = true }
+nix = { version = "0.26", optional = true }
 postcard = "1.0.0"
 policy-utils = { path = "../policy-utils" }
 proxy-attestation-client = { git = "https://github.com/veracruz-project/proxy-attestation-client", tag = "v0.2" }
@@ -56,7 +57,6 @@ reqwest = { version = "0.11", default-features = false, features = ["blocking", 
 serde = { version = "1.0.115", default-features = false, features = ["derive"] }
 serde_json = "1.0"
 signal-hook = { version = "0.3.13", optional = true }
-structopt = { version = "0.3", optional = true, features = ["wrap_help"] }
 tempfile = { version = "3.2.0", optional = true }
 transport-protocol = { path = "../transport-protocol" }
 uuid = { version = "1.1.2", features = ["serde"] }

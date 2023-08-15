@@ -14,7 +14,7 @@
 //! cargo run -- --file_prefix [PREFIX_STRING] --size [VEC_SIZE] --seed [RANDOM_SEED];
 //! ```
 
-use clap::{App, Arg};
+use clap::Arg;
 use rand::{rngs::StdRng, SeedableRng};
 use rand_distr::{Distribution, Normal};
 use std::{error::Error, fs::File, io::prelude::*};
@@ -26,54 +26,50 @@ use std::{error::Error, fs::File, io::prelude::*};
 /// * `size`, u64, the size of the Vecs, default is 10.
 /// * `seed`, u64, random number seed, default is 0.
 fn main() -> Result<(), Box<dyn Error>> {
-    let matches = App::new("Data generator for streaming number")
+    let matches = clap::Command::new("Data generator for streaming number")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
         .about("Generate an initial f64 encoded by postcard and then 2 vectors of streaming data, each of which contains [SIZE] numbers of f64 encoded individually by postcard.")
        .arg(
-           Arg::with_name("file_prefix")
-               .short("f")
+           Arg::new("file_prefix")
+               .short('f')
                .long("file_prefix")
                .value_name("STRING")
                .help("The prefix for the output file")
-               .takes_value(true)
+               .num_args(1)
                .required(true)
        )
        .arg(
-           Arg::with_name("size")
-               .short("s")
+           Arg::new("size")
+               .short('s')
                .long("size")
                .value_name("NUMBER")
                .help("The number of float-point numbers in each stream")
-               .takes_value(true)
-               .validator(is_u64)
+               .num_args(1)
+               .value_parser(clap::value_parser!(u64))
                .default_value("10")
        )
        .arg(
-           Arg::with_name("seed")
-               .short("e")
+           Arg::new("seed")
+               .short('e')
                .long("seed")
                .value_name("NUBMER")
                .help("The seed for the random number generator.")
-               .takes_value(true)
-               .validator(is_u64)
+               .num_args(1)
+               .value_parser(clap::value_parser!(u64))
                .default_value("0"),
         )
         .get_matches();
 
     let file_prefix = matches
-        .value_of("file_prefix")
-        .ok_or("Failed to read the file prefix.")?;
-    let dataset_size = matches
-        .value_of("size")
-        .ok_or("Failed to read the size")?
-        .parse::<u64>()
-        .map_err(|_| "Cannot parse size")?;
-    let seed = matches
-        .value_of("seed")
-        .ok_or("Failed to read the seed")?
-        .parse::<u64>()
-        .map_err(|_| "Cannot parse seed")?;
+        .get_one::<String>("file_prefix")
+        .expect("Failed to read the file prefix.");
+    let dataset_size = *matches
+        .get_one::<u64>("size")
+        .expect("Failed to read the size");
+    let seed = *matches
+        .get_one::<u64>("seed")
+        .expect("Failed to read the seed");
 
     let mut rng = StdRng::seed_from_u64(seed);
     let normal = Normal::new(0.0, 50.0)?;
@@ -105,11 +101,4 @@ fn main() -> Result<(), Box<dyn Error>> {
             .write(&number_2)?;
     }
     Ok(())
-}
-
-fn is_u64(v: String) -> Result<(), String> {
-    match v.parse::<u64>() {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("Cannot parse {} to u64, with error {:?}", v, e)),
-    }
 }

@@ -28,7 +28,7 @@ cfg-if = "1"
 err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls", default-features = false, features = ["std", "aesni", "padlock", "tls13"] }
-nix = { version = "0.20.2", optional = true }
+nix = { version = "0.26", optional = true }
 num = { version = "0.4", default-features = false }
 num-derive = { version = "0.3", default-features = false }
 num-traits = { version = "0.2", default-features = false }
@@ -39,10 +39,10 @@ serde = { version = "1.0.115", features = ["derive"] }
 serde_json = "1.0"
 strum = "0.24"
 strum_macros = "0.24"
-typetag = "=0.1.6"
+typetag = "0.1.8"
 wasi-types = { path = "../third-party/wasi-types" }
 wasmi = { path = "../third-party/wasmi" }
-wasmtime = { version = "9.0.1", optional = true }
+wasmtime = { version = "10.0.1", optional = true }
 
 [lib]
 name = "execution_engine"

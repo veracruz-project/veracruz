@@ -11,7 +11,7 @@
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Datelike, FixedOffset, Timelike};
-use clap::{App, Arg};
+use clap::{Arg, ArgAction};
 use data_encoding::HEXLOWER;
 use log::{info, warn};
 use policy_utils::{
@@ -154,108 +154,119 @@ impl Arguments {
     /// of them.  If required options are not present, or if any options are
     /// malformed, this will abort the program.
     fn parse_command_line() -> Result<Self> {
-        let matches = App::new(APPLICATION_NAME)
+        let matches = clap::Command::new(APPLICATION_NAME)
             .version(VERSION)
             .author(AUTHORS)
             .about(ABOUT)
+            .disable_help_flag(true)
             .arg(
-                Arg::with_name("certificate")
-                    .short("c")
+                Arg::new("certificate")
+                    .short('c')
                     .long("certificate")
                     .value_name("FILE")
                     .help("The filename of a cryptographic certificate identifying a computation participant.")
                     .required(true)
-                    .multiple(true),
+                    .num_args(1)
+                    .action(ArgAction::Append)
             )
             .arg(
-                Arg::with_name("capability")
-                    .short("p")
+                Arg::new("capability")
+                    .short('p')
                     .long("capability")
                     .value_name("CAPABILITIES")
                     .help("The capability table of a client or a program of the form 'output:rw,input-0:w,program.wasm:w' where each entry is separated by ','. These may be either some combination of 'r' and 'w' for reading and writing permissions respectively, or an integer containing the bitwise-or of the low-level WASI capabilities.")
                     .required(true)
-                    .multiple(true),
+                    .num_args(1)
+                    .action(ArgAction::Append)
             )
             .arg(
-                Arg::with_name("veracruz-server-ip")
-                    .short("s")
+                Arg::new("veracruz-server-ip")
+                    .short('s')
                     .long("veracruz-server-ip")
                     .value_name("IP ADDRESS")
                     .help("IP address of the Veracruz server.")
-                    .required(true),
+                    .num_args(1)
+                    .required(true)
             )
             .arg(
-                Arg::with_name("proxy-attestation-server-ip")
-                    .short("t")
+                Arg::new("proxy-attestation-server-ip")
+                    .short('t')
                     .long("proxy-attestation-server-ip")
                     .value_name("IP ADDRESS")
                     .help("IP address of the Veracruz proxy attestation server.")
-                    .required(true),
+                    .num_args(1)
+                    .required(true)
             )
             .arg(
-                Arg::with_name("proxy-attestation-server-cert")
+                Arg::new("proxy-attestation-server-cert")
                     .long("proxy-attestation-server-cert")
                     .value_name("PROXY_CERT")
                     .help("CA Certificate that the proxy attestation service uses to create and sign certificates")
-                    .required(true),
+                    .num_args(1)
+                    .required(true)
             )
             .arg(
-                Arg::with_name("css-file")
-                    .short("b")
+                Arg::new("css-file")
+                    .short('b')
                     .long("css-file")
                     .value_name("FILE")
                     .help("Filename of the CSS file for the Runtime Manager enclave for SGX measurement.")
-                    .required(false),
+                    .num_args(1)
+                    .required(false)
             )
             .arg(
-                Arg::with_name("pcr-file")
-                    .short("l")
+                Arg::new("pcr-file")
+                    .short('l')
                     .long("pcr-file")
                     .value_name("FILE")
                     .help("Filename of the PCR0 file for the Runtime Manager enclave for AWS Nitro Enclave measurement.")
-                    .required(false),
+                    .num_args(1)
+                    .required(false)
             )
             .arg(
-                Arg::with_name("output-policy-file")
-                    .short("o")
+                Arg::new("output-policy-file")
+                    .short('o')
                     .long("output-policy-file")
                     .value_name("FILE")
                     .help("Filename of the generated policy file.")
-            )
+                    .num_args(1)
+                )
             .arg(
-                Arg::with_name("certificate-expiry")
-                    .short("x")
+                Arg::new("certificate-expiry")
+                    .short('x')
                     .long("certificate-expiry")
                     .value_name("RFC2822 TIMEPOINT")
                     .help(
                         "The expiry point of the server certificate, expressed \
     as an RFC-2822 formatted timepoint.",
                     )
-                    .required(true),
+                    .num_args(1)
+                    .required(true)
             )
             .arg(
-                Arg::with_name("program-binary")
-                    .short("w")
+                Arg::new("program-binary")
+                    .short('w')
                     .long("program-binary")
                     .value_name("FILE")
                     .help("Specifies the filename of the WASM binary to use for the computation. \
     This can be of the form \"--program-binary name\" or \"--program-binary enclave_name=path\" if you want to \
     supply the file as a different name in the enclave. Multiple --program-binary flags or a comma-separated \
     list of files may be provided.")
+                    .num_args(1)
                     .required(true)
-                    .multiple(true),
+                    .action(ArgAction::Append)
             )
             .arg(
-                Arg::with_name("native-module-name")
+                Arg::new("native-module-name")
                     .long("native-module-name")
                     .value_name("NAME")
                     .help("Specifies the name of the native module to use for the computation. \
     This must be of the form \"--native-module-name name\". Multiple --native-module-name flags may be provided.")
                     .required(false)
-                    .multiple(true),
+                    .action(ArgAction::Append)
             )
             .arg(
-                Arg::with_name("native-module-entry-point")
+                Arg::new("native-module-entry-point")
                     .long("native-module-entry-point")
                     .value_name("FILE")
                     .help("Specifies the path to the entry point of the native module to use for the computation. \
@@ -263,38 +274,39 @@ impl Arguments {
     If the value is an empty string, the native module is assumed to be static, i.e. part of the Veracruz runtime, \
     and is looked up by name in the static native modules table.")
                     .required(false)
-                    .multiple(true),
+                    .action(ArgAction::Append)
             )
             .arg(
-                Arg::with_name("native-module-special-file")
+                Arg::new("native-module-special-file")
                     .long("native-module-special-file")
                     .value_name("FILE")
                     .help("Specifies the path to the special file of the native module to use for the computation. \
     This must be of the form \"--native-module-special-file path\". Multiple --native-module-special-file flags may be provided.")
                     .required(false)
-                    .multiple(true),
+                    .action(ArgAction::Append)
             )
             .arg(
-                Arg::with_name("pipeline")
-                    //.short("i")
+                Arg::new("pipeline")
+                    //.short('i')
                     .long("pipeline")
                     .value_name("SCRIPT")
                     .help("Script for executing several programs.")
                     .required(false)
-                    .multiple(true),
+                    .action(ArgAction::Append)
             )
             .arg(
-                Arg::with_name("debug")
-                    .short("d")
+                Arg::new("debug")
+                    .short('d')
                     .long("enclave-debug-mode")
                     .help(
                         "Specifies whether the Veracruz trusted runtime should allow debugging \
     information to be produced by the executing WASM binary.",
                     )
+                    .action(ArgAction::SetTrue)
             )
             .arg(
-                Arg::with_name("execution-strategy")
-                    .short("e")
+                Arg::new("execution-strategy")
+                    .short('e')
                     .long("execution-strategy")
                     .value_name("Interpretation | JIT")
                     .help(
@@ -303,17 +315,18 @@ impl Arguments {
                     )
             )
             .arg(
-                Arg::with_name("enable-clock")
-                    .short("n")
+                Arg::new("enable-clock")
+                    .short('n')
                     .long("enable-clock")
                     .help(
                         "Specifies whether the Veracruz trusted runtime should allow the WASM \
     binary to call clock functions (`clock_getres()`, `clock_gettime()`).",
                     )
+                    .action(ArgAction::SetTrue)
             )
             .arg(
-                Arg::with_name("max-memory-mib")
-                    .short("m")
+                Arg::new("max-memory-mib")
+                    .short('m')
                     .long("max-memory-mib")
                     .value_name("SIZE")
                     .help(
@@ -322,15 +335,15 @@ impl Arguments {
                     )
             )
             .arg(
-                Arg::with_name("hash")
-                    .short("h")
+                Arg::new("hash")
+                    .short('h')
                     .long("hashes")
                     .value_name("FILE")
                     .help("Specifies the filename of any (local) file that must match a hash. \
     This can be of the form \"--hash name\" or \"--hash  enclave_name=path\" if you want to \
     supply the file as a different name in the enclave. Multiple --hash flags or a comma-separated \
     list of files may be provided.")
-                    .multiple(true),
+                    .action(ArgAction::Append)
             )
             .get_matches();
 
@@ -338,7 +351,7 @@ impl Arguments {
 
         // Read all clients' certificates
         let certificates = matches
-            .values_of("certificate")
+            .get_many::<String>("certificate")
             .ok_or(anyhow!(
                 "No certificates were passed as command line parameters."
             ))?
@@ -348,7 +361,7 @@ impl Arguments {
         // Read all program paths
         let mut program_binaries = Vec::new();
         for path_raw in matches
-            .values_of_os("program-binary")
+            .get_many::<String>("program-binary")
             .ok_or(anyhow!("No program binary filename passed as an argument."))?
         {
             program_binaries
@@ -358,7 +371,7 @@ impl Arguments {
         // Use the program paths as the base of hashes
         // and append the extra hashes
         let mut hashes = program_binaries.clone();
-        if let Some(hashes_raw) = matches.values_of_os("hash") {
+        if let Some(hashes_raw) = matches.get_many::<String>("hash") {
             for hash_raw in hashes_raw {
                 hashes
                     .append(&mut parse_renamable_paths(hash_raw).map_err(|e| anyhow!("{:?}", e))?);
@@ -367,33 +380,33 @@ impl Arguments {
 
         // Read all native module names
         let native_modules_names = matches
-            .values_of("native-module-name")
+            .get_many::<String>("native-module-name")
             .map_or(Vec::new(), |p| p.map(|s| s.to_string()).collect::<Vec<_>>());
 
         // Read all native module entry points
         let native_modules_entry_points = matches
-            .values_of_os("native-module-entry-point")
+            .get_many::<String>("native-module-entry-point")
             .map_or(Vec::new(), |p| {
                 p.map(|s| PathBuf::from(s)).collect::<Vec<_>>()
             });
 
         // Read all native module special files
         let native_modules_special_files = matches
-            .values_of_os("native-module-special-file")
+            .get_many::<String>("native-module-special-file")
             .map_or(Vec::new(), |p| {
                 p.map(|s| PathBuf::from(s)).collect::<Vec<_>>()
             });
 
         // Read all the pipelines
         let pipelines = matches
-            .values_of("pipeline")
+            .get_many::<String>("pipeline")
             .map_or(Vec::new(), |pipelines| {
                 pipelines.map(|b| b.to_string()).collect::<Vec<_>>()
             });
 
         // Check all the capabilities. This includes (1) format and (2) length.
         let mut capabilities = matches
-            .values_of("capability")
+            .get_many::<String>("capability")
             .ok_or(anyhow!(
                 "No capabilities were passed as command line parameters."
             ))?
@@ -411,25 +424,25 @@ impl Arguments {
         let pipeline_capabilities = binary_capabilities.split_off(program_binaries.len());
 
         let veracruz_server_ip =
-            SocketAddr::from_str(matches.value_of("veracruz-server-ip").ok_or(anyhow!(
-                "No Veracruz server IP address was passed as a command line parameter."
-            ))?)?;
+            SocketAddr::from_str(matches.get_one::<String>("veracruz-server-ip").ok_or(
+                anyhow!("No Veracruz server IP address was passed as a command line parameter."),
+            )?)?;
 
-        let proxy_attestation_server_ip = SocketAddr::from_str(matches.value_of("proxy-attestation-server-ip").ok_or(anyhow!("No Veracruz proxy attestation server IP address was passed as a command line parameter."))?)?;
+        let proxy_attestation_server_ip = SocketAddr::from_str(matches.get_one::<String>("proxy-attestation-server-ip").ok_or(anyhow!("No Veracruz proxy attestation server IP address was passed as a command line parameter."))?)?;
 
-        let proxy_service_cert = PathBuf::from(matches.value_of("proxy-attestation-server-cert").ok_or(anyhow!("No Proxy Attestation Server certificate filename was passed as a command line parameter."))?);
+        let proxy_service_cert = PathBuf::from(matches.get_one::<String>("proxy-attestation-server-cert").ok_or(anyhow!("No Proxy Attestation Server certificate filename was passed as a command line parameter."))?);
 
         let output_policy_file = PathBuf::from(
             matches
-                .value_of("output-policy-file")
+                .get_one::<String>("output-policy-file")
                 .map_or(DEFAULT_OUTPUT_FILENAME, |fname| fname),
         );
 
         let css_file = matches
-            .value_of("css-file")
+            .get_one::<String>("css-file")
             .map(|fname| PathBuf::from(fname));
         let pcr0_file = matches
-            .value_of("pcr-file")
+            .get_one::<String>("pcr-file")
             .map(|fname| PathBuf::from(fname));
         if css_file.is_none() && pcr0_file.is_none() {
             return Err(anyhow!(
@@ -440,32 +453,32 @@ impl Arguments {
 
         let certificate_expiry = DateTime::parse_from_rfc2822(
             matches
-                .value_of("certificate-expiry")
+                .get_one::<String>("certificate-expiry")
                 .ok_or(anyhow!("No certificate lifetime passed as an argument."))?,
         )?;
 
         let execution_strategy = String::from(
             matches
-                .value_of("execution-strategy")
+                .get_one::<String>("execution-strategy")
                 .map_or(DEFAULT_EXECUTION_STRATEGY, |strategy| strategy),
         );
         check_execution_strategy(&execution_strategy)?;
 
-        let enclave_debug_mode = matches.is_present("debug");
+        let enclave_debug_mode = matches.get_flag("debug");
+        let enable_clock = matches.get_flag("enable-clock");
 
-        let enable_clock = matches.is_present("enable-clock");
-
-        let max_memory_mib = if let Some(max_memory_mib) = matches.value_of("max-memory-mib") {
-            max_memory_mib.parse().map_err(|e| {
-                anyhow!(format!(
-                    "Failed to parse max memory.  Error produced: {}.",
-                    e
-                ))
-            })?
-        } else {
-            info!("No maximum amount of memory passed as an argument.  Using a default.");
-            DEFAULT_MAX_MEMORY_MIB
-        };
+        let max_memory_mib =
+            if let Some(max_memory_mib) = matches.get_one::<String>("max-memory-mib") {
+                max_memory_mib.parse().map_err(|e| {
+                    anyhow!(format!(
+                        "Failed to parse max memory.  Error produced: {}.",
+                        e
+                    ))
+                })?
+            } else {
+                info!("No maximum amount of memory passed as an argument.  Using a default.");
+                DEFAULT_MAX_MEMORY_MIB
+            };
 
         info!("Successfully extracted command line arguments.");
 

@@ -9,7 +9,7 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use clap::{App, Arg};
+use clap::Arg;
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -29,72 +29,65 @@ struct Input {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let matches = App::new("Data generator for privaite set intersection sum")
+    let matches = clap::Command::new("Data generator for privaite set intersection sum")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
         .about("Generate a vector of private data comprising 128-bit identifiers and private values,  Vec<((u64, u64), u32)>, and a vector of sample comprising identifiers, Vec<(u64, u64)>. Identifiers are represented by two u64, because postcard does not support u128.")
         .arg(
-            Arg::with_name("directory")
-                .short("d")
+            Arg::new("directory")
+                .short('d')
                 .long("directory")
                 .value_name("STRING")
                 .help("The output directory")
-                .takes_value(true)
+                .num_args(1)
                 .required(true)
         )
         .arg(
-            Arg::with_name("size")
-                .short("s")
+            Arg::new("size")
+                .short('s')
                 .long("size")
                 .value_name("NUMBER")
                 .help("The number of elements in the dataset")
-                .takes_value(true)
-                .validator(is_u64)
+                .num_args(1)
+                .value_parser(clap::value_parser!(u64))
                 .default_value("10000")
         )
         .arg(
-            Arg::with_name("number_of_sample")
-                .short("n")
+            Arg::new("number_of_sample")
+                .short('n')
                 .long("num_of_sample")
                 .value_name("NUBMER")
                 .help("To generate how many samples.")
-                .takes_value(true)
-                .validator(is_u64)
+                .num_args(1)
+                .value_parser(clap::value_parser!(u64))
                 .default_value("2500")
         )
         .arg(
-            Arg::with_name("seed")
-                .short("e")
+            Arg::new("seed")
+                .short('e')
                 .long("seed")
                 .value_name("NUBMER")
                 .help("The seed for the random number generator.")
-                .takes_value(true)
-                .validator(is_u64)
+                .num_args(1)
+                .value_parser(clap::value_parser!(u64))
                 .default_value("0"),
         )
         .get_matches();
 
-    let dir = Path::new(
-        matches
-            .value_of("directory")
-            .ok_or("Failed to read the output directory.")?,
-    );
-    let size = matches
-        .value_of("size")
-        .ok_or("Failed to read the size.")?
-        .parse::<u64>()
-        .map_err(|_| "Failed to parse the size.")?;
-    let iter = matches
-        .value_of("number_of_sample")
-        .ok_or("Failed to read the number of samples.")?
-        .parse::<u64>()
-        .map_err(|_| "Failed to parse the number of samples.")?;
-    let seed = matches
-        .value_of("seed")
-        .ok_or("Failed to read the seed")?
-        .parse::<u64>()
-        .map_err(|_| "Cannot parse seed")?;
+    let directory = matches
+        .get_one::<String>("directory")
+        .expect("Failed to read the output directory.");
+    let size = *matches
+        .get_one::<u64>("size")
+        .expect("Failed to read the size.");
+    let iter = *matches
+        .get_one::<u64>("number_of_sample")
+        .expect("Failed to read the number of samples.");
+    let seed = *matches
+        .get_one::<u64>("seed")
+        .expect("Failed to read the seed.");
 
+    let dir = Path::new(directory);
     let seed = seed + ((iter as u64) << 48) + ((size as u64) << 8);
 
     let mut rng = StdRng::seed_from_u64(seed);
@@ -125,13 +118,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             .write(sample.as_slice())?;
     }
     Ok(())
-}
-
-fn is_u64(v: String) -> Result<(), String> {
-    match v.parse::<u64>() {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("Cannot parse {} to u64, with error {:?}", v, e)),
-    }
 }
 
 fn mk_lame_id(id: u128) -> (u64, u64) {

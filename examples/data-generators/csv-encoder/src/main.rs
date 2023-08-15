@@ -92,7 +92,7 @@ use std::{
     str::FromStr,
 };
 
-use clap::{App, Arg};
+use clap::Arg;
 use log::*;
 use toml::*;
 
@@ -227,29 +227,29 @@ impl CommandLineConfiguration {
 fn parse_command_line() -> CommandLineConfiguration {
     info!("Reading command line parameters.");
 
-    let matches = App::new(APPLICATION_NAME)
+    let matches = clap::Command::new(APPLICATION_NAME)
         .version(VERSION)
         .author(AUTHORS)
         .about(ABOUT)
         .arg(
-            Arg::with_name("input")
-                .short("i")
+            Arg::new("input")
+                .short('i')
                 .long("input")
                 .value_name("FILE")
                 .help("Name of input CSV file stored on disk.")
                 .required(true),
         )
         .arg(
-            Arg::with_name("output")
-                .short("o")
+            Arg::new("output")
+                .short('o')
                 .long("output")
                 .value_name("FILE")
                 .help("Name of encoded file to be stored on disk.")
                 .required(true),
         )
         .arg(
-            Arg::with_name("schema")
-                .short("s")
+            Arg::new("schema")
+                .short('s')
                 .long("schema")
                 .value_name("FILE")
                 .help("Name of TOML schema describing CSV file, and how it should be encoded.")
@@ -259,21 +259,21 @@ fn parse_command_line() -> CommandLineConfiguration {
 
     let mut config = CommandLineConfiguration::new();
 
-    if let Some(infile) = matches.value_of("input") {
+    if let Some(infile) = matches.get_one::<String>("input") {
         config.set_source_filename(infile.to_string());
     } else {
         eprintln!("No source filename provided.");
         exit(-1)
     }
 
-    if let Some(outfile) = matches.value_of("output") {
+    if let Some(outfile) = matches.get_one::<String>("output") {
         config.set_output_filename(outfile.to_string());
     } else {
         eprintln!("No target filename provided.");
         exit(-1)
     }
 
-    if let Some(schema) = matches.value_of("schema") {
+    if let Some(schema) = matches.get_one::<String>("schema") {
         config.set_schema_filename(schema.to_string());
     } else {
         eprintln!("No CSV schema filename provided.");

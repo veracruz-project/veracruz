@@ -9,90 +9,88 @@
 //! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use clap::{App, Arg};
+use clap::Arg;
 use rand::{prelude::*, rngs::StdRng, SeedableRng};
 use rand_distr::{Distribution, Normal};
 use std::{error::Error, fs::File, io::prelude::*};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let matches = App::new("Data generator for moving average convergence divergence algorithm")
+    let matches = clap::Command::new("Data generator for moving average convergence divergence algorithm")
         .version("pre-alpha")
         .author("The Veracruz Development Team")
         .about("Generate a vector of f64. In `generate` mode, it generates random data. In `external` mode, it reads the first [SIZE] numbers from an external data source.")
         // Command for generate random data
         .subcommand(
-            App::new("generate")
+            clap::Command::new("generate")
                .about("Generate random data.")
                .version("pre-alpha")
                .author("The Veracruz Development Team")
                .arg(
-                   Arg::with_name("file_prefix")
-                       .short("f")
+                   Arg::new("file_prefix")
+                       .short('f')
                        .long("file_prefix")
                        .value_name("STRING")
                        .help("The prefix for the output file")
-                       .takes_value(true)
+                       .num_args(1)
                        .required(true)
                )
                .arg(
-                   Arg::with_name("size")
-                       .short("s")
+                   Arg::new("size")
+                       .short('s')
                        .long("size")
                        .value_name("NUMBER")
                        .help("The number of float-point numbers")
-                       .takes_value(true)
-                       .validator(is_u64)
+                       .num_args(1)
+                       .value_parser(clap::value_parser!(u64))
                        .default_value("1000")
                )
                .arg(
-                   Arg::with_name("seed")
-                       .short("e")
+                   Arg::new("seed")
+                       .short('e')
                        .long("seed")
                        .value_name("NUBMER")
                        .help("The seed for the random number generator.")
-                       .takes_value(true)
-                       .validator(is_u64)
+                       .num_args(1)
+                       .value_parser(clap::value_parser!(u64))
                        .default_value("0"),
                 )
         )
         // Command for generate data from external resource.
         .subcommand(
-            App::new("external")
+            clap::Command::new("external")
                .about("Read from an external input file.")
                .version("pre-alpha")
                .author("The Veracruz Development Team")
                .arg(
-                   Arg::with_name("input_file")
-                       .short("i")
+                   Arg::new("input_file")
+                       .short('i')
                        .long("input_file")
                        .value_name("STRING")
                        .help("The data source")
-                       .takes_value(true)
+                       .num_args(1)
                        .required(true)
                )
                .arg(
-                   Arg::with_name("size")
-                       .short("s")
+                   Arg::new("size")
+                       .short('s')
                        .long("size")
                        .value_name("NUMBER")
                        .help("The number of float-point numbers")
-                       .takes_value(true)
-                       .validator(is_u64)
+                       .num_args(1)
+                       .value_parser(clap::value_parser!(u64))
                        .default_value("1000")
                )
         )
         .get_matches();
 
     let (file_prefix, size, dataset) = match matches.subcommand() {
-        ("external", Some(sub_args)) => {
+        Some(("external", sub_args)) => {
             let input_file = sub_args
-                .value_of("input_file")
-                .ok_or("Failed to read the input filename.")?;
-            let size = sub_args
-                .value_of("size")
-                .ok_or("Failed to read the size.")?
-                .parse::<u64>()
-                .map_err(|_| "Failed to parse the size.")?;
+                .get_one::<String>("input_file")
+                .expect("Failed to read the input filename.");
+            let size = *sub_args
+                .get_one::<u64>("size")
+                .expect("Failed to read the size");
 
             let file_prefix: Vec<&str> = input_file.split('.').collect();
             let file_prefix = file_prefix.first().ok_or("filename error")?;
@@ -113,20 +111,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             (file_prefix.to_string(), size, dataset)
         }
-        ("generate", Some(sub_args)) => {
+        Some(("generate", sub_args)) => {
             let file_prefix = sub_args
-                .value_of("file_prefix")
-                .ok_or("Failed to read the prefix name of the output file.")?;
-            let size = sub_args
-                .value_of("size")
-                .ok_or("Failed to read the size.")?
-                .parse::<u64>()
-                .map_err(|_| "Failed to parse the size.")?;
-            let seed = sub_args
-                .value_of("seed")
-                .ok_or("Failed to read the seed")?
-                .parse::<u64>()
-                .map_err(|_| "Cannot parse seed")?;
+                .get_one::<String>("file_prefix")
+                .expect("Failed to read the prefix name of the output file.");
+            let size = *sub_args
+                .get_one::<u64>("size")
+                .expect("Failed to read the size");
+            let seed = *sub_args
+                .get_one::<u64>("seed")
+                .expect("Failed to read the seed");
 
             let mut rng = StdRng::seed_from_u64(seed);
             let normal =
@@ -147,11 +141,4 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut file = File::create(format!("{}-{}.dat", file_prefix, size))?;
     file.write_all(&encode)?;
     Ok(())
-}
-
-fn is_u64(v: String) -> Result<(), String> {
-    match v.parse::<u64>() {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("Cannot parse {} to u64, with error {:?}", v, e)),
-    }
 }

@@ -10,16 +10,16 @@
 //! information on licensing and copyright.
 
 use anyhow::anyhow;
+use clap::Parser;
 use policy_utils::{parsers, policy::Policy};
 use std::{fs, io, io::Read, io::Write, path, process};
-use structopt::StructOpt;
 use veracruz_client::VeracruzClient;
 
-#[derive(Debug, StructOpt)]
-#[structopt(rename_all = "kebab")]
-struct Opt {
+#[derive(Parser, Debug)]
+#[command(rename_all = "kebab")]
+struct ClientArgs {
     /// Path to policy file
-    #[structopt(parse(from_os_str))]
+    #[arg()]
     policy_path: path::PathBuf,
 
     /// Request quiet operation
@@ -29,15 +29,15 @@ struct Opt {
     /// but this can turn that off.
     ///
     /// Note that unrecoverable errors will still be printed to stderr.
-    #[structopt(short, long)]
+    #[arg(short, long)]
     quiet: bool,
 
     /// Path to client certificate file
-    #[structopt(short, long, parse(from_os_str))]
+    #[arg(short, long)]
     identity: path::PathBuf,
 
     /// Path to client key file
-    #[structopt(short, long, parse(from_os_str))]
+    #[arg(short, long)]
     key: path::PathBuf,
 
     /// Specify optional program files to upload
@@ -51,10 +51,10 @@ struct Opt {
     /// Note: This requires "PiProvider" permissions in the
     /// policy file.
     ///
-    #[structopt(
-        short, long, multiple=true, number_of_values=1,
-        visible_alias="programs",
-        parse(try_from_os_str=parsers::parse_renamable_paths)
+    #[arg(
+        short, long,
+        visible_alias = "programs",
+        value_parser = parsers::parse_renamable_paths
     )]
     program: Vec<Vec<(String, path::PathBuf)>>,
 
@@ -69,10 +69,10 @@ struct Opt {
     /// Note: This requires "DataProvider" permissions in the
     /// policy file.
     ///
-    #[structopt(
-        short, long, multiple=true, number_of_values=1,
-        visible_alias="datas",
-        parse(try_from_os_str=parsers::parse_renamable_paths)
+    #[arg(
+        short, long,
+        visible_alias = "datas",
+        value_parser = parsers::parse_renamable_paths
     )]
     data: Vec<Vec<(String, path::PathBuf)>>,
 
@@ -90,13 +90,7 @@ struct Opt {
     /// Note: This requires "ResultReader" permissions in the
     /// policy file.
     ///
-    #[structopt(
-        short,
-        long,
-        multiple = true,
-        number_of_values = 1,
-        visible_alias = "computes"
-    )]
+    #[arg(short, long, visible_alias = "computes")]
     compute: Vec<String>,
 
     /// Specify optional output files to store results. If not provided
@@ -114,25 +108,25 @@ struct Opt {
     /// Note: This requires "ResultReader" permissions in the
     /// policy file.
     ///
-    #[structopt(
-        short, long, multiple=true, number_of_values=1,
-        visible_alias="outputs",
-        visible_alias="result",
-        visible_alias="results",
-        parse(try_from_os_str=parsers::parse_renamable_paths)
+    #[arg(
+        short, long,
+        visible_alias = "outputs",
+        visible_alias = "result",
+        visible_alias = "results",
+        value_parser = parsers::parse_renamable_paths
     )]
     output: Vec<Vec<(String, path::PathBuf)>>,
 
     /// Do not request a shutdown of the Veracruz server after receiving the
     /// results. This can be useful if you have multiple result readers.
-    #[structopt(short, long)]
+    #[arg(short, long)]
     no_shutdown: bool,
 
     /// Request shutdown without requesting data.
     ///
     /// Note: This requires "ResultReader" permissions in the
     /// policy file.
-    #[structopt(short, long)]
+    #[arg(short, long)]
     shutdown: bool,
 }
 
@@ -145,7 +139,7 @@ macro_rules! qprintln {
 /// Entry point
 fn main() {
     // parse args
-    let opt = Opt::from_args();
+    let opt = ClientArgs::parse();
 
     // setup logger
     env_logger::init();

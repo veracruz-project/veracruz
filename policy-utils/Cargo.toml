@@ -21,7 +21,7 @@ std = [
 anyhow = "1"
 err-derive = { version = "0.2", default-features = false }
 hex = { version = "0.4.2" }
-lalrpop-util = { version = "0.19.8", features = ["lexer"] }
+lalrpop-util = { version = "0.19.12", features = ["lexer"] }
 lexical-core = { version = "0.8.2", default-features = false }
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls", default-features = false, features = ["std", "aesni", "padlock", "tls13"] }
 regex = "1"
@@ -31,4 +31,4 @@ veracruz-utils = { path = "../veracruz-utils", optional = true }
 wasi-types = { path = "../third-party/wasi-types" }
 
 [build-dependencies]
-lalrpop = { version = "0.19.8", features = ["lexer"] }
+lalrpop = { version = "0.19.12", features = ["lexer"] }
