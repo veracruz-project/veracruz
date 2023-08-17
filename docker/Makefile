@@ -105,7 +105,7 @@ localci-exec:
 	docker exec -i -t $(CONTAINER)-localci-$(USER)-$(VERSION) /bin/bash || true
 
 localci-base: ci/Dockerfile.local ci-base
-	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/localci/$(USER):$(VERSION) -f $< .
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/localci:$(VERSION) -f $< .
 
 .PHONY: all-ci
 all-ci: ci-image localci-base
@@ -126,7 +126,7 @@ linux-exec:
 
 .PHONY:
 linux-base: linux/Dockerfile base
-	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/linux/$(USER):$(VERSION) -f $< .
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/linux:$(VERSION) -f $< .
 
 #####################################################################
 # Nitro-related targets
@@ -168,4 +168,4 @@ endif
 		(git fetch ; git checkout $(AWS_NITRO_CLI_REVISION))
 	make -C aws-nitro-enclaves-cli HOST_MACHINE=$(ARCH) nitro-cli
 	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) \
-		--build-arg NE_GID=$(NE_GID) -t $(IMAGE)/nitro/$(USER):$(VERSION) -f $< .
+		--build-arg NE_GID=$(NE_GID) -t $(IMAGE)/nitro:$(VERSION) -f $< .
