@@ -53,11 +53,6 @@ make nitro
 (On an ordinary Linux system you can build for `nitro`, but not run
 the tests.)
 
-### `ci`
-
-This is the same as `localci`, above, except that you will run as
-root. This container is used for CI in the cloud.
-
 ### `linux`
 
 This is the same as `localci`, above, except only for the Linux
@@ -68,3 +63,23 @@ platform.
 This is the same as `localci`, above, except only for the AWS Nitro
 platform and you can also run the Nitro tests on appropriate hardware.
 See the [Nitro instructions](../NITRO_INSTRUCTIONS.markdown).
+
+### `ci`
+
+This is the same as `localci`, above, except that you will run as
+root. This container is used for CI in the cloud.
+
+### Docker images
+
+```mermaid
+flowchart TD
+    A[ubuntu:22.04] -->|base/Dockerfile| B(veracruz/base:$VERSION)
+    B --> |linux/Dockerfile| C(veracruz/linux:$VERSION)
+    C --> |Dockerfile| D(veracruz/linux/$USER:$VERSION)
+    B --> |nitro/Dockerfile| E(veracruz/nitro:$VERSION)
+    E --> |Dockerfile| F(veracruz/nitro/$USER:$VERSION)
+    E --> |ci/Dockerfile.base| G(veracruz/ci-base:$VERSION)
+    G --> |ci/Dockerfile.cache| H(veracruz/ci:$VERSION)
+    G --> |ci/Dockerfile.local| I(veracruz/localci:$VERSION)
+    I --> |Dockerfile| J(veracruz/localci/$USER:$VERSION)
+```
