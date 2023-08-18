@@ -2,7 +2,7 @@
 
 ![CI build status](https://github.com/veracruz-project/veracruz/actions/workflows/main.yml/badge.svg)
 
-<img src = "https://confidentialcomputing.io/wp-content/uploads/sites/85/2019/08/cc_consortium-color.svg" width=192>
+<img src = "https://confidentialcomputing.io/wp-content/uploads/sites/10/2022/07/cc_consortium-color.svg" width=192>
 
 ## About
 
