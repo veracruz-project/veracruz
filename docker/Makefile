@@ -30,7 +30,7 @@ endif
 DOCKER_BUILD_CMD = DOCKER_BUILDKIT=1 docker build
 
 BUILD_ARGS = --build-arg ARCH=$(ARCH) --build-arg DOCKER_ARCH=$(DOCKER_ARCH) \
-	--build-arg VERSION=$(VERSION) \
+	--build-arg USER=$(USER) --build-arg VERSION=$(VERSION) \
 	$(EXTRA_BUILD_ARGS)
 
 DOCKER_RUN_PARAMS = \
@@ -44,14 +44,14 @@ default:
 
 .PHONY: base
 base: base/Dockerfile
-	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/base:$(VERSION) -f $< .
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/base/$(USER):$(VERSION) -f $< .
 
 .PHONY: %-build
 %-build: Dockerfile %-base
 	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) \
 		--build-arg USER=$(USER) --build-arg UID=$(UID) --build-arg TEE=$* \
 		--build-arg DOCKER_GROUP_ID=$(DOCKER_GROUP_ID) \
-		-t $(IMAGE)/$*/$(USER):$(VERSION) -f $< .
+		-t $(IMAGE)/$*/$(USER)/added:$(VERSION) -f $< .
 
 .PHONY: all-base
 all-base: base linux-base nitro-base
@@ -68,20 +68,20 @@ $(HOME)/.cargo/registry:
 	localci-run localci-exec localci-base
 
 ci-base: ci/Dockerfile.base nitro-base
-	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/ci-base:$(VERSION) -f $< .
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/ci-base/$(USER):$(VERSION) -f $< .
 
 ci-run: | $(HOME)/.cargo/registry
 	docker run --init --privileged --rm -d \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v $(abspath $(VERACRUZ_ROOT)):/work/veracruz \
 		--name $(CONTAINER)-ci-$(USER)-$(VERSION) \
-		$(IMAGE)/ci:$(VERSION) sleep inf
+		$(IMAGE)/ci/$(USER):$(VERSION) sleep inf
 
 ci-exec:
 	docker exec -u root -i -t $(CONTAINER)-ci-$(USER)-$(VERSION) /bin/bash || true
 
 ci-image: ci/Dockerfile.cache ci-base
-	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/ci:$(VERSION) -f $< .
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/ci/$(USER):$(VERSION) -f $< .
 
 ci-image-tag:
 	docker tag $(IMAGE)/ci:$(VERSION) ghcr.io/veracruz-project/veracruz/ci:$(VERSION)
@@ -99,13 +99,13 @@ localci-run: | $(HOME)/.cargo/registry
 	docker run --init --privileged --rm -d $(DOCKER_RUN_PARAMS) \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		--name $(CONTAINER)-localci-$(USER)-$(VERSION) \
-		$(IMAGE)/localci/$(USER):$(VERSION) sleep inf
+		$(IMAGE)/localci/$(USER)/added:$(VERSION) sleep inf
 
 localci-exec:
 	docker exec -i -t $(CONTAINER)-localci-$(USER)-$(VERSION) /bin/bash || true
 
 localci-base: ci/Dockerfile.local ci-base
-	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/localci:$(VERSION) -f $< .
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/localci/$(USER):$(VERSION) -f $< .
 
 .PHONY: all-ci
 all-ci: ci-image localci-base
@@ -118,7 +118,7 @@ all-ci: ci-image localci-base
 linux-run: | $(HOME)/.cargo/registry
 	docker run --init --privileged --rm -d $(DOCKER_RUN_PARAMS) \
 		--name $(CONTAINER)-linux-$(USER)-$(VERSION) \
-		$(IMAGE)/linux/$(USER):$(VERSION) sleep inf
+		$(IMAGE)/linux/$(USER)/added:$(VERSION) sleep inf
 
 .PHONY:
 linux-exec:
@@ -126,7 +126,7 @@ linux-exec:
 
 .PHONY:
 linux-base: linux/Dockerfile base
-	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/linux:$(VERSION) -f $< .
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/linux/$(USER):$(VERSION) -f $< .
 
 #####################################################################
 # Nitro-related targets
@@ -147,7 +147,7 @@ nitro-run: | $(HOME)/.cargo/registry
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-p $(LOCALIP):3010:3010/tcp \
 		--name $(CONTAINER)-nitro-$(USER)-$(VERSION) \
-		$(IMAGE)/nitro/$(USER):$(VERSION) sleep inf
+		$(IMAGE)/nitro/$(USER)/added:$(VERSION) sleep inf
 
 nitro-run-build: | $(HOME)/.cargo/registry
 	# This container does not need to be run in AWS, it can build but not start enclaves
@@ -155,7 +155,7 @@ nitro-run-build: | $(HOME)/.cargo/registry
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-p $(LOCALIP):3010:3010/tcp \
 		--name $(CONTAINER)-nitro-$(USER)-$(VERSION) \
-		$(IMAGE)/nitro/$(USER):$(VERSION) sleep inf
+		$(IMAGE)/nitro/$(USER)/added:$(VERSION) sleep inf
 
 nitro-exec:
 	docker exec -i -t $(CONTAINER)-nitro-$(USER)-$(VERSION) /bin/bash || true
@@ -168,4 +168,4 @@ endif
 		(git fetch ; git checkout $(AWS_NITRO_CLI_REVISION))
 	make -C aws-nitro-enclaves-cli HOST_MACHINE=$(ARCH) nitro-cli
 	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) \
-		--build-arg NE_GID=$(NE_GID) -t $(IMAGE)/nitro:$(VERSION) -f $< .
+		--build-arg NE_GID=$(NE_GID) -t $(IMAGE)/nitro/$(USER):$(VERSION) -f $< .

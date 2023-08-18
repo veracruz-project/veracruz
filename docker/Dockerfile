@@ -14,8 +14,9 @@
 
 ARG TEE
 ARG VERSION="latest"
+ARG USER=root
 
-FROM veracruz/${TEE}:${VERSION}
+FROM veracruz/${TEE}/${USER}:${VERSION}
 ARG USER=root
 ARG UID=0
 ARG DOCKER_GROUP_ID=0
