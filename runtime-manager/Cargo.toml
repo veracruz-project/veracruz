@@ -44,7 +44,7 @@ nsm_api = { package = "aws-nitro-enclaves-nsm-api", version = "0.3.0", optional 
 policy-utils = { path = "../policy-utils" }
 protobuf = "3.2.0"
 psa-attestation = { path = "../psa-attestation", optional = true }
-serde = { version = "1.0", default-features = false, features = ["alloc", "derive"], optional = true }
+serde = { version = "1.0.185", default-features = false, features = ["alloc", "derive"], optional = true }
 serde_json = "1.0"
 session-manager = { path = "../session-manager" }
 transport-protocol = { path = "../transport-protocol" }

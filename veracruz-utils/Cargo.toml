@@ -32,6 +32,6 @@ err-derive = "0.2"
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls", default-features = false, features = ["std", "aesni", "padlock", "tls13"] }
 platform-services = { path = "../platform-services", optional = true }
 # The cargo patch mechanism does NOT work when we add function into a macro_rules!
-serde = { version = "1.0.115", default-features = false, optional = true }
+serde = { version = "1.0.185", default-features = false, optional = true }
 serde_json = { version = "1.0", default-features = false }
 uuid = { version = "1.1.2", features = ["serde"] }
