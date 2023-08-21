@@ -1,144 +1,85 @@
 # Building Veracruz
 
-<img src = "https://confidentialcomputing.io/wp-content/uploads/sites/85/2019/08/cc_consortium-color.svg" width=192>
+<img src = "https://confidentialcomputing.io/wp-content/uploads/sites/10/2022/07/cc_consortium-color.svg" width=192>
 
-This is the repository for the Docker container used for developing Veracruz.
-Veracruz is an open-source runtime for collaborative privacy-preserving compute.
-The main Veracruz repository can be found [here](https://github.com/veracruz-project/veracruz).
-
-Veracruz is an adopted project of the Confidential Compute Consortium (CCC).
-
-## Supported platforms
-
-- AWS Nitro Enclaves
-- Linux (no TEE technology used)
+This directory has the code for building the Docker containers used
+for developing Veracruz.
 
 ## Requirements
 
-- **Docker:** 
+- **Docker:**
 We use Docker to provide a consistent build environment.  Follow this guide to [install Docker](https://docs.docker.com/engine/install/) if necessary.
-- **Enable Docker squash experimental feature:** *The tests are done on a linux machine. [To enable docker experimental features on another OS.](https://docs.docker.com/engine/reference/commandline/checkpoint_create/)*
-We use the `squash` docker experimental feature to help reduce the Veracruz docker image size, to enable this feature:
-    - run: 
-        ```sh 
-        sudo service docker stop
-        ```
-    - copy the following in `/etc/docker/daemon.json `
-        ```sh
-        {
-            "experimental": true
-        }
-        ```
-    - run:
-        ```sh 
-        sudo service docker start
-        ```
 
 ## Local build setup
 
-Once all the necessary requirements are available, run the following commands:
-- Clone the Veracruz repository: This will pull the docker submodule
-
-    ```
-    git clone --recursive https://github.com/veracruz-project/veracruz.git 
-    export VERACRUZ_ROOT=$PWD/veracruz
-    ```
-- Once you have a local copy of the Veracruz source:
-
-    ```
-    cd veracruz/docker
-    ```
-
-The following instructions depend on the platform you're building for. (SGX, Arm TZ)
-
-Note that building the Docker image will take a long time (we appreciate any suggestions on how this can be sped up!)
-
-- ### Build Instructions for AWS Nitro Enclaves
-    ```
-    make nitro-base
-    ```
-
-- ### Build Instructions for Linux
-    ```
-    make linux-base
-    ```
-
-- ### Starting the veracruz container
-    For AWS Nitro Enclaves:
-    ```
-    make nitro-run
-    ```
-
-    Or, for Linux:
-    ```
-    make linux-run
-    ```
-
-There should be a Docker container running called "veracruz_<PLATFORM>_<USERNAME>". To verify that it's running, run: 
-    ```
-    docker ps
-    ```
-    
-You can now start a shell in the newly created container:
-    For Nitro:
+Enter this directory in a local copy of the Veracruz source:
 ```
-    make nitro-exec
+cd veracruz/docker
 ```
 
-    For Linux:
+## Build and run
+
+There are several different Docker containers that can be used,
+depending on the platform. If you are new to Veracruz you should
+probably try `localci` first.
+
+### `localci`
+
+To build the container:
 ```
-    make linux-exec
+make localci-build
 ```
 
-## Test Instructions for AWS Nitro Enclaves
-
-Once inside the container, set up your local environment.
-
-Now, to build the binaries:
+To run the container:
 ```
-cd workspaces/
+make localci-run
+```
+
+With `docker ps` you should now be able to see the container running.
+
+To get a shell in the container running as the appropriate non-root user:
+```
+make localci-exec
+```
+
+The Veracruz tree should be mounted in the container, so you can run,
+for example:
+```
+cd /work/veracruz/workspaces
+make linux && make linux-tests
 make nitro
 ```
 
-and to run the tests:
+(On an ordinary Linux system you can build for `nitro`, but not run
+the tests.)
 
-```
-cd workspaces/nitro-host/
-make test-server
-make veracruz-test
-```
+### `linux`
 
-## Test Instructions for Linux
+This is the same as `localci`, above, except only for the Linux
+platform.
 
-Once inside the container, build the binaries:
-```
-cd workspaces/
-make linux
-```
+### `nitro`
 
-and to run the tests:
+This is the same as `localci`, above, except only for the AWS Nitro
+platform and you can also run the Nitro tests on appropriate hardware.
+See the [Nitro instructions](../NITRO_INSTRUCTIONS.markdown).
 
-```
-cd workspaces/linux-host/
-make test-server
-make veracruz-test
-```
+### `ci`
 
-# Cleaning a build
+This is the same as `localci`, above, except that you will run as
+root. This container is used for CI in the cloud.
 
-The Veracruz Makefile exposes a build target, `clean`, which recursively
-invokes `cargo clean` for each major subcomponent of the project.  However,
-sometimes this is not enough to fix a broken build environment (note that this
-is common when using `xargo` to build e.g. the examples, or the rest of the
-SDK).  In that case, it is useful to also delete the contents of the
-`~/.xargo` directory, in addition to the standard clean build process described
-above.
+### Docker images
 
-# Generating the certificates
-
-Cryptographic certificates can be generated by using the following `openssl`
-invocation:
-
-```
-openssl req -new -x509 -key <key filename> -sha256 -nodes -days 3650 -out <certificate filename> -config cert.conf 
+```mermaid
+flowchart TD
+    A[ubuntu:22.04] -->|base/Dockerfile| B(veracruz/base:$VERSION)
+    B --> |linux/Dockerfile| C(veracruz/linux:$VERSION)
+    C --> |Dockerfile| D(veracruz/linux/$USER:$VERSION)
+    B --> |nitro/Dockerfile| E(veracruz/nitro:$VERSION)
+    E --> |Dockerfile| F(veracruz/nitro/$USER:$VERSION)
+    E --> |ci/Dockerfile.base| G(veracruz/ci-base:$VERSION)
+    G --> |ci/Dockerfile.cache| H(veracruz/ci:$VERSION)
+    G --> |ci/Dockerfile.local| I(veracruz/localci:$VERSION)
+    I --> |Dockerfile| J(veracruz/localci/$USER:$VERSION)
 ```
