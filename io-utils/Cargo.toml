@@ -17,7 +17,7 @@ byteorder = { version = "1.4.3", optional = true }
 err-derive = "0.2"
 log = "0.4.13"
 nix = { version = "0.26", optional = true }
-serde = { version = "1.0.115", features = ["derive"] }
+serde = { version = "1.0.185", features = ["derive"] }
 serde_json = { version = "1.0", default-features = false, optional = true }
 stringreader = "0.1"
 transport-protocol = { path = "../transport-protocol" }

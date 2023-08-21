@@ -9,4 +9,4 @@ version = "0.3.0"
 anyhow = "1.0.14"
 postcard = { version = "1.0.0", features = [ "alloc", "use-std" ] }
 rusty-machine = "0.5.4"
-serde = { version = "1.0.3", features = ["derive"] }
+serde = { version = "1.0.185", features = ["derive"] }
