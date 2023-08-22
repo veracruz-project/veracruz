@@ -34,20 +34,13 @@
 //! information on licensing and copyright.
 
 use crate::{
-    fs::{strip_root_slash_path, strip_root_slash_str, FileSystem, FileSystemResult},
-    native_modules::common::STATIC_NATIVE_MODULES,
+    fs::{FileSystemResult, strip_root_slash_path, strip_root_slash_str},
+    native_modules::common::STATIC_NATIVE_MODULES
 };
 use log::info;
 #[cfg(feature = "std")]
 use nix::sys::signal;
-use policy_utils::principal::{NativeModule, NativeModuleType};
-use std::{
-    fs::{create_dir, create_dir_all, read_dir, remove_dir_all, File},
-    io::{Read, Write},
-    path::{Path, PathBuf},
-    process::Command,
-};
-use wasi_types::{ErrNo, FdFlags, LookupFlags, OpenFlags};
+use wasi_types::ErrNo;
 
 /// Path to the native module's manager sysroot on the kernel filesystem. Native
 /// module directories are created under this directory.
@@ -65,21 +58,20 @@ const EXECUTION_CONFIGURATION_FILE: &str = "execution_config";
 pub struct NativeModuleManager {
     /// Native module to execute.
     native_module: NativeModule,
-    /// Native module's view of the VFS. This is used to copy files from the VFS
-    /// to the kernel filesystem.
-    native_module_vfs: FileSystem,
+    ///// Native module's view of the VFS. This is used to copy files from the VFS
+    ///// to the kernel filesystem.
+    //native_module_vfs: FileSystem,
     /// Native module directory. Gets mounted into the sandbox environment
     /// before the native module is executed.
     native_module_directory: PathBuf,
 }
 
 impl NativeModuleManager {
-    pub fn new(native_module: NativeModule, native_module_vfs: FileSystem) -> Self {
-        let native_module_directory = PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT)
-            .join(strip_root_slash_str(native_module.name()));
+    //pub fn new(native_module: NativeModule, native_module_vfs: FileSystem) -> Self {
+    pub fn new(native_module: NativeModule) -> Self {
+        let native_module_directory = PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT).join(strip_root_slash_str(native_module.name()));
         Self {
             native_module,
-            native_module_vfs,
             native_module_directory,
         }
     }
@@ -116,35 +108,33 @@ impl NativeModuleManager {
         Ok(mappings)
     }
 
-    /// Prepare native module's filesystem by copying to the kernel filesystem
-    /// all the part of the VFS visible to the native module.
-    /// Returns a list of top-level files, i.e. files immediately under the
-    /// root, that should be copied to the kernel filesystem.
-    /// Fails if creating a new file or directory or writing to a file fails.
-    /// To be useful, this function must be called after provisioning files to
-    /// the VFS, and maybe even after the WASM program invokes the native module.
-    fn prepare_fs(&mut self) -> FileSystemResult<Vec<PathBuf>> {
-        create_dir_all(self.native_module_directory.as_path()).map_err(|_| ErrNo::Access)?;
-        let (visible_files_and_dirs, top_level_files) = self
-            .native_module_vfs
-            .read_all_files_and_dirs_by_absolute_path("/")?;
-        for (path, buffer) in visible_files_and_dirs {
-            let path = self
-                .native_module_directory
-                .join(strip_root_slash_path(&path));
+    ///// Prepare native module's filesystem by copying to the kernel filesystem
+    ///// all the part of the VFS visible to the native module.
+    ///// Returns a list of top-level files, i.e. files immediately under the
+    ///// root, that should be copied to the kernel filesystem.
+    ///// Fails if creating a new file or directory or writing to a file fails.
+    ///// To be useful, this function must be called after provisioning files to
+    ///// the VFS, and maybe even after the WASM program invokes the native module.
+    //fn prepare_fs(&mut self) -> FileSystemResult<Vec<PathBuf>> {
+        //create_dir_all(self.native_module_directory.as_path()).map_err(|_| ErrNo::Access)?;
+        //let (visible_files_and_dirs, top_level_files) = self.native_module_vfs.read_all_files_and_dirs_by_absolute_path("/")?;
+        //for (path, buffer) in visible_files_and_dirs {
+            //let path = self.native_module_directory.join(strip_root_slash_path(&path));
 
-            // Create parent directories
-            let parent_path = path.parent().ok_or(ErrNo::NoEnt)?;
-            create_dir_all(parent_path)?;
+            //// Create parent directories
+            //let parent_path = path.parent().ok_or(ErrNo::NoEnt)?;
+            //create_dir_all(parent_path)?;
 
-            match buffer {
-                Some(b) => {
-                    let mut file = File::create(path)?;
-                    file.write_all(&b)?;
-                }
-                None => create_dir(path)?,
-            }
-        }
+            //match buffer {
+                //Some(b) => {
+                    //let mut file = File::create(path)?;
+                    //file.write_all(&b)?;
+                //},
+                //None => {
+                    //create_dir(path)?
+                //}
+            //}
+        //}
 
         // Make sure all top-level files exist on the kernel filesystem to avoid
         // potential mount errors later on.
@@ -153,13 +143,13 @@ impl NativeModuleManager {
         // Let's assume every top-level file is a directory. We don't care if
         // this results in errors later, since the native module is not supposed
         // to access these files
-        for f in &top_level_files {
-            let path = self.native_module_directory.join(strip_root_slash_path(&f));
-            let _ = create_dir(path);
-        }
+        //for f in &top_level_files {
+            //let path = self.native_module_directory.join(strip_root_slash_path(&f));
+            //let _ = create_dir(path);
+        //}
 
-        Ok(top_level_files)
-    }
+        //Ok(top_level_files)
+    //}
 
     /// Recursively copy a `path` under the native module's directory to the
     /// VFS.
@@ -169,67 +159,55 @@ impl NativeModuleManager {
     /// This function should be called after the native module's execution to
     /// reflect the side effects of execution onto the VFS.
     fn copy_fs_to_vfs(&mut self, path_unprefixed: &Path) -> FileSystemResult<()> {
-        let path_prefixed = self
-            .native_module_directory
-            .join(strip_root_slash_path(&path_unprefixed));
-        if path_prefixed.is_dir() {
-            for entry in read_dir(path_prefixed)? {
-                let entry = entry?;
-                let path_prefixed = entry.path();
-                let path_unprefixed = path_prefixed
-                    .strip_prefix(&self.native_module_directory)
-                    .map_err(|_| ErrNo::Access)?;
+        //let path_prefixed = self.native_module_directory.join(strip_root_slash_path(&path_unprefixed));
+        //if path_prefixed.is_dir() {
+            //for entry in read_dir(path_prefixed)? {
+                //let entry = entry?;
+                //let path_prefixed = entry.path();
+                //let path_unprefixed = path_prefixed.strip_prefix(&self.native_module_directory).map_err(|_| ErrNo::Access)?;
 
-                // Ignore execution configuration file
-                if path_unprefixed == PathBuf::from(EXECUTION_CONFIGURATION_FILE) {
-                    continue;
-                }
+                //// Ignore execution configuration file
+                //if path_unprefixed == PathBuf::from(EXECUTION_CONFIGURATION_FILE) {
+                    //continue;
+                //}
 
-                let path_unprefixed = PathBuf::from("/").join(path_unprefixed);
-                if path_prefixed.is_dir() {
-                    // Create directory on the VFS with `path_open()`
-                    let prestat = self.native_module_vfs.find_prestat(&path_unprefixed);
-                    if prestat.is_ok() {
-                        let (fd, file_name) = prestat?;
-                        self.native_module_vfs.path_open(
-                            fd,
-                            LookupFlags::empty(),
-                            file_name,
-                            OpenFlags::CREATE,
-                            FileSystem::DEFAULT_RIGHTS,
-                            FileSystem::DEFAULT_RIGHTS,
-                            FdFlags::empty(),
-                        )?;
-                        self.copy_fs_to_vfs(&path_unprefixed)?;
-                    }
-                } else {
-                    // Read file on the kernel fileystem by chunks of 1MiB
-                    let mut f = File::open(&path_prefixed)?;
-                    let mut buf: [u8; 1048576] = [0; 1048576];
+                //let path_unprefixed = PathBuf::from("/").join(path_unprefixed);
+                //if path_prefixed.is_dir() {
+                    //// Create directory on the VFS with `path_open()`
+                    //let prestat = self.native_module_vfs.find_prestat(&path_unprefixed);
+                    //if prestat.is_ok() {
+                        //let (fd, file_name) = prestat?;
+                        //self.native_module_vfs.path_open(
+                            //fd,
+                            //LookupFlags::empty(),
+                            //file_name,
+                            //OpenFlags::CREATE,
+                            //FileSystem::DEFAULT_RIGHTS,
+                            //FileSystem::DEFAULT_RIGHTS,
+                            //FdFlags::empty(),
+                        //)?;
+                        //self.copy_fs_to_vfs(&path_unprefixed)?;
+                    //}
+                //} else {
+                    //// Read file on the kernel fileystem by chunks of 1MiB
+                    //let mut f = File::open(&path_prefixed)?;
+                    //let mut buf: [u8; 1048576] = [0; 1048576];
 
-                    // Copy file to the VFS. First truncate the VFS file then
-                    // append to it. If the principal doesn't have write access,
-                    // just ignore it
-                    if self
-                        .native_module_vfs
-                        .write_file_by_absolute_path(&path_unprefixed, vec![], false)
-                        .is_ok()
-                    {
-                        loop {
-                            let n = f.read(&mut buf)?;
-                            if n == 0 {
-                                break;
-                            }
-                            self.native_module_vfs.write_file_by_absolute_path(
-                                &path_unprefixed,
-                                buf[..n].to_vec(),
-                                true,
-                            )?;
-                        }
-                    }
-                }
-            }
-        }
+                    //// Copy file to the VFS. First truncate the VFS file then
+                    //// append to it. If the principal doesn't have write access,
+                    //// just ignore it
+                    //if self.native_module_vfs.write_file_by_absolute_path(&path_unprefixed, vec![], false).is_ok() {
+                        //loop {
+                            //let n = f.read(&mut buf)?;
+                            //if n == 0 {
+                                //break;
+                            //}
+                            //self.native_module_vfs.write_file_by_absolute_path(&path_unprefixed, buf[..n].to_vec(), true)?;
+                        //}
+                    //}
+                //}
+            //}
+        //}
         Ok(())
     }
 
@@ -253,12 +231,12 @@ impl NativeModuleManager {
             let nm = nm
                 .get_mut(&self.native_module.name().to_string())
                 .ok_or(ErrNo::Inval)?;
-            if nm.try_parse(&input)? {
-                nm.serve(&mut self.native_module_vfs, &input)?;
-            }
+            //if nm.try_parse(&input)? {
+                //nm.serve(&mut self.native_module_vfs, &input)?;
+            //}
         } else {
             info!("Preparing the native module's filesystem...");
-            let top_level_files = self.prepare_fs()?;
+            //let top_level_files = self.prepare_fs()?;
             info!("OK");
 
             // Inject execution configuration into the native module's directory
@@ -285,7 +263,8 @@ impl NativeModuleManager {
                 .expect("sigaction failed");
             }
 
-            let mount_mappings = self.build_mappings(top_level_files)?;
+            // TODO change in the future
+            let mount_mappings = self.build_mappings(vec!["/".into()])?;
             let entry_point_tmp;
             let entry_point = match self.native_module.r#type() {
                 NativeModuleType::Dynamic {
@@ -321,8 +300,8 @@ impl NativeModuleManager {
 
             info!("Propagating side effects to the VFS (access errors are ignored)...");
             self.copy_fs_to_vfs(&PathBuf::from(""))?;
-            let _ = self.native_module_vfs.write_stdout(&output.stdout);
-            let _ = self.native_module_vfs.write_stderr(&output.stderr);
+            //let _ = self.native_module_vfs.write_stdout(&output.stdout);
+            //let _ = self.native_module_vfs.write_stderr(&output.stderr);
             info!("OK");
 
             self.teardown_fs()?;

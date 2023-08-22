@@ -24,25 +24,22 @@
 //! and copyright information.
 
 use anyhow::anyhow;
-use clap::{Arg, ArgAction};
-use execution_engine::{execute, fs::FileSystem, Options};
+use clap::{App, Arg};
+use execution_engine::{execute, Environment};
 use log::*;
 use policy_utils::{
-    parsers::{enforce_leading_slash, parse_pipeline},
-    pipeline::Expr,
-    principal::{ExecutionStrategy, NativeModule, NativeModuleType, Principal},
-    CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH,
+    parsers::parse_pipeline,
+    pipeline::Expr, 
+    principal::{ExecutionStrategy, NativeModule, NativeModuleType},
 };
 use std::{
-    collections::HashMap,
+    collections::HashSet,
     error::Error,
-    fs::{create_dir_all, File},
-    io::{Read, Write},
-    path::{Path, PathBuf},
+    path::PathBuf,
     time::Instant,
     vec::Vec,
+    iter::FromIterator,
 };
-use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -59,7 +56,7 @@ const APPLICATION_NAME: &str = "freestanding-execution-engine";
 const AUTHORS: &str = "The Veracruz Development Team.  See the file `AUTHORS.md` in the \
                        Veracruz `docs` subdirectory for detailed authorship information.";
 /// Application version number.
-const VERSION: &str = "pre-alpha";
+const VERSION: &str = "alpha";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line options and parsing.
@@ -69,21 +66,21 @@ const VERSION: &str = "pre-alpha";
 struct CommandLineOptions {
     /// The list of file names passed as input data-sources.
     input_sources: Vec<String>,
-    /// The list of file names passed as output.
-    output_sources: Vec<String>,
+    ///// The list of file names passed as output.
+    //output_sources: Vec<String>,
     /// The execution strategy to use when performing the computation.
     execution_strategy: ExecutionStrategy,
-    /// Whether the contents of `stdout` should be dumped before exiting.
-    dump_stdout: bool,
-    /// Whether the contents of `stderr` should be dumped before exiting.
-    dump_stderr: bool,
-    /// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be
-    /// enabled.
-    enable_clock: bool,
+    ///// Whether the contents of `stdout` should be dumped before exiting.
+    //dump_stdout: bool,
+    ///// Whether the contents of `stderr` should be dumped before exiting.
+    //dump_stderr: bool,
+    ///// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be
+    ///// enabled.
+    //enable_clock: bool,
     /// Environment variables for the program.
     environment_variables: Vec<(String, String)>,
-    /// Whether strace is enabled.
-    enable_strace: bool,
+    ///// Whether strace is enabled.
+    //enable_strace: bool,
     /// A list of native module names.
     native_modules_names: Vec<String>,
     /// A list of paths to native module entry points.
@@ -114,17 +111,17 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 )
                 .num_args(0..),
         )
-        .arg(
-            Arg::new("output")
-                .short('o')
-                .long("output-source")
-                .value_name("DIRECTORIES")
-                .help(
-                    "Space-separated paths to the output directories. The directories are copied \
-                     into disk on the host. All program are granted with write capabilities.",
-                )
-                .num_args(0..),
-        )
+        //.arg(
+            //Arg::with_name("output")
+                //.short("o")
+                //.long("output-source")
+                //.value_name("DIRECTORIES")
+                //.help(
+                    //"Space-separated paths to the output directories. The directories are copied \
+                     //into disk on the host. All program are granted with write capabilities.",
+                //)
+                //.multiple(true),
+        //)
         .arg(
             Arg::new("native-module-name")
                 .long("native-module-name")
@@ -173,30 +170,27 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
                      interpretation).",
                 ),
         )
-        .arg(
-            Arg::new("dump-stdout")
-                .short('d')
-                .long("dump-stdout")
-                .help("Whether the contents of stdout should be dumped before exiting")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("dump-stderr")
-                .short('e')
-                .long("dump-stderr")
-                .help("Whether the contents of stderr should be dumped before exiting")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("enable-clock")
-                .short('c')
-                .long("enable-clock")
-                .help(
-                    "Whether clock functions (`clock_getres()`, `clock_gettime()`) should be \
-                     enabled.",
-                )
-                .action(ArgAction::SetTrue),
-        )
+        //.arg(
+            //Arg::with_name("dump-stdout")
+                //.short("d")
+                //.long("dump-stdout")
+                //.help("Whether the contents of stdout should be dumped before exiting"),
+        //)
+        //.arg(
+            //Arg::with_name("dump-stderr")
+                //.short("e")
+                //.long("dump-stderr")
+                //.help("Whether the contents of stderr should be dumped before exiting"),
+        //)
+        //.arg(
+            //Arg::with_name("enable-clock")
+                //.short("c")
+                //.long("enable-clock")
+                //.help(
+                    //"Whether clock functions (`clock_getres()`, `clock_gettime()`) should be \
+                     //enabled.",
+                //),
+        //)
         .arg(
             Arg::new("env")
                 .long("env")
@@ -205,12 +199,11 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
                 .num_args(1)
                 .action(ArgAction::Append),
         )
-        .arg(
-            Arg::new("strace")
-                .long("strace")
-                .help("Enable strace-like output for WASI calls.")
-                .action(ArgAction::SetTrue),
-        )
+        //.arg(
+            //Arg::with_name("strace")
+                //.long("strace")
+                //.help("Enable strace-like output for WASI calls."),
+        //)
         .get_matches();
 
     info!("Parsed command line.");
@@ -276,20 +269,20 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
         Vec::new()
     };
 
-    let output_sources = if let Some(data) = matches.get_many::<String>("output") {
-        let output_sources: Vec<String> = data.map(|e| e.to_string()).collect();
-        info!(
-            "Selected {} data sources as input to computation.",
-            output_sources.len()
-        );
-        output_sources
-    } else {
-        Vec::new()
-    };
+    //let output_sources = if let Some(data) = matches.values_of("output") {
+        //let output_sources: Vec<String> = data.map(|e| e.to_string()).collect();
+        //info!(
+            //"Selected {} data sources as input to computation.",
+            //output_sources.len()
+        //);
+        //output_sources
+    //} else {
+        //Vec::new()
+    //};
 
-    let enable_clock = matches.get_flag("enable-clock");
-    let dump_stdout = matches.get_flag("dump-stdout");
-    let dump_stderr = matches.get_flag("dump-stderr");
+    //let enable_clock = matches.is_present("enable-clock");
+    //let dump_stdout = matches.is_present("dump-stdout");
+    //let dump_stderr = matches.is_present("dump-stderr");
 
     let environment_variables = match matches.get_many::<String>("env") {
         None => Vec::new(),
@@ -301,17 +294,17 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
             .collect(),
     };
 
-    let enable_strace = matches.get_flag("strace");
+    //let enable_strace = matches.is_present("strace");
 
     Ok(CommandLineOptions {
         input_sources,
-        output_sources,
+        //output_sources,
         execution_strategy,
-        dump_stdout,
-        dump_stderr,
-        enable_clock,
+        //dump_stdout,
+        //dump_stderr,
+        //enable_clock,
         environment_variables,
-        enable_strace,
+        //enable_strace,
         native_modules_names,
         native_modules_entry_points,
         native_modules_special_files,
@@ -319,42 +312,42 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
     })
 }
 
-/// Loads the specified data sources, as provided on the command line, for
-/// reading and massages them into metadata frames, ready for
-/// the computation.  May abort the program if something goes wrong when reading
-/// any data source.
-fn load_input_sources(
-    input_sources: &[String],
-    vfs: &mut FileSystem,
-) -> Result<(), Box<dyn Error>> {
-    for file_path in input_sources.iter() {
-        let file_path = Path::new(file_path);
-        load_input_source(&file_path, vfs)?;
-    }
-    Ok(())
-}
+///// Loads the specified data sources, as provided on the command line, for
+///// reading and massages them into metadata frames, ready for
+///// the computation.  May abort the program if something goes wrong when reading
+///// any data source.
+//fn load_input_sources(
+    //input_sources: &[String],
+    //vfs: &mut FileSystem,
+//) -> Result<(), Box<dyn Error>> {
+    //for file_path in input_sources.iter() {
+        //let file_path = Path::new(file_path);
+        //load_input_source(&file_path, vfs)?;
+    //}
+    //Ok(())
+//}
 
-fn load_input_source<T: AsRef<Path>>(
-    file_path: T,
-    vfs: &mut FileSystem,
-) -> Result<(), Box<dyn Error>> {
-    let file_path = file_path.as_ref();
-    info!("Loading data source '{:?}'.", file_path);
-    if file_path.is_file() {
-        let mut file = File::open(file_path)?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)?;
+//fn load_input_source<T: AsRef<Path>>(
+    //file_path: T,
+    //vfs: &mut FileSystem,
+//) -> Result<(), Box<dyn Error>> {
+    //let file_path = file_path.as_ref();
+    //info!("Loading data source '{:?}'.", file_path);
+    //if file_path.is_file() {
+        //let mut file = File::open(file_path)?;
+        //let mut buffer = Vec::new();
+        //file.read_to_end(&mut buffer)?;
 
-        vfs.write_file_by_absolute_path(&Path::new("/").join(file_path), buffer, false)?;
-    } else if file_path.is_dir() {
-        for dir in file_path.read_dir()? {
-            load_input_source(&dir?.path(), vfs)?;
-        }
-    } else {
-        return Err(format!("Error on load {:?}", file_path).into());
-    }
-    Ok(())
-}
+        //vfs.write_file_by_absolute_path(&Path::new("/").join(file_path), buffer, false)?;
+    //} else if file_path.is_dir() {
+        //for dir in file_path.read_dir()? {
+            //load_input_source(&dir?.path(), vfs)?;
+        //}
+    //} else {
+        //return Err(format!("Error on load {:?}", file_path).into());
+    //}
+    //Ok(())
+//}
 
 /// Entry: reads the static configuration and the command line parameters,
 /// parsing both and then starts provisioning the Veracruz host state, before
@@ -368,54 +361,59 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Construct file table for all programs
 
-    let mut file_table = HashMap::new();
+    //let mut file_table = HashMap::new();
 
-    let read_right = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR;
-    let write_right = read_right
-        | Rights::FD_WRITE
-        | Rights::PATH_CREATE_FILE
-        | Rights::PATH_FILESTAT_SET_SIZE
-        | Rights::PATH_CREATE_DIRECTORY;
+    //let read_right = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR;
+    //let write_right = read_right
+        //| Rights::FD_WRITE
+        //| Rights::PATH_CREATE_FILE
+        //| Rights::PATH_FILESTAT_SET_SIZE
+        //| Rights::PATH_CREATE_DIRECTORY;
 
     // Set up standard streams table
 
-    file_table.insert(PathBuf::from(CANONICAL_STDIN_FILE_PATH), read_right);
-    file_table.insert(PathBuf::from(CANONICAL_STDOUT_FILE_PATH), write_right);
-    file_table.insert(PathBuf::from(CANONICAL_STDERR_FILE_PATH), write_right);
+    //file_table.insert(PathBuf::from(CANONICAL_STDIN_FILE_PATH), read_right);
+    //file_table.insert(PathBuf::from(CANONICAL_STDOUT_FILE_PATH), write_right);
+    //file_table.insert(PathBuf::from(CANONICAL_STDERR_FILE_PATH), write_right);
 
     // Set up services
-
-    file_table.insert(PathBuf::from("/services"), read_right);
-    file_table.insert(PathBuf::from("/services"), write_right);
+    
+    //file_table.insert(PathBuf::from("/services"), read_right);
+    //file_table.insert(PathBuf::from("/services"), write_right);
 
     // Add read permission to input path
 
-    for file_path in cmdline.input_sources.iter() {
-        // NOTE: inject the root path.
-        file_table.insert(Path::new("/").join(file_path), read_right);
-    }
+    //for file_path in cmdline.input_sources.iter() {
+        //// NOTE: inject the root path.
+        //file_table.insert(Path::new("/").join(file_path), read_right);
+    //}
+
+    let preopened_dir = HashSet::from_iter(cmdline.input_sources.iter().map(|s| PathBuf::from(s)));
 
     // Add write permission to output path
 
-    for file_path in cmdline.output_sources.iter() {
-        // NOTE: inject the root path.
-        file_table.insert(Path::new("/").join(file_path), write_right);
-    }
+    //for file_path in cmdline.output_sources.iter() {
+        //// NOTE: inject the root path.
+        //file_table.insert(Path::new("/").join(file_path), write_right);
+    //}
 
     // Construct the rights table
 
-    let mut right_table = HashMap::new();
+    //let mut right_table = HashMap::new();
 
     // Insert the file right for all programs
 
     // Grant the super user read access to any file under the root. This is
     // used internally to read the program on behalf of the executing party
 
-    let mut su_read_rights = HashMap::new();
-    su_read_rights.insert(PathBuf::from("/"), write_right);
-    right_table.insert(Principal::InternalSuperUser, su_read_rights);
+    //let mut su_read_rights = HashMap::new();
+    //su_read_rights.insert(
+        //PathBuf::from("/"),
+        //write_right,
+    //);
+    //right_table.insert(Principal::InternalSuperUser, su_read_rights);
 
-    info!("The final rights table: {:?}", right_table);
+    //info!("The final rights table: {:?}", right_table);
 
     // Construct the native module table
     info!("Serializing native modules.");
@@ -437,12 +435,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .zip(&cmdline.native_modules_special_files)
     {
         // Add a backslash (VFS requirement)
-        let special_file = enforce_leading_slash(
-            special_file
-                .to_str()
-                .ok_or(anyhow!("Fail to convert special_file to str."))?,
-        )
-        .into_owned();
+        //let special_file = enforce_leading_slash(special_file.to_str()
+        //.ok_or(
+            //anyhow!("Fail to convert special_file to str."),
+        //)?).into_owned();
 
         let nm_type = if entry_point_path == &PathBuf::from("") {
             NativeModuleType::Static {
@@ -457,33 +453,30 @@ fn main() -> Result<(), Box<dyn Error>> {
         native_modules.push(NativeModule::new(name.to_string(), nm_type));
     }
 
-    let mut vfs = FileSystem::new(right_table, native_modules)?;
-    load_input_sources(&cmdline.input_sources, &mut vfs)?;
+    //let mut vfs = FileSystem::new(right_table, native_modules)?;
+    //load_input_sources(&cmdline.input_sources, &mut vfs)?;
 
     info!("Data sources loaded.");
 
-    // Execute the pipeline with the supplied options
+    // Execute the pipeline with the supplied environment
 
-    let options = Options {
-        enable_clock: cmdline.enable_clock,
-        enable_strace: cmdline.enable_strace,
+    let env = Environment {
         environment_variables: cmdline.environment_variables,
         ..Default::default()
     };
 
     info!(
-        "Invoking pipeline {:?} with options {:?}.",
-        cmdline.pipeline, options
+        "Invoking pipeline {:?} with environment {:?}.",
+        cmdline.pipeline, env
     );
 
     let main_time = Instant::now();
 
     let return_code = execute(
         &cmdline.execution_strategy,
-        vfs.clone(),
-        vfs.clone(),
+        &preopened_dir,
         cmdline.pipeline.clone(),
-        &options,
+        &env,
     )?;
 
     info!(
@@ -527,33 +520,33 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Map all output directories
 
-    for file_path in cmdline.output_sources.iter() {
-        for (output_path, buf) in vfs
-            .read_all_files_by_absolute_path(Path::new("/").join(file_path))?
-            .iter()
-        {
-            let output_path = output_path.strip_prefix("/").unwrap_or(output_path);
+    //for file_path in cmdline.output_sources.iter() {
+        //for (output_path, buf) in vfs
+            //.read_all_files_by_absolute_path(Path::new("/").join(file_path))?
+            //.iter()
+        //{
+            //let output_path = output_path.strip_prefix("/").unwrap_or(output_path);
 
-            if let Some(parent_path) = output_path.parent() {
-                if parent_path != Path::new("") {
-                    create_dir_all(parent_path)?;
-                }
-            }
+            //if let Some(parent_path) = output_path.parent() {
+                //if parent_path != Path::new("") {
+                    //create_dir_all(parent_path)?;
+                //}
+            //}
 
-            let mut to_write = File::create(output_path)?;
-            to_write.write_all(&buf)?;
+            //let mut to_write = File::create(output_path)?;
+            //to_write.write_all(&buf)?;
 
-            // Try to decode
-            let decode: String = match postcard::from_bytes(buf) {
-                Ok(o) => o,
-                Err(_) => match std::str::from_utf8(buf) {
-                    Ok(oo) => oo.to_string(),
-                    Err(_) => "(Cannot parse as a UTF-8 string)".to_string(),
-                },
-            };
+            //// Try to decode
+            //let decode: String = match postcard::from_bytes(buf) {
+                //Ok(o) => o,
+                //Err(_) => match std::str::from_utf8(buf) {
+                    //Ok(oo) => oo.to_string(),
+                    //Err(_) => "(Cannot parse as a UTF-8 string)".to_string(),
+                //},
+            //};
 
-            info!("{:?}: {:?}", output_path, decode);
-        }
-    }
+            //info!("{:?}: {:?}", output_path, decode);
+        //}
+    //}
     Ok(())
 }

@@ -38,9 +38,8 @@ use std::{
     os::unix::ffi::{OsStrExt, OsStringExt},
 };
 use wasi_types::{
-    Advice, DirCookie, DirEnt, ErrNo, Event, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat,
-    FileType, Inode, LookupFlags, OpenFlags, PreopenType, Prestat, RiFlags, Rights, RoFlags,
-    SdFlags, SetTimeFlags, SiFlags, Size, Subscription, Timestamp, Whence,
+    DirEnt, ErrNo, Fd, FdFlags, FdStat, FileDelta, FileSize, FileStat,
+    FileType, Inode, LookupFlags, OpenFlags, Rights, Timestamp, Whence,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -721,8 +720,8 @@ struct FdEntry {
     fd_stat: FdStat,
     /// The current offset of the file descriptor.
     offset: FileSize,
-    /// Advice on how regions of the file are to be used.
-    advice: Vec<(FileSize, FileSize, Advice)>,
+    ///// Advice on how regions of the file are to be used.
+    //advice: Vec<(FileSize, FileSize, Advice)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -826,10 +825,10 @@ impl FileSystem {
         Ok(rst)
     }
 
-    #[inline]
-    fn service_fs(&self) -> FileSystemResult<Self> {
-        Ok(self.clone())
-    }
+    //#[inline]
+    //fn service_fs(&self) -> FileSystemResult<Self> {
+        //Ok(self.clone())
+    //}
 
     /// Create a dummy filesystem
     #[allow(dead_code)]
@@ -980,8 +979,8 @@ impl FileSystem {
             inode,
             fd_stat,
             offset: 0,
-            /// Advice on how regions of the file are to be used.
-            advice: Vec::new(),
+            ///// Advice on how regions of the file are to be used.
+            //advice: Vec::new(),
         };
         self.fd_table.insert(fd, fd_entry);
     }
@@ -1033,32 +1032,32 @@ impl FileSystem {
     // Operations on the filesystem. Rust style implementation of WASI API
     ////////////////////////////////////////////////////////////////////////////
 
-    /// Allows the programmer to declare how they intend to use various parts of
-    /// a file to the runtime.
-    #[inline]
-    pub(crate) fn fd_advise(
-        &mut self,
-        fd: Fd,
-        offset: FileSize,
-        len: FileSize,
-        adv: Advice,
-    ) -> FileSystemResult<()> {
-        self.check_right(&fd, Rights::FD_ADVISE)?;
-        let entry = self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?;
-        entry.advice.push((offset, len, adv));
-        Ok(())
-    }
+    ///// Allows the programmer to declare how they intend to use various parts of
+    ///// a file to the runtime.
+    //#[inline]
+    //pub(crate) fn fd_advise(
+        //&mut self,
+        //fd: Fd,
+        //offset: FileSize,
+        //len: FileSize,
+        //adv: Advice,
+    //) -> FileSystemResult<()> {
+        //self.check_right(&fd, Rights::FD_ADVISE)?;
+        //let entry = self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?;
+        //entry.advice.push((offset, len, adv));
+        //Ok(())
+    //}
 
-    /// The stub implementation of `fd_allocate`. Return unsupported error `NoSys`.
-    #[inline]
-    pub(crate) fn fd_allocate(
-        &mut self,
-        _fd: Fd,
-        _offset: FileSize,
-        _len: FileSize,
-    ) -> FileSystemResult<()> {
-        Err(ErrNo::NoSys)
-    }
+    ///// The stub implementation of `fd_allocate`. Return unsupported error `NoSys`.
+    //#[inline]
+    //pub(crate) fn fd_allocate(
+        //&mut self,
+        //_fd: Fd,
+        //_offset: FileSize,
+        //_len: FileSize,
+    //) -> FileSystemResult<()> {
+        //Err(ErrNo::NoSys)
+    //}
 
     /// Implements the `fd_close` operation on the filesystem, which closes a
     /// file descriptor.  Returns `ErrNo::BadF`, if `fd` is not a current file-descriptor.
@@ -1077,40 +1076,40 @@ impl FileSystem {
         Ok(())
     }
 
-    /// The stub implementation of `fd_datasync`. Return unsupported error `NoSys`.
-    #[inline]
-    pub(crate) fn fd_datasync(&mut self, fd: Fd) -> FileSystemResult<()> {
-        self.check_right(&fd, Rights::FD_DATASYNC)?;
-        Err(ErrNo::NoSys)
-    }
+    ///// The stub implementation of `fd_datasync`. Return unsupported error `NoSys`.
+    //#[inline]
+    //pub(crate) fn fd_datasync(&mut self, fd: Fd) -> FileSystemResult<()> {
+        //self.check_right(&fd, Rights::FD_DATASYNC)?;
+        //Err(ErrNo::NoSys)
+    //}
 
-    /// Return a copy of the status of the file descriptor, `fd`.
-    #[inline]
-    pub(crate) fn fd_fdstat_get(&self, fd: Fd) -> FileSystemResult<FdStat> {
-        Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.fd_stat)
-    }
+    ///// Return a copy of the status of the file descriptor, `fd`.
+    //#[inline]
+    //pub(crate) fn fd_fdstat_get(&self, fd: Fd) -> FileSystemResult<FdStat> {
+        //Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.fd_stat)
+    //}
 
-    /// Change the flag associated with the file descriptor, `fd`.
-    #[inline]
-    pub(crate) fn fd_fdstat_set_flags(&mut self, fd: Fd, flags: FdFlags) -> FileSystemResult<()> {
-        self.check_right(&fd, Rights::FD_FDSTAT_SET_FLAGS)?;
-        self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?.fd_stat.flags = flags;
-        Ok(())
-    }
+    ///// Change the flag associated with the file descriptor, `fd`.
+    //#[inline]
+    //pub(crate) fn fd_fdstat_set_flags(&mut self, fd: Fd, flags: FdFlags) -> FileSystemResult<()> {
+        //self.check_right(&fd, Rights::FD_FDSTAT_SET_FLAGS)?;
+        //self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?.fd_stat.flags = flags;
+        //Ok(())
+    //}
 
-    /// Change the right associated with the file descriptor, `fd`.
-    #[inline]
-    pub(crate) fn fd_fdstat_set_rights(
-        &mut self,
-        fd: Fd,
-        rights_base: Rights,
-        rights_inheriting: Rights,
-    ) -> FileSystemResult<()> {
-        let mut fd_stat = self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?.fd_stat;
-        fd_stat.rights_base = rights_base;
-        fd_stat.rights_inheriting = rights_inheriting;
-        Ok(())
-    }
+    ///// Change the right associated with the file descriptor, `fd`.
+    //#[inline]
+    //pub(crate) fn fd_fdstat_set_rights(
+        //&mut self,
+        //fd: Fd,
+        //rights_base: Rights,
+        //rights_inheriting: Rights,
+    //) -> FileSystemResult<()> {
+        //let mut fd_stat = self.fd_table.get_mut(&fd).ok_or(ErrNo::BadF)?.fd_stat;
+        //fd_stat.rights_base = rights_base;
+        //fd_stat.rights_inheriting = rights_inheriting;
+        //Ok(())
+    //}
 
     /// Return a copy of the status of the open file pointed by the file descriptor, `fd`.
     pub(crate) fn fd_filestat_get(&self, fd: Fd) -> FileSystemResult<FileStat> {
@@ -1138,37 +1137,37 @@ impl FileSystem {
             .resize_file(size, 0)
     }
 
-    /// Change the time of the open file pointed by the file descriptor, `fd`. If `fst_flags`
-    /// contains `ATIME_NOW` or `MTIME_NOW`, the method immediately returns unsupported error
-    /// `NoSys`.
-    pub(crate) fn fd_filestat_set_times(
-        &mut self,
-        fd: Fd,
-        atime: Timestamp,
-        mtime: Timestamp,
-        fst_flags: SetTimeFlags,
-        current_time: Timestamp,
-    ) -> FileSystemResult<()> {
-        self.check_right(&fd, Rights::FD_FILESTAT_SET_TIMES)?;
-        let inode = self
-            .fd_table
-            .get(&fd)
-            .map(|FdEntry { inode, .. }| *inode)
-            .ok_or(ErrNo::BadF)?;
+    ///// Change the time of the open file pointed by the file descriptor, `fd`. If `fst_flags`
+    ///// contains `ATIME_NOW` or `MTIME_NOW`, the method immediately returns unsupported error
+    ///// `NoSys`.
+    //pub(crate) fn fd_filestat_set_times(
+        //&mut self,
+        //fd: Fd,
+        //atime: Timestamp,
+        //mtime: Timestamp,
+        //fst_flags: SetTimeFlags,
+        //current_time: Timestamp,
+    //) -> FileSystemResult<()> {
+        //self.check_right(&fd, Rights::FD_FILESTAT_SET_TIMES)?;
+        //let inode = self
+            //.fd_table
+            //.get(&fd)
+            //.map(|FdEntry { inode, .. }| *inode)
+            //.ok_or(ErrNo::BadF)?;
 
-        let mut inode_table = self.lock_inode_table()?;
-        let mut inode_impl = inode_table.get_mut(&inode)?;
-        if fst_flags.contains(SetTimeFlags::ATIME_NOW) {
-            inode_impl.file_stat.atime = current_time;
-        } else if fst_flags.contains(SetTimeFlags::MTIME_NOW) {
-            inode_impl.file_stat.mtime = current_time;
-        } else if fst_flags.contains(SetTimeFlags::ATIME) {
-            inode_impl.file_stat.atime = atime;
-        } else if fst_flags.contains(SetTimeFlags::MTIME) {
-            inode_impl.file_stat.mtime = mtime;
-        }
-        Ok(())
-    }
+        //let mut inode_table = self.lock_inode_table()?;
+        //let mut inode_impl = inode_table.get_mut(&inode)?;
+        //if fst_flags.contains(SetTimeFlags::ATIME_NOW) {
+            //inode_impl.file_stat.atime = current_time;
+        //} else if fst_flags.contains(SetTimeFlags::MTIME_NOW) {
+            //inode_impl.file_stat.mtime = current_time;
+        //} else if fst_flags.contains(SetTimeFlags::ATIME) {
+            //inode_impl.file_stat.atime = atime;
+        //} else if fst_flags.contains(SetTimeFlags::MTIME) {
+            //inode_impl.file_stat.mtime = mtime;
+        //}
+        //Ok(())
+    //}
 
     /// A rust-style implementation for `fd_pread`.
     /// The actual WASI spec, requires, after `fd`, an extra parameter of type IoVec,
@@ -1218,22 +1217,22 @@ impl FileSystem {
         Ok(len)
     }
 
-    /// Return the status of a pre-opened Fd `fd`.
-    #[inline]
-    pub(crate) fn fd_prestat_get(&mut self, fd: Fd) -> FileSystemResult<Prestat> {
-        let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
-        let resource_type = PreopenType::Dir {
-            name_len: <_>::try_from_or_errno(path.as_os_str().len())?,
-        };
-        Ok(Prestat { resource_type })
-    }
+    ///// Return the status of a pre-opened Fd `fd`.
+    //#[inline]
+    //pub(crate) fn fd_prestat_get(&mut self, fd: Fd) -> FileSystemResult<Prestat> {
+        //let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
+        //let resource_type = PreopenType::Dir {
+            //name_len: <_>::try_from_or_errno(path.as_os_str().len())?,
+        //};
+        //Ok(Prestat { resource_type })
+    //}
 
-    /// Return the path of a pre-opened Fd `fd`. The path must be consistent with the status returned by `fd_prestat_get`
-    #[inline]
-    pub(crate) fn fd_prestat_dir_name(&mut self, fd: Fd) -> FileSystemResult<PathBuf> {
-        let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
-        Ok(path.to_path_buf())
-    }
+    ///// Return the path of a pre-opened Fd `fd`. The path must be consistent with the status returned by `fd_prestat_get`
+    //#[inline]
+    //pub(crate) fn fd_prestat_dir_name(&mut self, fd: Fd) -> FileSystemResult<PathBuf> {
+        //let path = self.prestat_table.get(&fd).ok_or(ErrNo::BadF)?;
+        //Ok(path.to_path_buf())
+    //}
 
     /// A rust-style implementation for `fd_pwrite`.
     /// The actual WASI spec, requires that `ciovec` is of type Vec<IoVec>.
@@ -1277,8 +1276,7 @@ impl FileSystem {
             let native_module = service.lock().map_err(|_| ErrNo::Busy)?;
 
             // Invoke native module manager
-            let mut native_module_manager =
-                NativeModuleManager::new(*native_module.clone(), self.service_fs()?);
+            let mut native_module_manager = NativeModuleManager::new(*native_module.clone());
             // Invoke native module with execution configuration
             native_module_manager.execute(exec_config)?;
         }
@@ -1316,41 +1314,41 @@ impl FileSystem {
         Ok(read_len)
     }
 
-    /// The implementation of `fd_readdir`.
-    #[inline]
-    pub(crate) fn fd_readdir(
-        &mut self,
-        fd: Fd,
-        cookie: DirCookie,
-    ) -> FileSystemResult<Vec<(DirEnt, Vec<u8>)>> {
-        self.check_right(&fd, Rights::FD_READDIR)?;
-        let dir_inode = self.get_inode_by_fd(&fd)?;
-        // limit lock scope
-        let mut dirs = {
-            let inode_table = self.lock_inode_table()?;
-            inode_table.get(&dir_inode)?.read_dir(&inode_table)?
-        };
-        let cookie = <_>::try_from_or_errno(cookie.0)?;
-        if dirs.len() < cookie {
-            return Ok(Vec::new());
-        }
-        let rst = dirs.split_off(cookie);
-        Ok(rst)
-    }
+    ///// The implementation of `fd_readdir`.
+    //#[inline]
+    //pub(crate) fn fd_readdir(
+        //&mut self,
+        //fd: Fd,
+        //cookie: DirCookie,
+    //) -> FileSystemResult<Vec<(DirEnt, Vec<u8>)>> {
+        //self.check_right(&fd, Rights::FD_READDIR)?;
+        //let dir_inode = self.get_inode_by_fd(&fd)?;
+        //// limit lock scope
+        //let mut dirs = {
+            //let inode_table = self.lock_inode_table()?;
+            //inode_table.get(&dir_inode)?.read_dir(&inode_table)?
+        //};
+        //let cookie = <_>::try_from_or_errno(cookie.0)?;
+        //if dirs.len() < cookie {
+            //return Ok(Vec::new());
+        //}
+        //let rst = dirs.split_off(cookie);
+        //Ok(rst)
+    //}
 
-    /// Atomically renumbers the `old_fd` to the `new_fd`.  Note that as
-    /// execution engine is single-threaded this is atomic from the WASM program's
-    /// point of view.
-    pub(crate) fn fd_renumber(&mut self, old_fd: Fd, new_fd: Fd) -> FileSystemResult<()> {
-        let entry = self.fd_table.get(&old_fd).ok_or(ErrNo::BadF)?.clone();
-        if self.fd_table.get(&new_fd).is_none() {
-            self.fd_table.insert(new_fd, entry);
-            self.fd_table.remove(&old_fd);
-            Ok(())
-        } else {
-            Err(ErrNo::BadF)
-        }
-    }
+    ///// Atomically renumbers the `old_fd` to the `new_fd`.  Note that as
+    ///// execution engine is single-threaded this is atomic from the WASM program's
+    ///// point of view.
+    //pub(crate) fn fd_renumber(&mut self, old_fd: Fd, new_fd: Fd) -> FileSystemResult<()> {
+        //let entry = self.fd_table.get(&old_fd).ok_or(ErrNo::BadF)?.clone();
+        //if self.fd_table.get(&new_fd).is_none() {
+            //self.fd_table.insert(new_fd, entry);
+            //self.fd_table.remove(&old_fd);
+            //Ok(())
+        //} else {
+            //Err(ErrNo::BadF)
+        //}
+    //}
 
     /// Change the offset of Fd `fd`.
     pub(crate) fn fd_seek(
@@ -1391,19 +1389,19 @@ impl FileSystem {
         Ok(new_offset)
     }
 
-    /// The stub implementation of `fd_sync`. It is a no-op now.
-    #[inline]
-    pub(crate) fn fd_sync(&mut self, fd: Fd) -> FileSystemResult<()> {
-        self.check_right(&fd, Rights::FD_SYNC)?;
-        Ok(())
-    }
+    ///// The stub implementation of `fd_sync`. It is a no-op now.
+    //#[inline]
+    //pub(crate) fn fd_sync(&mut self, fd: Fd) -> FileSystemResult<()> {
+        //self.check_right(&fd, Rights::FD_SYNC)?;
+        //Ok(())
+    //}
 
-    /// Returns the current offset associated with the file descriptor.
-    #[inline]
-    pub(crate) fn fd_tell(&self, fd: Fd) -> FileSystemResult<FileSize> {
-        self.check_right(&fd, Rights::FD_TELL)?;
-        Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset)
-    }
+    ///// Returns the current offset associated with the file descriptor.
+    //#[inline]
+    //pub(crate) fn fd_tell(&self, fd: Fd) -> FileSystemResult<FileSize> {
+        //self.check_right(&fd, Rights::FD_TELL)?;
+        //Ok(self.fd_table.get(&fd).ok_or(ErrNo::BadF)?.offset)
+    //}
 
     /// A rust-style base implementation for `fd_write`. It directly calls `fd_pwrite` with the
     /// current `offset` of Fd `fd` and then calls `fd_seek`.
@@ -1420,87 +1418,87 @@ impl FileSystem {
         Ok(rst)
     }
 
-    /// The implementation of `path_create_directory`.
-    #[inline]
-    pub(crate) fn path_create_directory<T: AsRef<Path>>(
-        &mut self,
-        fd: Fd,
-        path: T,
-    ) -> FileSystemResult<()> {
-        self.check_right(&fd, Rights::PATH_CREATE_DIRECTORY)?;
-        let parent_inode = self.get_inode_by_fd(&fd)?;
-        if !self.lock_inode_table()?.is_dir(&parent_inode) {
-            return Err(ErrNo::NotDir);
-        }
-        // The path exists
-        if self.get_inode_by_fd_path(&fd, path.as_ref()).is_ok() {
-            return Err(ErrNo::Exist);
-        }
-        // Create ALL missing dir in the path
-        // In each round, the `last` carries the current parent inode or an error
-        // and component is the next component in the path.
-        path.as_ref().components().fold(
-            Ok(parent_inode),
-            |last: FileSystemResult<Inode>, component| {
-                // If there is an error
-                let last = last?;
-                let component_path = match component {
-                    Component::Normal(p) => Ok(p),
-                    _otherwise => Err(ErrNo::Inval),
-                }?;
-                let new_inode = self.lock_inode_table()?.new_inode()?;
-                self.lock_inode_table()?
-                    .add_dir(last, component_path, new_inode)?;
-                // return the next inode, preparing for the next round.
-                Ok(new_inode)
-            },
-        )?;
-        Ok(())
-    }
+    ///// The implementation of `path_create_directory`.
+    //#[inline]
+    //pub(crate) fn path_create_directory<T: AsRef<Path>>(
+        //&mut self,
+        //fd: Fd,
+        //path: T,
+    //) -> FileSystemResult<()> {
+        //self.check_right(&fd, Rights::PATH_CREATE_DIRECTORY)?;
+        //let parent_inode = self.get_inode_by_fd(&fd)?;
+        //if !self.lock_inode_table()?.is_dir(&parent_inode) {
+            //return Err(ErrNo::NotDir);
+        //}
+        //// The path exists
+        //if self.get_inode_by_fd_path(&fd, path.as_ref()).is_ok() {
+            //return Err(ErrNo::Exist);
+        //}
+        //// Create ALL missing dir in the path
+        //// In each round, the `last` carries the current parent inode or an error
+        //// and component is the next component in the path.
+        //path.as_ref().components().fold(
+            //Ok(parent_inode),
+            //|last: FileSystemResult<Inode>, component| {
+                //// If there is an error
+                //let last = last?;
+                //let component_path = match component {
+                    //Component::Normal(p) => Ok(p),
+                    //_otherwise => Err(ErrNo::Inval),
+                //}?;
+                //let new_inode = self.lock_inode_table()?.new_inode()?;
+                //self.lock_inode_table()?
+                    //.add_dir(last, component_path, new_inode)?;
+                //// return the next inode, preparing for the next round.
+                //Ok(new_inode)
+            //},
+        //)?;
+        //Ok(())
+    //}
 
-    /// Return a copy of the status of the file at path `path`. We only support the searching from the root Fd. We ignore searching flag `flags`.
-    pub(crate) fn path_filestat_get<T: AsRef<Path>>(
-        &mut self,
-        fd: Fd,
-        _flags: LookupFlags,
-        path: T,
-    ) -> FileSystemResult<FileStat> {
-        let path = path.as_ref();
-        self.check_right(&fd, Rights::PATH_FILESTAT_GET)?;
-        let inode = self.get_inode_by_fd_path(&fd, path)?;
-        Ok(self.lock_inode_table()?.get(&inode)?.file_stat)
-    }
+    ///// Return a copy of the status of the file at path `path`. We only support the searching from the root Fd. We ignore searching flag `flags`.
+    //pub(crate) fn path_filestat_get<T: AsRef<Path>>(
+        //&mut self,
+        //fd: Fd,
+        //_flags: LookupFlags,
+        //path: T,
+    //) -> FileSystemResult<FileStat> {
+        //let path = path.as_ref();
+        //self.check_right(&fd, Rights::PATH_FILESTAT_GET)?;
+        //let inode = self.get_inode_by_fd_path(&fd, path)?;
+        //Ok(self.lock_inode_table()?.get(&inode)?.file_stat)
+    //}
 
-    /// Change the time of the open file at `path` If `fst_flags`
-    /// contains `ATIME_NOW` or `MTIME_NOW`, the method immediately returns unsupported error
-    /// `NoSys`. We only support searching from the root Fd. We ignore searching flag `flags`.
-    pub(crate) fn path_filestat_set_times<T: AsRef<Path>>(
-        &mut self,
-        fd: Fd,
-        _flags: LookupFlags,
-        path: T,
-        atime: Timestamp,
-        mtime: Timestamp,
-        fst_flags: SetTimeFlags,
-        current_time: Timestamp,
-    ) -> FileSystemResult<()> {
-        let path = path.as_ref();
-        self.check_right(&fd, Rights::PATH_FILESTAT_SET_TIMES)?;
+    ///// Change the time of the open file at `path` If `fst_flags`
+    ///// contains `ATIME_NOW` or `MTIME_NOW`, the method immediately returns unsupported error
+    ///// `NoSys`. We only support searching from the root Fd. We ignore searching flag `flags`.
+    //pub(crate) fn path_filestat_set_times<T: AsRef<Path>>(
+        //&mut self,
+        //fd: Fd,
+        //_flags: LookupFlags,
+        //path: T,
+        //atime: Timestamp,
+        //mtime: Timestamp,
+        //fst_flags: SetTimeFlags,
+        //current_time: Timestamp,
+    //) -> FileSystemResult<()> {
+        //let path = path.as_ref();
+        //self.check_right(&fd, Rights::PATH_FILESTAT_SET_TIMES)?;
 
-        let inode = self.get_inode_by_fd_path(&fd, path)?;
-        let mut inode_table = self.lock_inode_table()?;
-        let mut inode_impl = inode_table.get_mut(&inode)?;
-        if fst_flags.contains(SetTimeFlags::ATIME_NOW) {
-            inode_impl.file_stat.atime = current_time;
-        } else if fst_flags.contains(SetTimeFlags::MTIME_NOW) {
-            inode_impl.file_stat.mtime = current_time;
-        } else if fst_flags.contains(SetTimeFlags::ATIME) {
-            inode_impl.file_stat.atime = atime;
-        } else if fst_flags.contains(SetTimeFlags::MTIME) {
-            inode_impl.file_stat.mtime = mtime;
-        }
-        Ok(())
-    }
+        //let inode = self.get_inode_by_fd_path(&fd, path)?;
+        //let mut inode_table = self.lock_inode_table()?;
+        //let mut inode_impl = inode_table.get_mut(&inode)?;
+        //if fst_flags.contains(SetTimeFlags::ATIME_NOW) {
+            //inode_impl.file_stat.atime = current_time;
+        //} else if fst_flags.contains(SetTimeFlags::MTIME_NOW) {
+            //inode_impl.file_stat.mtime = current_time;
+        //} else if fst_flags.contains(SetTimeFlags::ATIME) {
+            //inode_impl.file_stat.atime = atime;
+        //} else if fst_flags.contains(SetTimeFlags::MTIME) {
+            //inode_impl.file_stat.mtime = mtime;
+        //}
+        //Ok(())
+    //}
 
     /// A minimum functionality of opening a file or directory on behalf of the principal `principal`.
     /// We only support search from the root Fd. We ignore the dir look up flag.
@@ -1575,7 +1573,6 @@ impl FileSystem {
         let new_fd = self.new_fd()?;
         let FileStat {
             file_type,
-            file_size,
             ..
         } = self.lock_inode_table()?.get(&inode)?.file_stat;
         let fd_stat = FdStat {
@@ -1590,169 +1587,169 @@ impl FileSystem {
                 inode,
                 fd_stat,
                 offset: 0,
-                advice: vec![(0, file_size, Advice::Normal)],
+                //advice: vec![(0, file_size, Advice::Normal)],
             },
         );
         Ok(new_fd)
     }
 
-    /// The stub implementation of `path_readlink`. Return unsupported error `NoSys`.
-    /// We only support the searching from the root Fd.
-    #[inline]
-    pub(crate) fn path_readlink<T: AsRef<Path>>(
-        &mut self,
-        fd: Fd,
-        _path: T,
-    ) -> FileSystemResult<Vec<u8>> {
-        self.check_right(&fd, Rights::PATH_READLINK)?;
-        Err(ErrNo::NoSys)
-    }
+    ///// The stub implementation of `path_readlink`. Return unsupported error `NoSys`.
+    ///// We only support the searching from the root Fd.
+    //#[inline]
+    //pub(crate) fn path_readlink<T: AsRef<Path>>(
+        //&mut self,
+        //fd: Fd,
+        //_path: T,
+    //) -> FileSystemResult<Vec<u8>> {
+        //self.check_right(&fd, Rights::PATH_READLINK)?;
+        //Err(ErrNo::NoSys)
+    //}
 
-    /// The stub implementation of `path_remove_directory`. Return unsupported error `NoSys`.
-    #[inline]
-    pub(crate) fn path_remove_directory<T: AsRef<Path>>(
-        &mut self,
-        fd: Fd,
-        _path: T,
-    ) -> FileSystemResult<()> {
-        self.check_right(&fd, Rights::PATH_REMOVE_DIRECTORY)?;
-        Err(ErrNo::NoSys)
-    }
+    ///// The stub implementation of `path_remove_directory`. Return unsupported error `NoSys`.
+    //#[inline]
+    //pub(crate) fn path_remove_directory<T: AsRef<Path>>(
+        //&mut self,
+        //fd: Fd,
+        //_path: T,
+    //) -> FileSystemResult<()> {
+        //self.check_right(&fd, Rights::PATH_REMOVE_DIRECTORY)?;
+        //Err(ErrNo::NoSys)
+    //}
 
-    /// The stub implementation of `path_rename`. Return unsupported error `NoSys`.
-    #[inline]
-    pub(crate) fn path_rename<T: AsRef<Path>, R: AsRef<Path>>(
-        &mut self,
-        old_fd: Fd,
-        _old_path: T,
-        new_fd: Fd,
-        _new_path: R,
-    ) -> FileSystemResult<()> {
-        self.check_right(&old_fd, Rights::PATH_RENAME_SOURCE)?;
-        self.check_right(&new_fd, Rights::PATH_RENAME_TARGET)?;
-        Err(ErrNo::NoSys)
-    }
+    ///// The stub implementation of `path_rename`. Return unsupported error `NoSys`.
+    //#[inline]
+    //pub(crate) fn path_rename<T: AsRef<Path>, R: AsRef<Path>>(
+        //&mut self,
+        //old_fd: Fd,
+        //_old_path: T,
+        //new_fd: Fd,
+        //_new_path: R,
+    //) -> FileSystemResult<()> {
+        //self.check_right(&old_fd, Rights::PATH_RENAME_SOURCE)?;
+        //self.check_right(&new_fd, Rights::PATH_RENAME_TARGET)?;
+        //Err(ErrNo::NoSys)
+    //}
 
-    /// The stub implementation of `path_rename`. Return unsupported error `NoSys`.
-    #[inline]
-    pub(crate) fn path_link<T: AsRef<Path>, R: AsRef<Path>>(
-        &mut self,
-        old_fd: Fd,
-        _old_flag: LookupFlags,
-        _old_path: T,
-        new_fd: Fd,
-        _new_path: R,
-    ) -> FileSystemResult<()> {
-        self.check_right(&old_fd, Rights::PATH_LINK_SOURCE)?;
-        self.check_right(&new_fd, Rights::PATH_LINK_TARGET)?;
-        Err(ErrNo::NoSys)
-    }
+    ///// The stub implementation of `path_rename`. Return unsupported error `NoSys`.
+    //#[inline]
+    //pub(crate) fn path_link<T: AsRef<Path>, R: AsRef<Path>>(
+        //&mut self,
+        //old_fd: Fd,
+        //_old_flag: LookupFlags,
+        //_old_path: T,
+        //new_fd: Fd,
+        //_new_path: R,
+    //) -> FileSystemResult<()> {
+        //self.check_right(&old_fd, Rights::PATH_LINK_SOURCE)?;
+        //self.check_right(&new_fd, Rights::PATH_LINK_TARGET)?;
+        //Err(ErrNo::NoSys)
+    //}
 
-    /// The stub implementation of `path_symlink`. Return unsupported error `NoSys`.
-    #[inline]
-    pub(crate) fn path_symlink<T: AsRef<Path>, R: AsRef<Path>>(
-        &mut self,
-        _old_path: T,
-        fd: Fd,
-        _new_path: R,
-    ) -> FileSystemResult<()> {
-        self.check_right(&fd, Rights::PATH_SYMLINK)?;
-        Err(ErrNo::NoSys)
-    }
+    ///// The stub implementation of `path_symlink`. Return unsupported error `NoSys`.
+    //#[inline]
+    //pub(crate) fn path_symlink<T: AsRef<Path>, R: AsRef<Path>>(
+        //&mut self,
+        //_old_path: T,
+        //fd: Fd,
+        //_new_path: R,
+    //) -> FileSystemResult<()> {
+        //self.check_right(&fd, Rights::PATH_SYMLINK)?;
+        //Err(ErrNo::NoSys)
+    //}
 
-    /// The stub implementation of `path_unlink_file`. Return unsupported error `NoSys`.
-    #[inline]
-    pub(crate) fn path_unlink_file<T: AsRef<Path>>(
-        &mut self,
-        fd: Fd,
-        _path: T,
-    ) -> FileSystemResult<()> {
-        self.check_right(&fd, Rights::PATH_UNLINK_FILE)?;
-        Err(ErrNo::NoSys)
-    }
+    ///// The stub implementation of `path_unlink_file`. Return unsupported error `NoSys`.
+    //#[inline]
+    //pub(crate) fn path_unlink_file<T: AsRef<Path>>(
+        //&mut self,
+        //fd: Fd,
+        //_path: T,
+    //) -> FileSystemResult<()> {
+        //self.check_right(&fd, Rights::PATH_UNLINK_FILE)?;
+        //Err(ErrNo::NoSys)
+    //}
 
-    /// The stub implementation of `poll_oneoff`. Return unsupported error `NoSys`.
-    #[inline]
-    pub(crate) fn poll_oneoff(
-        &mut self,
-        _subscriptions: Vec<Subscription>,
-        _events: Vec<Event>,
-    ) -> FileSystemResult<Size> {
-        Err(ErrNo::NoSys)
-    }
+    ///// The stub implementation of `poll_oneoff`. Return unsupported error `NoSys`.
+    //#[inline]
+    //pub(crate) fn poll_oneoff(
+        //&mut self,
+        //_subscriptions: Vec<Subscription>,
+        //_events: Vec<Event>,
+    //) -> FileSystemResult<Size> {
+        //Err(ErrNo::NoSys)
+    //}
 
-    /// The stub implementation of `sock_recv`. Return unsupported error `NoSys`.
-    #[inline]
-    pub(crate) fn sock_recv<B: AsMut<[u8]>>(
-        &mut self,
-        socket: Fd,
-        _bufs: &[B],
-        _ri_flags: RiFlags,
-    ) -> FileSystemResult<(Size, RoFlags)> {
-        self.check_right(&socket, Rights::FD_READ)?;
-        Err(ErrNo::NoSys)
-    }
+    ///// The stub implementation of `sock_recv`. Return unsupported error `NoSys`.
+    //#[inline]
+    //pub(crate) fn sock_recv<B: AsMut<[u8]>>(
+        //&mut self,
+        //socket: Fd,
+        //_bufs: &[B],
+        //_ri_flags: RiFlags,
+    //) -> FileSystemResult<(Size, RoFlags)> {
+        //self.check_right(&socket, Rights::FD_READ)?;
+        //Err(ErrNo::NoSys)
+    //}
 
-    /// The stub implementation of `sock_send`. Return unsupported error `NoSys`.
-    #[inline]
-    pub(crate) fn sock_send<B: AsRef<[u8]>>(
-        &mut self,
-        socket: Fd,
-        _bufs: &[B],
-        _si_flags: SiFlags,
-    ) -> FileSystemResult<Size> {
-        self.check_right(&socket, Rights::FD_WRITE)?;
-        Err(ErrNo::NoSys)
-    }
+    ///// The stub implementation of `sock_send`. Return unsupported error `NoSys`.
+    //#[inline]
+    //pub(crate) fn sock_send<B: AsRef<[u8]>>(
+        //&mut self,
+        //socket: Fd,
+        //_bufs: &[B],
+        //_si_flags: SiFlags,
+    //) -> FileSystemResult<Size> {
+        //self.check_right(&socket, Rights::FD_WRITE)?;
+        //Err(ErrNo::NoSys)
+    //}
 
-    /// The stub implementation of `sock_shutdown`. Return unsupported error `NoSys`.
-    #[inline]
-    pub(crate) fn sock_shutdown(&mut self, socket: Fd, _flags: SdFlags) -> FileSystemResult<()> {
-        self.check_right(&socket, Rights::SOCK_SHUTDOWN)?;
-        Err(ErrNo::NoSys)
-    }
+    ///// The stub implementation of `sock_shutdown`. Return unsupported error `NoSys`.
+    //#[inline]
+    //pub(crate) fn sock_shutdown(&mut self, socket: Fd, _flags: SdFlags) -> FileSystemResult<()> {
+        //self.check_right(&socket, Rights::SOCK_SHUTDOWN)?;
+        //Err(ErrNo::NoSys)
+    //}
 
-    /// This function, added for Veracruz, creates a new anonymous file.
-    /// It will return an Err if getrandom fails, but perhaps in no other
-    /// circumstances.
-    pub(crate) fn fd_create(&mut self) -> FileSystemResult<Fd> {
-        let inode = self.lock_inode_table()?.new_inode()?;
-        let file_stat = FileStat {
-            device: 0u64.into(),
-            inode: inode.clone(),
-            file_type: FileType::RegularFile,
-            num_links: 0,
-            file_size: 0,
-            atime: Timestamp::from_nanos(0),
-            mtime: Timestamp::from_nanos(0),
-            ctime: Timestamp::from_nanos(0),
-        };
-        let node = InodeEntry {
-            file_stat,
-            data: InodeImpl::File(Vec::new()),
-        };
-        self.lock_inode_table()?.insert(inode, node)?;
+    ///// This function, added for Veracruz, creates a new anonymous file.
+    ///// It will return an Err if getrandom fails, but perhaps in no other
+    ///// circumstances.
+    //pub(crate) fn fd_create(&mut self) -> FileSystemResult<Fd> {
+        //let inode = self.lock_inode_table()?.new_inode()?;
+        //let file_stat = FileStat {
+            //device: 0u64.into(),
+            //inode: inode.clone(),
+            //file_type: FileType::RegularFile,
+            //num_links: 0,
+            //file_size: 0,
+            //atime: Timestamp::from_nanos(0),
+            //mtime: Timestamp::from_nanos(0),
+            //ctime: Timestamp::from_nanos(0),
+        //};
+        //let node = InodeEntry {
+            //file_stat,
+            //data: InodeImpl::File(Vec::new()),
+        //};
+        //self.lock_inode_table()?.insert(inode, node)?;
 
-        let new_fd = self.new_fd()?;
-        let file_type = FileType::RegularFile;
-        let flags = FdFlags::empty();
-        let rights_base = Rights::all();
-        let rights_inheriting = Rights::all();
-        let fd_stat = FdStat {
-            file_type,
-            flags,
-            rights_base,
-            rights_inheriting,
-        };
-        let fd_entry = FdEntry {
-            inode,
-            fd_stat,
-            offset: 0,
-            advice: vec![(0, 0, Advice::Normal)],
-        };
-        self.fd_table.insert(new_fd, fd_entry);
-        Ok(new_fd)
-    }
+        //let new_fd = self.new_fd()?;
+        //let file_type = FileType::RegularFile;
+        //let flags = FdFlags::empty();
+        //let rights_base = Rights::all();
+        //let rights_inheriting = Rights::all();
+        //let fd_stat = FdStat {
+            //file_type,
+            //flags,
+            //rights_base,
+            //rights_inheriting,
+        //};
+        //let fd_entry = FdEntry {
+            //inode,
+            //fd_stat,
+            //offset: 0,
+            //advice: vec![(0, 0, Advice::Normal)],
+        //};
+        //self.fd_table.insert(new_fd, fd_entry);
+        //Ok(new_fd)
+    //}
 
     ////////////////////////////////////////////////////////////////////////
     // Public interface for the filesystem.

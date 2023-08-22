@@ -17,7 +17,7 @@ use policy_utils::{
     pipeline::Expr, policy::Policy, principal::Principal, CANONICAL_STDIN_FILE_PATH,
 };
 use std::{
-    collections::HashMap,
+    collections::{HashSet, HashMap},
     path::PathBuf,
     string::String,
     sync::{
@@ -218,18 +218,18 @@ impl ProtocolState {
             caller_principal, execution_principal
         );
         let execution_strategy = self.global_policy.execution_strategy();
-        let options = execution_engine::Options {
-            enable_clock: *self.global_policy.enable_clock(),
+        let env = execution_engine::Environment {
+            //enable_clock: *self.global_policy.enable_clock(),
             environment_variables,
             ..Default::default()
         };
 
         let return_code = execute(
             &execution_strategy,
-            self.vfs.spawn(caller_principal)?,
-            self.vfs.spawn(execution_principal)?,
+            //TODO 
+            &HashSet::from([PathBuf::from("/")]),
             pipeline,
-            &options,
+            &env,
         )?;
 
         let response = Self::response_error_code_returned(return_code);

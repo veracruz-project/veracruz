@@ -17,10 +17,11 @@
 
 #[cfg(feature = "std")]
 use crate::engines::wasmtime::WasmtimeRuntimeState;
-use crate::Options;
+use crate::Environment;
 use crate::{
-    engines::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
-    fs::FileSystem,
+    //engines::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
+    engines::{common::ExecutionEngine},
+    //fs::FileSystem,
     native_module_manager::NativeModuleManager,
 };
 use anyhow::{anyhow, Result};
@@ -29,7 +30,7 @@ use policy_utils::{
     pipeline::Expr,
     principal::{ExecutionStrategy, NativeModule, NativeModuleType},
 };
-use std::{boxed::Box, path::PathBuf};
+use std::{boxed::Box, path::{Path, PathBuf}, fs, collections::HashSet};
 
 /// Returns whether the given path corresponds to a WASM binary.
 fn is_wasm_binary(path_string: &String) -> bool {
@@ -41,25 +42,28 @@ fn is_wasm_binary(path_string: &String) -> bool {
 /// The function will return the error code.
 pub fn execute_pipeline(
     strategy: &ExecutionStrategy,
-    caller_filesystem: &mut FileSystem,
-    pipeline_filesystem: &FileSystem,
+    //caller_filesystem: &mut FileSystem,
+    //pipeline_filesystem: &FileSystem,
+    preopened_dir: &HashSet<PathBuf>,
     pipeline: Box<Expr>,
-    options: &Options,
+    env: &Environment,
 ) -> Result<u32> {
     use policy_utils::pipeline::Expr::*;
     match *pipeline {
         Literal(mut path_string) => {
             // Turn a relative path into an absolute path.
-            if &path_string[0..1] != "/" {
-                path_string.insert(0, '/');
-            }
+            //if &path_string[0..1] != "/" {
+                //path_string.insert(0, '/');
+            //}
             info!("Literal {:?}", path_string);
             if is_wasm_binary(&path_string) {
                 // Read and call execute_WASM program
-                let binary = caller_filesystem.read_executable_by_absolute_path(path_string)?;
+                // TODO: open the local file
+                //let binary = caller_filesystem.read_executable_by_absolute_path(path_string)?;
+                let binary = fs::read(path_string)?;
                 info!("Successful to read binary");
                 let return_code =
-                    execute_program(strategy, pipeline_filesystem.clone(), binary, options)?;
+                    execute_program(strategy, preopened_dir, binary, env)?;
                 Ok(return_code)
             } else {
                 // Treat program as a provisioned native module
@@ -76,7 +80,7 @@ pub fn execute_pipeline(
                 // shared libraries), or the native module manager won't be able to
                 // prepare the sandbox
                 let mut native_module_manager =
-                    NativeModuleManager::new(native_module, pipeline_filesystem.clone());
+                    NativeModuleManager::new(native_module);
                 native_module_manager
                     .execute(vec![])
                     .map(|_| 0)
@@ -86,13 +90,7 @@ pub fn execute_pipeline(
         Seq(vec) => {
             info!("Seq {:?}", vec);
             for expr in vec {
-                let return_code = execute_pipeline(
-                    strategy,
-                    caller_filesystem,
-                    pipeline_filesystem,
-                    expr,
-                    options,
-                )?;
+                let return_code = execute_pipeline(strategy, preopened_dir, expr, env)?;
 
                 // An error occurs
                 if return_code != 0 {
@@ -104,27 +102,12 @@ pub fn execute_pipeline(
             Ok(0)
         }
         IfElse(cond, true_branch, false_branch) => {
-            info!(
-                "IfElse {:?} true -> {:?} false -> {:?}",
-                cond, true_branch, false_branch
-            );
-            let return_code = if caller_filesystem.file_exists(cond)? {
-                execute_pipeline(
-                    strategy,
-                    caller_filesystem,
-                    pipeline_filesystem,
-                    true_branch,
-                    options,
-                )?
+            info!("IfElse {:?} true -> {:?} false -> {:?}", cond, true_branch, false_branch);
+            let return_code = if Path::new(&cond).exists() {
+                execute_pipeline(strategy, preopened_dir, true_branch, env)?
             } else {
                 match false_branch {
-                    Some(f) => execute_pipeline(
-                        strategy,
-                        caller_filesystem,
-                        pipeline_filesystem,
-                        f,
-                        options,
-                    )?,
+                    Some(f) => execute_pipeline(strategy, preopened_dir, f, env)?,
                     None => 0,
                 }
             };
@@ -136,18 +119,20 @@ pub fn execute_pipeline(
 /// Execute the `program`. All I/O operations in the program are through at `filesystem`.
 fn execute_program(
     strategy: &ExecutionStrategy,
-    filesystem: FileSystem,
+    preopened_dir: &HashSet<PathBuf>,
+    //filesystem: FileSystem,
     program: Vec<u8>,
-    options: &Options,
+    env: &Environment,
 ) -> Result<u32> {
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
         ExecutionStrategy::Interpretation => {
-            Box::new(WASMIRuntimeState::new(filesystem, options.clone())?)
+            //Box::new(WASMIRuntimeState::new(filesystem, options.clone())?),
+            return Err(anyhow::anyhow!(crate::engines::common::FatalEngineError::EngineIsNotReady));
         }
         ExecutionStrategy::JIT => {
             cfg_if::cfg_if! {
                 if #[cfg(any(feature = "std", feature = "nitro"))] {
-                    Box::new(WasmtimeRuntimeState::new(filesystem, options.clone())?)
+                    Box::new(WasmtimeRuntimeState::new(preopened_dir, env.clone())?)
                 } else {
                     return Err(anyhow::anyhow!(crate::engines::common::FatalEngineError::EngineIsNotReady));
                 }
