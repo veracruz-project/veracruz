@@ -29,11 +29,7 @@ byteorder = "1.4.3"
 cfg-if = "1"
 err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-<<<<<<< HEAD:crates/execution-engine/Cargo.toml
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls", default-features = false, features = ["std", "aesni", "padlock", "tls13"] }
-=======
-mbedtls = { path = "../third-party/rust-mbedtls/mbedtls" }
->>>>>>> 9f6fbe17 (Update the wasmtime and wasmi version.):execution-engine/Cargo.toml
 nix = { version = "0.26", optional = true }
 num = { version = "0.4", default-features = false }
 num-derive = { version = "0.3", default-features = false }
@@ -47,7 +43,8 @@ strum = "0.24"
 strum_macros = "0.24"
 typetag = "0.1.8"
 wasi-types = { path = "../third-party/wasi-types" }
-wasmtime = { version = "10.0.1", optional = true }
+wasmtime = { version = "11", optional = true }
+wasmtime-wasi = { version = "11", optional = true }
 
 [lib]
 name = "execution_engine"
