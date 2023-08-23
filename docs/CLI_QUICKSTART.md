@@ -63,11 +63,11 @@ Veracruz supports the direct execution of non-WebAssembly native code via the
 compile the example to WebAssembly, which Rust makes very easy for us:
 
 ``` bash
-$ cargo build \
-    --manifest-path=workspaces/applications/Cargo.toml \
+$ (cd workspaces/applications ; \
+   cargo build \
     --target wasm32-wasi \
     --release \
-    --package shamir-secret-sharing
+    --package shamir-secret-sharing)
 ```
 
 You should now find the example compiled to WebAssembly in the `target/wasm32-wasi/release`
