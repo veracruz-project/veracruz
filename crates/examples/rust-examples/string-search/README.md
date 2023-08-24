@@ -10,7 +10,7 @@ This simple version of search lets you input query text as argument, and an inpu
 
 3. Inside `sdk/freestanding-execution-engine`, create a directory called `input`, and another directory called `output`.
 
-4. Run the following command `cp -r ../../README.markdown input/hello-world-1.dat`.
+4. Run the following command `cp -r ../../README.md input/hello-world-1.dat`.
 This will copy the Veracruz README file to the input directory to be our input to the program.
 
 5. Go to the `string-search` directory and run the following commands:

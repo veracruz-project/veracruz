@@ -10,7 +10,7 @@ This is a simple program that lets you move the cursor inside a text file for a 
 
 3. Inside `sdk/freestanding-execution-engine`, Create a directory called `input`, and another directory called `output`.
 
-4. Run the command `cp ../../README.markdown input/`. This will copy the Veracruz README file to the input directory to be our input to the program.
+4. Run the command `cp ../../README.md input/`. This will copy the Veracruz README file to the input directory to be our input to the program.
 
 5. Go to `file-seek` directory and run the following commands
   ```
@@ -28,4 +28,4 @@ RUST_LOG="info" cargo run -- --env SKIP=1000 --input-source input --input-source
 ```
 The number after `--env SKIP=` is the number of bytes that you want to skip from the beginning of the text file. Feel free to change it to whatever you want.
 
-8. You should have seen a very long log of information. Go to the `output` directory and you should see the `NEW_README.markdown` file and it should the remainder of the text file after skipping the desired number of bytes.
+8. You should have seen a very long log of information. Go to the `output` directory and you should see the `NEW_README.md` file and it should the remainder of the text file after skipping the desired number of bytes.

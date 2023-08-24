@@ -15,7 +15,7 @@
 //!
 //! ## Licensing and copyright notice
 //!
-//! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for
+//! See the `LICENSE.md` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
 //! Error codes describing the result of a platform service function.

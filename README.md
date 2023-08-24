@@ -20,18 +20,20 @@ Veracruz uses *strong isolation* technology (a mixture of *trusted hardware* and
 Concretely, Veracruz computations are special-purpose *WebAssembly* binaries, compiled against a small SDK which we provide.
 WebAssembly acts both as a sandbox, pinning down the behaviour of the program, and allows us to abstract over the different strong isolation technologies that we support.
 
-To learn more about Veracruz, the motivation, design, use-cases, and so on, please read the [Veracruz project wiki](https://github.com/veracruz-project/veracruz/wiki) or dive in and start playing with Veracruz using [our Docker container](https://github.com/veracruz-project/veracruz-docker-image).
+To learn more about Veracruz, the motivation, design, use-cases, and so on, please read the [Veracruz project wiki](https://github.com/veracruz-project/veracruz/wiki).
 The latest project news is available on the [Veracruz project homepage](https://veracruz-project.github.io).
 
 To jump straight into the codebase, please read the growing number of guides we have on how to get started with Veracruz:
-- [BUILD INSTRUCTIONS](docker/README.md) - Set up a build environment for Veracruz
-- [CLI_QUICKSTART.markdown](CLI_QUICKSTART.markdown) - Quickly run Veracruz with a prepared demo program
+- [Build instructions](docker/README.md) - Set up a build environment for Veracruz
+- [CLI Quickstart](docs/CLI_QUICKSTART.md) - Quickly run Veracruz with a prepared demo program
 
 ## News
 
-- **May 2022**: we have released Veracruz 22.05 (see the `veracruz-2205` Git tag).  See `documents/release-notes/VERACRUZ-2205.markdown` for notable changes in this release.
+- **May 2023**: our paper "Private delegated computations using strong isolation" was accepted into [IEEE Transactions on Emerging Topics in Computing](https://doi.ieeecomputersociety.org/10.1109/TETC.2023.3281738).
+- **June 2022**: we have released Veracruz 22.06 (see the `veracruz-2206` Git tag).  See [release notes](docs/release-notes/VERACRUZ-2206.md) for notable changes in this release.
+- **May 2022**: we have released Veracruz 22.05 (see the `veracruz-2205` Git tag).  See [release notes](docs/release-notes/VERACRUZ-2205.md) for notable changes in this release.
 - **May 2022**: we have released a technical report on the Veracruz and IceCap projects, hosted on [Arxiv](https://arxiv.org/abs/2205.03322).
-- **April 2022**: we have released Veracruz 22.04 (see the `veracruz-2204` Git tag).  See `documents/release-notes/VERACRUZ-2204.markdown` for notable changes in this release.
+- **April 2022**: we have released Veracruz 22.04 (see the `veracruz-2204` Git tag).  See [release notes](docs/release-notes/VERACRUZ-2204.md) for notable changes in this release.
 
 ## Get involved!
 
@@ -65,6 +67,4 @@ If you use Veracruz or otherwise wish to discuss the project, please cite the pr
 
 ## License
 
-This project's codebase is licensed under the [MIT license](LICENSE_MIT.markdown).
-
-We use the image [Veracruz Puerto - Vista desde el Hotel Emporio](examples/data-generators/image-processing-generator/veracruz.jpg) by Eduardo Pavon as a test dataset for some of our examples.  This image is licensed under the [Creative Commons Attribution Share Alike 2.0 Generic (CC-BY-SA 2.0) license](LICENSE_CC-BY-SA-2.0.markdown).
+Except where otherwise stated, this project's codebase is licensed under the [MIT license](LICENSE.md).

@@ -6,7 +6,7 @@
 #
 # COPYRIGHT
 #
-# See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
+# See the `LICENSE.md` file in the Veracruz root director for licensing
 # and copyright information.
 
 PLATFORM := $(shell uname)

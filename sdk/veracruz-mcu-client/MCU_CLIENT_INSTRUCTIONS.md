@@ -2,8 +2,9 @@
 # MCU client demo
 
 This is a quick guide on how to run the MCU client demo. It assumes you have
-already set up a Veracruz build environment (see [BUILD_INSTRUCTIONS.markdown](../BUILD_INSTRUCTIONS.markdown)),
-and are familiar with running the Veracruz server.
+already set up a Veracruz build environment (see
+[Build instructions](../../docker/README.md)), and are familiar with running
+the Veracruz server.
 
 
 ## Setup and servers

@@ -20,7 +20,7 @@
 //!
 //! ## Copyright
 //!
-//! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
+//! See the file `LICENSE.md` in the Veracruz root directory for licensing
 //! and copyright information.
 
 use anyhow::anyhow;
@@ -56,8 +56,8 @@ const ABOUT: &str = "Veracruz: a platform for practical secure multi-party compu
 /// The name of the application.
 const APPLICATION_NAME: &str = "freestanding-execution-engine";
 /// The authors list.
-const AUTHORS: &str = "The Veracruz Development Team.  See the file `AUTHORS.markdown` in the \
-                       Veracruz root directory for detailed authorship information.";
+const AUTHORS: &str = "The Veracruz Development Team.  See the file `AUTHORS.md` in the \
+                       Veracruz `docs` subdirectory for detailed authorship information.";
 /// Application version number.
 const VERSION: &str = "pre-alpha";
 

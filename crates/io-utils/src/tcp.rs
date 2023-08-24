@@ -6,7 +6,7 @@
 //!
 //! # Copyright and licensing
 //!
-//! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for copyright
+//! See the `LICENSE.md` file in the Veracruz root directory for copyright
 //! and licensing information.
 
 use super::fd::{receive_buffer, send_buffer};

@@ -6,7 +6,7 @@
 #
 # COPYRIGHT AND LICENSING
 #
-# See the `LICENSING.markdown` file in the Veracruz root directory for
+# See the `LICENSE.md` file in the Veracruz root directory for
 # licensing and copyright information.
 
 .PHONY: all install clean clean-cargo-lock clean-datasets datasets doc fmt

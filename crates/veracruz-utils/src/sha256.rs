@@ -6,7 +6,7 @@
 //!
 //! ## Licensing and copyright notice
 //!
-//! See the `LICENSE_MIT.markdown` file in the Veracruz root directory
+//! See the `LICENSE.md` file in the Veracruz root directory
 //! for information on licensing and copyright.
 
 use mbedtls::hash::{Md, Type};

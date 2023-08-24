@@ -8,7 +8,7 @@
 #
 # COPYRIGHT AND LICENSING
 #
-# See the `LICENSING.markdown` file in the Veracruz root directory for
+# See the `LICENSE.md` file in the Veracruz root directory for
 # licensing and copyright information.
 
 import argparse

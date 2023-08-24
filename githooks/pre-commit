@@ -12,7 +12,7 @@
 #
 # Copyright and licensing
 #
-# See the `LICENSE_MIT.markdown` file in the Veracruz repository root
+# See the `LICENSE.md` file in the Veracruz repository root
 # directory for copyright and licensing information.
 
 HAS_RUSTFMT_ERROR=0

@@ -11,14 +11,14 @@
 //!
 //! ## Copyright
 //!
-//! See the file `LICENSING.markdown` in the Veracruz root directory for licensing and
+//! See the file `LICENSE.md` in the Veracruz root directory for licensing and
 //! copyright information.
 
 use anyhow;
 use std::{fs::File, io::prelude::*, io::SeekFrom};
 
-const INPUT_FILENAME: &'static str = "/input/README.markdown";
-const OUTPUT_FILENAME: &'static str = "/output/NEW_README.markdown";
+const INPUT_FILENAME: &'static str = "/input/README.md";
+const OUTPUT_FILENAME: &'static str = "/output/NEW_README.md";
 
 fn main() -> anyhow::Result<()> {
     let mut f = File::open(INPUT_FILENAME)?;

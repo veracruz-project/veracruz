@@ -6,7 +6,7 @@
 //!
 //! # Copyright
 //!
-//! See the file `LICENSE_MIT.markdown` in the Veracruz root directory for licensing
+//! See the file `LICENSE.md` in the Veracruz root directory for licensing
 //! and copyright information.
 //!
 //! # Example

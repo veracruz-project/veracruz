@@ -1,4 +1,4 @@
-Copyright 2020–2021 Veracruz, a series of LF Projects, LLC.
+Copyright 2020–2023 Veracruz, a series of LF Projects, LLC.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
