@@ -75,6 +75,8 @@ pub fn proxy_attestation_setup(
     provision_file("/opt/veraison/psa_corim.cbor", "http://arm.com/psa/iot/1");
 
     provision_file("/opt/veraison/nitro_corim.cbor", "http://aws.com/nitro");
+
+    provision_file("/opt/veraison/amd_sev_snp_corim.cbor", "https://amd.com/sev-snp");
     return ProxyChildren {
         vts_child: vts_child,
         provisioning_child: provisioning_child,

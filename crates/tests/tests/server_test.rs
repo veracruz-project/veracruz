@@ -935,6 +935,8 @@ impl TestExecutor {
             Platform::Linux
         } else if cfg!(feature = "nitro") {
             Platform::Nitro
+        } else if cfg!(feature = "sev") {
+            Platform::SEVSNP
         } else {
             panic!("Unknown platform.");
         };

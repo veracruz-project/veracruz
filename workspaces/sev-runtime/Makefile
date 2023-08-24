@@ -9,7 +9,7 @@
 # See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
 # and copyright information.
 
-.PHONY: all clean clean-cargo-lock doc fmt clippy sev-runtime-manager
+.PHONY: all clean clean-cargo-lock doc fmt clippy
 
 default: all
 
@@ -26,12 +26,13 @@ all: .guest_image_canary
 		-copy-in "./target/x86_64-unknown-linux-musl/debug/sev-runtime-manager:/root/" \
 		-copy-in veracruz.service:/etc/systemd/system/ \
 		-copy-in "./modules:/etc/" \
+		-copy-in "./sevtool:/root/" \
 		--link /etc/systemd/system/veracruz.service:/etc/systemd/system/multi-user.target.wants/veracruz.service
-	touch .guest_imag3e_canary
+	touch .guest_image_canary
 
 ./target/x86_64-unknown-linux-musl/debug/sev-runtime-manager: FORCE
 	RUSTFLAGS="--remap-path-prefix $(unresolved_crates_path)=$(shell readlink -f $(unresolved_crates_path))" \
-	cargo build $(PROFILE_FLAG) $(V_FLAG)
+	cargo build --target x86_64-unknown-linux-musl $(PROFILE_FLAG) $(V_FLAG)
 
 FORCE:
 

@@ -19,9 +19,9 @@ from ${DOCKER_ARCH}golang:1.19 AS go_builder
 
 RUN set -eux; \
     echo "iteration 0"; \
-    git clone https://github.com/veracruz-project/proxy_attestation_server.git --branch main --tags ; \
+    git clone https://github.com/veracruz-project/proxy_attestation_server.git --branch dreemkiller_sev --tags ; \
     cd proxy_attestation_server; \
-    git checkout v0.2.1; \
+    go mod download github.com/mattn/go-sqlite3; \
     go build -o ./vts/vts -ldflags "-X 'github.com/veraison/services/config.SchemeLoader=builtin'" github.com/veraison/services/vts/cmd/vts-service; \
     go build -o ./provisioning/provisioning -ldflags "-X 'github.com/veraison/services/config.SchemeLoader=builtin'" github.com/veraison/services/provisioning/cmd/provisioning-service; \
     go build .; \
@@ -35,10 +35,13 @@ RUN set -eux; \
 COPY MyComidPsaIak.json /go/
 COPY AWSNitroComid.json /go/
 COPY corimMini.json /go/
+COPY AMDSEVSNP.json /go/
 RUN cocli comid create --template MyComidPsaIak.json
 RUN cocli comid create --template AWSNitroComid.json
+RUN cocli comid create --template AMDSEVSNP.json
 RUN cocli corim create -m MyComidPsaIak.cbor -t corimMini.json -o psa_corim.cbor
 RUN cocli corim create -m AWSNitroComid.cbor -t corimMini.json -o nitro_corim.cbor
+RUN cocli corim create -m AMDSEVSNP.cbor -t corimMini.json -o amd_sev_snp_corim.cbor
 
 FROM ${DOCKER_ARCH}ubuntu:22.04
 
@@ -145,6 +148,7 @@ COPY --from=go_builder /go/proxy_attestation_server/provisioning /opt/veraison/p
 COPY --from=go_builder /go/proxy_attestation_server/proxy_attestation_server /opt/veraison/
 COPY --from=corim_builder /go/psa_corim.cbor /opt/veraison/
 COPY --from=corim_builder /go/nitro_corim.cbor /opt/veraison/
+COPY --from=corim_builder /go/amd_sev_snp_corim.cbor /opt/veraison/
 
 COPY vts_config.yaml /opt/veraison/vts/config.yaml
 COPY --from=go_builder /go/proxy_attestation_server/vts/skey.jwk /opt/veraison/vts/

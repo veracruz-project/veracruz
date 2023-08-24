@@ -32,7 +32,7 @@ use vsocket::VsockSocket;
 pub struct VeracruzServerSev {
     /// A convenience struct for handling VSOCK connections to the enclave
     vsocksocket: VsockSocket,
-    //vm_process:  Child,
+    vm_process: Child,
 }
 
 impl VeracruzServer for VeracruzServerSev {
@@ -61,26 +61,27 @@ impl VeracruzServer for VeracruzServerSev {
             .arg("-m").arg("2048M,slots=5,maxmem=30G")
             .arg("-no-reboot")
             .arg("-drive").arg("if=pflash,format=raw,unit=0,file=/work/veracruz/SEVImage/snp-release/usr/local/share/qemu/OVMF_CODE.fd,readonly")
-            .arg("-drive").arg("if=pflash,format=raw,unit=1,file=/work/veracruz/SEVImage/sev-guest-dermil01-larger.fd")
-            .arg("-drive").arg("file=/work/veracruz/SEVImage/sev-guest-dermil01-larger.img,if=none,id=disk0,format=raw")
-            .arg("-device").arg("virtio-scsi-pci,id=scsi0,disable-legacy=on,iommu_platform=true")
-            .arg("-device").arg("scsi-hd,drive=disk0")
-            .arg("-machine").arg("memory-encryption=sev0,vmport=off")
-            .arg("-object").arg("memory-backend-memfd-private,id=ram1,size=2048M,share=true")
-            .arg("-object").arg("sev-snp-guest,id=sev0,cbitpos=51,reduced-phys-bits=1,discard=none")
-            .arg("-machine").arg("memory-backend=ram1,kvm-type=protected")
-            .arg("-nographic")
-            //.arg("-monitor").arg("pty")
-            .arg("-monitor").arg("unix:monitor,server,nowait")
-            .arg("-serial").arg("mon:stdio")
-            .arg("-device").arg("vhost-vsock-pci,guest-cid=3")
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|err| {
-                println!("qemu failed to start:{:?}", err);
-                err
-            })?;
+        //     .arg("-drive").arg("if=pflash,format=raw,unit=1,file=/work/veracruz/SEVImage/sev-guest-dermil01-larger.fd")
+        //     //.arg("-drive").arg("file=/work/veracruz/SEVImage/sev-guest-dermil01-larger.img,if=none,id=disk0,format=raw")
+             .arg("-drive").arg("file=/work/veracruz/workspaces/sev-runtime/sev-guest-runtime-manager.img,if=none,id=disk0,format=raw")
+             .arg("-device").arg("virtio-scsi-pci,id=scsi0,disable-legacy=on,iommu_platform=true")
+             .arg("-device").arg("scsi-hd,drive=disk0")
+             .arg("-machine").arg("memory-encryption=sev0,vmport=off")
+             .arg("-object").arg("memory-backend-memfd-private,id=ram1,size=2048M,share=true")
+             .arg("-object").arg("sev-snp-guest,id=sev0,cbitpos=51,reduced-phys-bits=1,discard=none")
+             .arg("-machine").arg("memory-backend=ram1,kvm-type=protected")
+             .arg("-nographic")
+             //.arg("-monitor").arg("pty")
+             .arg("-monitor").arg("unix:monitor,server,nowait")
+             .arg("-serial").arg("mon:stdio")
+             .arg("-device").arg("vhost-vsock-pci,guest-cid=3")
+             .stdout(Stdio::null())
+             .stderr(Stdio::null())
+             .spawn()
+             .map_err(|err| {
+                 println!("qemu failed to start:{:?}", err);
+                 err
+             })?;
         println!("VeracruzServerSev::new handle:{:?}", handle);
         println!("VeracruzServerSev::new calling VsockSocket::connect");
         let socket = VsockSocket::connect(cid, port)
@@ -90,7 +91,7 @@ impl VeracruzServer for VeracruzServerSev {
             })?;
         println!("VeracruzServerSev::now startup took:{} seconds", start.elapsed().as_secs());
         let mut meta = Self {
-            //vm_process: handle,
+            vm_process: handle,
             vsocksocket: socket,
         };
 
@@ -155,8 +156,7 @@ impl Drop for VeracruzServerSev {
 
 impl VeracruzServerSev {
     fn shutdown_sev_vm(&mut self) -> Result<(), Box<dyn Error>> {
-        // TODO: Something here
-        //self.vm_process.kill()?;
+        self.vm_process.kill()?;
         return Ok(());
     }
 }

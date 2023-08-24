@@ -1,0 +1,37 @@
+# workspaces/nitro-host/Cargo.toml:
+# Workspace for untrusted Nitro services and tests
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT
+#
+# See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
+# and copyright information.
+
+cargo-features = ["resolver"]
+
+[workspace]
+exclude = [
+  "crates/third-party/rust-mbedtls",
+  "crates/third-party/wasmi",
+]
+members = [
+  "crates/veracruz-client",
+  "crates/sev-veracruz-server",
+  "crates/tests",
+  "src/sev-host",
+]
+resolver = "2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+
+[patch.'https://github.com/veracruz-project/nitro-enclave']
+raw-fd = { git = "https://github.com//veracruz-project/nitro-enclave", branch = "dreemkiller_expose_vsocket" }
+vsocket = { git = "https://github.com//veracruz-project/nitro-enclave", branch = "dreemkiller_expose_vsocket" }
+[patch.'https://github.com/veracruz-project/proxy-attestation-client']
+proxy-attestation-client = {  git = "https://github.com//veracruz-project/proxy-attestation-client", branch = "dreemkiller_add_sev" }

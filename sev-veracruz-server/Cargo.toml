@@ -23,7 +23,7 @@ veracruz-utils = { path = "../veracruz-utils"}
 vsocket = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.1" }
 
 [patch.'https://github.com/veracruz-project/nitro-enclave']
-raw-fd = { path = "../nitro-enclave/raw-fd" }
-vsocket = {path ="../nitro-enclave/vsocket" }
+raw-fd = { git = "https://github.com//veracruz-project/nitro-enclave", branch = "dreemkiller_expose_vsocket" }
+vsocket = { git = "https://github.com//veracruz-project/nitro-enclave", branch = "dreemkiller_expose_vsocket" }
 [patch.'https://github.com/veracruz-project/proxy-attestation-client']
-proxy-attestation-client = { path = "../proxy-attestation-client"}
+proxy-attestation-client = { git = "https://github.com//veracruz-project/proxy-attestation-client", branch = "dreemkiller_add_sev" }

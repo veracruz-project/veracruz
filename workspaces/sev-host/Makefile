@@ -21,9 +21,9 @@ WORKSPACE_DIR = $(abspath ..)
 include $(WORKSPACE_DIR)/common.mk
 
 OUT_DIR ?= $(abspath test-collateral)
-RUNTIME_ENCLAVE_BINARY_PATH = $(WORKSPACE_DIR)/sev-host/crates/sev-runtime-manager/target/x86_64-unknown-linux-musl/$(PROFILE_PATH)/sev-runtime-manager
+RUNTIME_ENCLAVE_BINARY_PATH = $(WORKSPACE_DIR)/sev-runtime/target/x86_64-unknown-linux-musl/$(PROFILE_PATH)/sev-runtime-manager
 MEASUREMENT_FILE = $(RUNTIME_ENCLAVE_BINARY_PATH)
-MEASUREMENT_PARAMETER = --css-file $(MEASUREMENT_FILE)
+MEASUREMENT_PARAMETER = --sevsnp-hash a101bb6bd0ada6b64b2432d03a5c04a0ebffb59ef8a16992320d7bbbae13d839d379973e90e98afac35025f024e5627e
 include $(WORKSPACE_DIR)/shared.mk
 
 CC = CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
