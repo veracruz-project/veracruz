@@ -285,7 +285,7 @@ jobs:
         id: tlstest
         run: |
           # Extract and execute bash code blocks from README.md:
-          cd tests/tlstest && \
+          cd crates/tests/tlstest && \
           sed -n '/``` bash/,/```/{/```/d; p}' README.md > README.md.sh && \
           bash -euxo pipefail README.md.sh
       - name: Check modification to Cargo.lock

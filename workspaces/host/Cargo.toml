@@ -18,8 +18,8 @@ exclude = [
   "crates/third-party/wasmi",
 ]
 members = [
-  "crates/sdk/freestanding-execution-engine",
-  "crates/sdk/generate-policy",
+  "crates/freestanding-execution-engine",
+  "crates/generate-policy",
 ]
 resolver = "2"
 

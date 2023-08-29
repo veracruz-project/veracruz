@@ -95,8 +95,8 @@ $(CERTS): $(WORKSPACE_DIR)/host/crates/test-collateral/%_cert.pem : $(WORKSPACE_
 datasets: $(OUT_DIR) $(CERTS) $(KEYS) $(CA_KEY) $(CA_CRT)
 	$(MAKE) -C $(WORKSPACE_DIR)/data-generators
 	$(MAKE) -C ../host datasets
-	cp -r ../../examples/datasets/* $(OUT_DIR)
-	cp ../../test-collateral/*.pem $(OUT_DIR)
+	cp -r crates/examples/datasets/* $(OUT_DIR)
+	cp crates/test-collateral/*.pem $(OUT_DIR)
 
 ###################################################
 # Generate Policy Files
@@ -161,8 +161,8 @@ POLICY_FILES ?= \
 
 PGEN = $(WORKSPACE_DIR)/host/target/$(PROFILE_PATH)/generate-policy
 
-$(PGEN): $(WORKSPACE_DIR)/host/crates/sdk/generate-policy/src/main.rs \
-	$(WORKSPACE_DIR)/host/crates/sdk/generate-policy/Cargo.toml
+$(PGEN): $(WORKSPACE_DIR)/host/crates/generate-policy/src/main.rs \
+	$(WORKSPACE_DIR)/host/crates/generate-policy/Cargo.toml
 	$(MAKE) -C $(WORKSPACE_DIR)/host
 
 policy-files: $(OUT_DIR) measurement-file $(patsubst %.json, $(OUT_DIR)/%.json, $(POLICY_FILES))

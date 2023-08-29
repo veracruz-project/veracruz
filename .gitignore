@@ -44,5 +44,5 @@ sdk/datasets/
 sdk/target
 */.idea/
 */*/.idea/
-*/Cargo.lock
+crates/*/Cargo.lock
 build/**
