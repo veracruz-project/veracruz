@@ -62,7 +62,7 @@ platform.
 
 This is the same as `localci`, above, except only for the AWS Nitro
 platform and you can also run the Nitro tests on appropriate hardware.
-See the [Nitro instructions](../NITRO_INSTRUCTIONS.markdown).
+See the [Nitro instructions](../docs/NITRO_INSTRUCTIONS.md).
 
 ### `ci`
 

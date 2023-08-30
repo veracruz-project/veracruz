@@ -6,7 +6,7 @@
 #
 # COPYRIGHT
 #
-# See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
+# See the `LICENSE.md` file in the Veracruz root directory for licensing
 # and copyright information.
 
 TARGET_DATS = hello-world-1.dat hello-world-2.dat

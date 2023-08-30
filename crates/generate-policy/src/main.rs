@@ -6,7 +6,7 @@
 //!
 //! # COPYRIGHT
 //!
-//! See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
+//! See the `LICENSE.md` file in the Veracruz root directory for licensing
 //! and copyright information.
 
 use anyhow::{anyhow, Result};
@@ -59,7 +59,7 @@ files from a series of command line arguments.";
 const APPLICATION_NAME: &'static str = "generate-policy";
 /// The authors list.
 const AUTHORS: &'static str = "The Veracruz Development Team.  See the file \
-`AUTHORS.markdown` in the Veracruz root directory for detailed authorship \
+`AUTHORS.md` in the Veracruz `docs` subdirectory for detailed authorship \
 information.";
 /// The application's version information.
 const VERSION: &'static str = "0.1.0";

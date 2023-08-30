@@ -11,7 +11,7 @@ This directory is a simple program that takes a file called `huffman_example_inp
 
 3. Inside the `sdk/freestanding-execution-engine`, Create a directory called `input`, and another directory called `output`.
 
-4. Run the command `cp ../../README.markdown input/hello-world-1.dat`. This will copy the Veracruz README file to the input directory to be our input to the program.
+4. Run the command `cp ../../README.md input/hello-world-1.dat`. This will copy the Veracruz README file to the input directory to be our input to the program.
 
 5. Go to the `huffman-encoding` directory and run the following commands:
 ```

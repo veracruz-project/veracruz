@@ -22,7 +22,7 @@
 //!
 //! ## Copyright
 //!
-//! See the file `LICENSING.markdown` in the Veracruz root directory for licensing
+//! See the file `LICENSE.md` in the Veracruz root directory for licensing
 //! and copyright information.
 
 use std::{fs, io};

@@ -84,7 +84,7 @@ jobs:
           # Copy artifacts to new directory
           mkdir -p artifacts
           cp -a \
-          proxy_cleanup.sh \
+          sdk/proxy_cleanup.sh \
           workspaces/ca-cert.conf \
           workspaces/cert.conf \
           workspaces/host/target/debug/freestanding-execution-engine \
@@ -252,7 +252,7 @@ jobs:
           name: nitro
           path: workspaces/**/Cargo.lock
 
-  # tests that the CLI_QUICKSTART.markdown is still up to date
+  # tests that the docs/CLI_QUICKSTART.md is still up to date
   quickstart:
     runs-on: ubuntu-latest
     needs: [check]
@@ -270,17 +270,17 @@ jobs:
       - name: add the GITHUB_WORKSPACE into git config
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - name: Running CLI_QUICKSTART.markdown
+      - name: Running docs/CLI_QUICKSTART.md
         id: quickstart-test
         run: |
           # grab every bash code block, remove line continuation, and only keep lines
           # that start with '$' (of course removing that '$' in the process)
-          sed -n '/``` bash/,/```/{/```/d; p}' CLI_QUICKSTART.markdown \
+          sed -n '/``` bash/,/```/{/```/d; p}' docs/CLI_QUICKSTART.md \
             | sed ':a; /\\$/{N; s/\\\n//; ta}' \
             | sed -n '/^\$/{s/^\$ \?//; p}' \
-            > CLI_QUICKSTART.markdown.sh
+            > CLI_QUICKSTART.md.sh
           # run the quickstart
-          bash -euxo pipefail CLI_QUICKSTART.markdown.sh
+          bash -euxo pipefail CLI_QUICKSTART.md.sh
       - name: Running tlstest/README.md
         id: tlstest
         run: |

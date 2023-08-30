@@ -3,7 +3,7 @@
 This document walks through running an example Veracruz program using
 the Veracruz command-line interface.
 
-It assumes you have walked through the steps in [BUILD_INSTRUCTIONS.markdown](BUILD_INSTRUCTIONS.markdown).
+It assumes you have walked through the steps in [Build instructions](../docker/README.md).
 
 So do that first and make sure the tests are passing! The rest of this
 walkthrough will assume you're in a docker container capable of building
@@ -59,7 +59,7 @@ directory.
 The rust-examples are a part of the `applications` workspace in the workspaces
 directory, so we need to use the `workspaces/applications` Cargo.toml. Note that
 Veracruz supports the direct execution of non-WebAssembly native code via the
-[Native Module Manager](COMPONENTS.markdown#native-modules). Here, we will
+[Native Module Manager](COMPONENTS.md#native-modules). Here, we will
 compile the example to WebAssembly, which Rust makes very easy for us:
 
 ``` bash

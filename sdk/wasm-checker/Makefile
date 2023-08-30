@@ -6,7 +6,7 @@
 #
 # Copyright and Licensing
 #
-# See the `LICENSING.markdown` file in the Veracruz root directory for
+# See the `LICENSE.md` file in the Veracruz root directory for
 # copyright and licensing information.
 
 bin/wasm-checker: src/main.cc wabt json

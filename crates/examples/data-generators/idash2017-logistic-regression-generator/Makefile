@@ -8,7 +8,7 @@
 #
 # COPYRIGHT
 #
-# See the `LICENSE_MIT.markdown` file in the Veracruz root directory for licensing
+# See the `LICENSE.md` file in the Veracruz root directory for licensing
 # and copyright information.
 
 SOURCE_FILES = edin.txt idash.txt lbw.txt nhanes3.txt pcs.txt uis.txt
