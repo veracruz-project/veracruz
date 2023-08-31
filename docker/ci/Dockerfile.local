@@ -17,8 +17,10 @@ ARG VERSION="latest"
 FROM veracruz/ci-base:${VERSION} as final
 
 ARG ARCH=x86_64
+ARG WASM_RUST_VERSION=1.66.1
 
-RUN rustup target add ${ARCH}-unknown-linux-musl wasm32-wasi && \
+RUN rustup target add ${ARCH}-unknown-linux-musl && \
+    rustup toolchain install ${WASM_RUST_VERSION} --target wasm32-wasi && \
     rustup component add rustfmt
 
 WORKDIR /work
