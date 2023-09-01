@@ -17,6 +17,8 @@ default: build
 
 tests: test-server test-client veracruz-test
 
+tests-cca: test-server-cca
+
 icecap_plat ?= qemu
 
 WORKSPACE_DIR = $(abspath ..)
@@ -36,12 +38,20 @@ include mk/$(icecap_plat).mk
 
 VERACRUZ_ICECAP_QEMU_IMAGE = $(WORKSPACE_DIR)/icecap-runtime/build/$(icecap_plat)/disposable/cmake/elfloader/build/elfloader
 
+VERACRUZ_ICECAP_LKVM_FIRMWARE_ADDRESS = $(shell cat /work/veracruz/workspaces/icecap-runtime/firmware_start)
+VERACRUZ_ICECAP_LKVM_FIRMWARE_IMAGE = $(WORKSPACE_DIR)/icecap-runtime/css-icecap.bin
 BUILD_PARAMETERS = VERACRUZ_ICECAP_QEMU_IMAGE=$(VERACRUZ_ICECAP_QEMU_IMAGE)
-TEST_PARAMETERS = VERACRUZ_ICECAP_QEMU_IMAGE=$(VERACRUZ_ICECAP_QEMU_IMAGE) \
-	VERACRUZ_POLICY_DIR=$(OUT_DIR) \
+
+TEST_PARAMETERS = VERACRUZ_POLICY_DIR=$(OUT_DIR) \
 	VERACRUZ_TRUST_DIR=$(OUT_DIR) \
 	VERACRUZ_PROGRAM_DIR=$(OUT_DIR) \
 	VERACRUZ_DATA_DIR=$(OUT_DIR)
+
+QEMU_TEST_PARAMETERS = VERACRUZ_ICECAP_QEMU_IMAGE=$(VERACRUZ_ICECAP_QEMU_IMAGE) \
+	$(TEST_PARAMETERS)
+
+CCA_TEST_PARAMETERS = VERACRUZ_ICECAP_LKVM_FIRMWARE_ADDRESS=$(VERACRUZ_ICECAP_LKVM_FIRMWARE_ADDRESS) \
+	$(TEST_PARAMETERS)
 
 CLIPPY_OPTIONS = --no-deps -A clippy::type_complexity -A clippy::module_inception -D warnings
 
@@ -51,7 +61,15 @@ build: rustup-plat icecap-runtime
 	$(COMPILERS) $(BUILD_PARAMETERS) \
 		cargo build $(PROFILE_FLAG) $(host_feature_flags) $(V_FLAG)
 
-build-veracruz-server-test: rustup-plat icecap-runtime
+build-cca: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
+	$(COMPILERS)  $(BUILD_PARAMETERS) \
+		cargo build $(PROFILE_FLAG) \
+		--features veracruz-client/icecap \
+		--features veracruz-server/icecap-cca \
+		$(host_feature_flags) \
+		$(V_FLAG)
+
+build-veracruz-server-test: rustup-plat $(VERACRUZ_ICECAP_QEMU_IMAGE)
 	$(COMPILERS) $(BUILD_PARAMETERS) \
 		cargo test --no-run $(PROFILE_FLAG) \
 		$(host_feature_flags) \
@@ -71,13 +89,23 @@ icecap-runtime:
 
 test-dependencies: test-collateral icecap-runtime
 
-CARGO_TEST = $(COMPILERS) $(TEST_PARAMETERS) cargo test $(PROFILE_FLAG)
+CARGO_TEST = $(COMPILERS) $(QEMU_TEST_PARAMETERS) cargo test $(PROFILE_FLAG) \
+	--features icecap
+
+CCA_CARGO_TEST = $(COMPILERS)  $(CCA_TEST_PARAMETERS) cargo test $(PROFILE_FLAG) \
+	$(host_feature_flags) --features icecap-cca
 
 build-tests:
 	$(CARGO_TEST) --no-run
 
 test-server: test-dependencies build-tests
-	$(CARGO_TEST) --test server_test -- --test-threads=1 --nocapture
+	$(CARGO_TEST) -p tests --test server_test -- --test-threads=1 --nocapture
+
+build-tests-cca:
+	$(CCA_CARGO_TEST) --no-run
+
+test-server-cca: test-collateral
+	$(CCA_CARGO_TEST) -p tests --test server_test --no-run -- --test-threads=1 --nocapture
 
 test-client: test-dependencies
 	$(CARGO_TEST) -p veracruz-client --lib -- --test-threads=1
@@ -106,7 +134,7 @@ clippy: rustup-plat icecap-runtime
 		--features veracruz-utils/icecap \
 		-- $(CLIPPY_OPTIONS)
 	# workspace testing crates
-	$(COMPILERS) $(TEST_PARAMETERS) cargo clippy --tests \
+	$(COMPILERS) $(QEMU_TEST_PARAMETERS) cargo clippy --tests \
 		$(PROFILE_FLAG) -p tests \
 		--features tests/icecap \
 		-- $(CLIPPY_OPTIONS)

@@ -22,13 +22,14 @@ icecap = [
   "veracruz-server/icecap",
   "veracruz-utils/icecap",
 ]
-icecap-lkvm = [
-  "veracruz-server/icecap-lkvm"
+icecap-cca = [
+  "policy-utils/icecap",
+  "veracruz-server/icecap-cca",
+  "veracruz-utils/icecap",
 ]
-icecap-qemu = [
-  "veracruz-server/icecap-qemu",
-  "icecap-veracruz-server"
-]
+icecap-lkvm = ["veracruz-server/icecap-lkvm"]
+icecap-lkvm_realm = ["veracruz-server/icecap-lkvm_realm"]
+icecap-qemu = ["veracruz-server/icecap-qemu"]
 linux = [
   "linux-veracruz-server",
   "policy-utils/std",

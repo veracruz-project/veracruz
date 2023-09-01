@@ -24,8 +24,32 @@ use icecap_core::{
 };
 use icecap_start_generic::declare_generic_main;
 use icecap_std_external;
-use runtime_manager::common_runtime::CommonRuntime;
+use runtime_manager::{
+    common_runtime::CommonRuntime,
+    managers::session_manager::init_session_manager,
+};
+
+use veracruz_utils::{
+    runtime_manager_message::{ RuntimeManagerRequest, RuntimeManagerResponse, Status },
+};
+
 use serde::{Deserialize, Serialize};
+
+use core::fmt::{self, Write};
+use icecap_core::ring_buffer::*;
+
+pub(crate) struct Writer<'a>(pub &'a mut BufferedRingBuffer);
+
+macro_rules! out {
+    ($dst:expr, $($arg:tt)*) => (Writer($dst).write_fmt(format_args!($($arg)*)).unwrap());
+}
+
+impl fmt::Write for Writer<'_> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.0.tx(s.as_bytes());
+        Ok(())
+    }
+}
 
 mod icecap_runtime;
 
@@ -40,48 +64,50 @@ struct Config {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Badges {
-    virtio_console_server_ring_buffer: Badge,
+    virtio_console_server_tx: Badge,
+    virtio_console_server_rx: Badge,
+    //virtio_console_server_ring_buffer: Badge,
 }
 
 fn main(config: Config) -> Fallible<()> {
     // TODO why do we need this?
     icecap_runtime_init();
-
-    debug_println!("icecap-realmos: initializing...");
-
     // enable ring buffer to serial-server
-    let virtio_console_client =
-        RingBuffer::unmanaged_from_config(&config.virtio_console_server_ring_buffer);
-    virtio_console_client.enable_notify_read();
-    virtio_console_client.enable_notify_write();
-    debug_println!("icecap-realmos: enabled ring buffer");
-
+    let mut virtio_console_client = BufferedRingBuffer::new(
+        RingBuffer::unmanaged_from_config(
+            &config.virtio_console_server_ring_buffer,
+        )
+    );
     debug_println!("icecap-realmos: running...");
     RuntimeManager::new(
         virtio_console_client,
         config.event_nfn,
-        config.badges.virtio_console_server_ring_buffer,
+        config.badges.virtio_console_server_tx,
+        config.badges.virtio_console_server_rx,
     )
     .run()
 }
 
 struct RuntimeManager {
-    channel: RingBuffer,
+    channel: BufferedRingBuffer,
     event: Notification,
-    virtio_console_server_ring_buffer_badge: Badge,
+    virtio_console_server_tx: Badge,
+    virtio_console_server_rx: Badge,
     active: bool,
 }
 
 impl RuntimeManager {
     fn new(
-        channel: RingBuffer,
+        channel: BufferedRingBuffer,
         event: Notification,
-        virtio_console_server_ring_buffer_badge: Badge,
+        virtio_console_server_tx: Badge,
+        virtio_console_server_rx: Badge,
     ) -> Self {
         Self {
             channel: channel,
             event: event,
-            virtio_console_server_ring_buffer_badge: virtio_console_server_ring_buffer_badge,
+            virtio_console_server_tx: virtio_console_server_tx,
+            virtio_console_server_rx: virtio_console_server_rx,
             active: true,
         }
     }
@@ -93,57 +119,45 @@ impl RuntimeManager {
         let mut runtime = CommonRuntime::new(&icecap_runtime);
         loop {
             let badge = self.event.wait();
-            if badge & self.virtio_console_server_ring_buffer_badge != 0 {
-                self.process(&mut runtime)?;
-                self.channel.enable_notify_read();
-                self.channel.enable_notify_write();
+            if badge &  self.virtio_console_server_rx != 0 {
+                let received_buffer = self.receive_buffer()?;
+                let response_buffer = runtime.decode_dispatch(&received_buffer)
+                    .map_err(|e| format_err!("Failed to dispatch request: {}", e))?;
+                debug_println!("IceCap Runtime Manager::main_loop received:{:02x?}", response_buffer);
+                self.send_buffer(&response_buffer)?;
 
-                if !self.active {
-                    return Ok(());
-                }
+                self.channel.rx_callback();
             }
+            self.channel.tx_callback();
         }
     }
 
-    fn process(&mut self, runtime: &mut CommonRuntime) -> Fallible<()> {
-        // recv request if we have a full request in our ring buffer
-        if self.channel.poll_read() < size_of::<u32>() {
-            return Ok(());
+    pub fn receive_buffer(&mut self) -> Result<Vec<u8>, Error> {
+        let mut raw_header = vec![];
+        while raw_header.len() < size_of::<u32>() {
+            if let Some(raw) = self.channel.rx() {
+                raw_header = [&raw_header[..], &raw[..]].concat();
+            }
         }
-        let mut raw_header = [0; size_of::<u32>()];
-        self.channel.peek(&mut raw_header);
-        let header = bincode::deserialize::<u32>(&raw_header)
+        let mut raw_request = vec![];
+        //header containers part of the request
+        if raw_header.len() > size_of::<u32>() {
+            raw_request = raw_header[size_of::<u32>()..].to_vec();
+        }
+        let header = bincode::deserialize::<u32>(&raw_header[..size_of::<u32>()])
             .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
         let size = usize::try_from(header)
             .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
-
-        if self.channel.poll_read() < size_of::<u32>() + size {
-            return Ok(());
+        while raw_request.len() < size {
+            if let Some(raw) = self.channel.rx() {
+                raw_request = [&raw_request[..], &raw[..]].concat();
+            }
         }
-        let mut raw_request = vec![0; usize::try_from(header).unwrap()];
-        self.channel.skip(size_of::<u32>());
-        self.channel.read(&mut raw_request);
-        // let request = bincode::deserialize::<RuntimeManagerRequest>(&raw_request)
-        //     .map_err(|e| format_err!("Failed to deserialize request: {}", e))?;
+        Ok(raw_request)
+    }
 
-        // process requests
-        //let response = self.handle(request)?;
-        let response_buffer = runtime
-            .decode_dispatch(&raw_request)
-            .map_err(|err| format_err!("runtime.decode_dispatch failed: {}", err))?;
-
-        // send response
-        // let raw_response = bincode::serialize(&response_buffer)
-        //     .map_err(|e| format_err!("Failed to serialize response: {}", e))?;
-        let raw_header = bincode::serialize(&u32::try_from(response_buffer.len()).unwrap())
-            .map_err(|e| format_err!("Failed to serialize response: {}", e))?;
-
-        self.channel.write(&raw_header);
-        self.channel.write(&response_buffer);
-
-        self.channel.notify_read();
-        self.channel.notify_write();
-
+    pub fn send_buffer(&mut self, buffer: &[u8]) -> Result<(), Error> {
+        self.channel.tx(&buffer);
         Ok(())
     }
 }

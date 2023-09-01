@@ -350,6 +350,43 @@ impl VeracruzServer for VeracruzServerIceCap {
             .read_exact(&mut buffer)
             .map_err(|e| anyhow!(e))?;
         return Ok(buffer);
+    fn tls_data(
+        &mut self,
+        session_id: u32,
+        input: Vec<u8>,
+    ) -> Result<(bool, Option<Vec<Vec<u8>>>), VeracruzServerError> {
+        match self.communicate(&RuntimeManagerRequest::SendTlsData(session_id, input))? {
+            RuntimeManagerResponse::Status(Status::Success) => (),
+            resp => {
+                return Err(VeracruzServerError::IceCapError(
+                    IceCapError::UnexpectedRuntimeManagerResponse(resp),
+                ))
+            }
+        }
+
+        let mut acc = Vec::new();
+        let active = loop {
+            if !self.tls_data_needed(session_id)? {
+                break true;
+            }
+            match self.communicate(&RuntimeManagerRequest::GetTlsData(session_id))? {
+                RuntimeManagerResponse::TlsData(data, active) => {
+                    acc.push(data);
+                    if !active {
+                        break false;
+                    }
+                }
+                resp => return Err(IceCapError::UnexpectedRuntimeManagerResponse(resp).into()),
+            };
+        };
+
+        Ok((
+            active,
+            match acc.len() {
+                0 => None,
+                _ => Some(acc),
+            },
+        ))
     }
 }
 
