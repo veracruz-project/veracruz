@@ -37,10 +37,7 @@
 use super::{
     error::PolicyError,
     expiry::Timepoint,
-    principal::{
-        ExecutionStrategy, FileHash, Identity, NativeModule, Pipeline, Principal, Program,
-        RightsTable,
-    },
+    principal::{PermissionTable, FilePermissions, ExecutionStrategy, FileHash, Identity, NativeModule, Pipeline, Principal, Program},
     Platform,
 };
 use anyhow::{anyhow, Result};
@@ -52,7 +49,7 @@ use std::{
     vec::Vec,
 };
 use veracruz_utils::sha256::sha256;
-use wasi_types::Rights;
+use log::info;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Veracruz policies, proper.
@@ -171,6 +168,7 @@ impl Policy {
     /// Returns `Ok(policy)` iff these well-formedness checks pass.
     pub fn from_json(json: &str) -> Result<Self> {
         // parse json
+        info!("from_json:{:?}", json);
         let mut policy: Self = serde_json::from_str(json)?;
 
         for p in policy.pipelines.iter_mut() {
@@ -341,7 +339,7 @@ impl Policy {
 
     /// Return the CapabilityTable in this policy. It contains capabilities related to all
     /// participants and programs.
-    pub fn get_rights_table(&self) -> RightsTable {
+    pub fn get_rights_table(&self) -> PermissionTable {
         let mut table = HashMap::new();
         for identity in self.identities() {
             let id = Principal::Participant(*identity.id() as u64);
@@ -397,16 +395,15 @@ impl Policy {
 
     /// Extract the input filenames from a right_map. If a program has rights call
     /// fd_read and path_open, it is considered as an input file.
-    fn get_required_inputs(right_map: &HashMap<PathBuf, Rights>) -> Vec<PathBuf> {
-        let mut rst = right_map
+    fn get_required_inputs(right_map: &HashMap<PathBuf, FilePermissions>) -> Vec<PathBuf> {
+        right_map
             .iter()
-            .fold(Vec::new(), |mut acc, (file_name, right)| {
-                if right.contains(Rights::FD_READ | Rights::PATH_OPEN) {
-                    acc.push(file_name.into());
+            .filter_map(|(k,v)| {
+                if v.read {
+                    Some(k.clone())
+                } else {
+                    None
                 }
-                acc
-            });
-        rst.sort();
-        rst
+            }).collect()
     }
 }

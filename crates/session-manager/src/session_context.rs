@@ -114,7 +114,7 @@ impl SessionContext {
             let principal = Principal::new(
                 cert.clone(),
                 *identity.id(),
-                identity.file_rights().to_vec(),
+                identity.file_rights_map(),
             );
 
             root_certs.append(cert);

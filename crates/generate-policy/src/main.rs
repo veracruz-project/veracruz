@@ -18,24 +18,19 @@ use policy_utils::{
     expiry::Timepoint,
     parsers::{enforce_leading_slash, parse_renamable_paths},
     policy::Policy,
-    principal::{
-        ExecutionStrategy, FileHash, FileRights, Identity, NativeModule, NativeModuleType,
-        Pipeline, Program,
-    },
+    principal::{ExecutionStrategy, FileHash, FilePermissions, Identity, NativeModule, NativeModuleType, Pipeline, Program},
 };
-use regex::Regex;
 use serde_json::{json, to_string_pretty, Value};
 use std::{
-    convert::TryFrom,
     fmt::Debug,
     fs::{read_to_string, File},
     io::{Read, Write},
     net::SocketAddr,
     path::PathBuf,
     str::FromStr,
+    collections::HashMap,
 };
 use veracruz_utils::sha256::sha256;
-use wasi_types::Rights;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Miscellaneous useful functions.
@@ -176,7 +171,7 @@ impl Arguments {
                     .short('p')
                     .long("capability")
                     .value_name("CAPABILITIES")
-                    .help("The capability table of a client or a program of the form 'output:rw,input-0:w,program.wasm:w' where each entry is separated by ','. These may be either some combination of 'r' and 'w' for reading and writing permissions respectively, or an integer containing the bitwise-or of the low-level WASI capabilities.")
+                    .help("The capability table of a client or a program of the form 'output:rw,input-0:w,program.wasm:w' where each entry is separated by ','. The permission is specified by 'r' for read, 'w' for write and 'x' for execute.")
                     .required(true)
                     .num_args(1)
                     .action(ArgAction::Append)
@@ -781,17 +776,19 @@ fn check_execution_strategy(strategy: &str) -> Result<()> {
 /// Checks that all strings appearing in all vectors in the `capabilities` argument are
 /// valid Veracruz capabilities: of the form "[FILE_NAME]:[Right_number]".
 fn check_capability(capabilities: &[Vec<String>]) -> Result<()> {
+    info!("check_capability");
+    // If all capabilities of type vec<[FILE_NAME]:[Right_number]> can be parsed.
     if !capabilities.iter().all(|v| {
+        // If any of [FILE_NAME]:[Right_number] has parsing issue, `all` returns false.
         v.iter().all(|s| {
             let mut split = s.split(':');
-            //skip the filename
+            //Skip the filename. If there is no next, something wents wrong, returning false.
             split.next();
-            let cap_check = match split.next() {
+            match split.next() {
                 None => false,
-                Some(cap) => cap.parse::<u64>().is_ok(),
-            };
-            //The length must be 2 hence it must be none.
-            cap_check || split.next().is_none()
+                // If the the cap contains char more than "rwx", the `all` call returns false.
+                Some(cap) => cap.trim().chars().all(|c| c == 'r' || c == 'w' || c == 'x'),
+            }
         })
     }) {
         return Err(anyhow!(
@@ -824,77 +821,37 @@ fn compute_file_hash(argument: &PathBuf) -> Result<String> {
 }
 
 #[inline]
-fn serialize_capability(cap_string: &[String]) -> Result<Vec<FileRights>> {
-    let mut result = Vec::new();
+fn serialize_capability(cap_string: &[String]) -> Result<HashMap<PathBuf, FilePermissions>> {
+    let mut result = HashMap::new();
     for c in cap_string.iter() {
-        result.push(serialize_capability_entry(c.as_str())?);
+        let (k,v) = serialize_capability_entry(c.as_str())?;
+        result.insert(k,v);
     }
+    info!("{:?}",result);
     Ok(result)
 }
 
-fn serialize_capability_entry(cap_string: &str) -> Result<FileRights> {
-    // common shorthand (r = read, w = write, rw = read + write)
-    #[allow(non_snake_case)]
-    let READ_RIGHTS = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR;
-
-    #[allow(non_snake_case)]
-    let WRITE_RIGHTS: Rights = Rights::FD_WRITE
-        | Rights::PATH_CREATE_FILE
-        | Rights::PATH_FILESTAT_SET_SIZE
-        | Rights::FD_SEEK
-        | Rights::PATH_OPEN
-        | Rights::PATH_CREATE_DIRECTORY;
-
-    #[allow(non_snake_case)]
-    let EXECUTE_RIGHTS = Rights::PATH_OPEN | Rights::FD_EXECUTE | Rights::FD_SEEK;
-
+fn serialize_capability_entry(cap_string: &str) -> Result<(PathBuf, FilePermissions)> {
     let mut split = cap_string.split(':');
-    let file_name = enforce_leading_slash(
-        split
-            .next()
-            .expect(&format!("Failed to parse {}, empty string", cap_string))
-            .trim(),
-    )
-    .into_owned();
+    let file_name = split
+        .next()
+        .ok_or(anyhow!("Failed to parse {}, empty string", cap_string))?
+        .trim();
     let string_number = split
         .next()
-        .expect(&format!(
+        .ok_or(anyhow!(
             "Failed to parse `{}`, contains no `:`",
             cap_string
-        ))
+        ))?
         .trim();
+    info!("{}:{}", file_name, string_number);
 
-    let re = Regex::new(r"[rwx]+")?;
-    let rights = {
-        if re.is_match(string_number) {
-            let mut rights = Rights::empty();
-            if string_number.contains("r") {
-                rights = rights | READ_RIGHTS;
-            }
-            if string_number.contains("w") {
-                rights = rights | WRITE_RIGHTS;
-            }
-            if string_number.contains("x") {
-                rights = rights | EXECUTE_RIGHTS;
-            }
-            rights
-        } else {
-            // parse raw WASI rights
-            let number = string_number
-                .parse::<u32>()
-                .expect(&format!("Failed to parse {}, not a u64", string_number));
-            // check if this is a valid number
-            Rights::from_bits(number as u64).expect(&format!(
-                "Failed to parse {}, not a u64 representing WASI Right",
-                number
-            ))
-        }
-    };
+    Ok((PathBuf::from(file_name), FilePermissions {
+        read: string_number.contains("r"),
+        write: string_number.contains("w"),
+        execute: string_number.contains("x"),
+    }))
 
-    Ok(FileRights::new(
-        file_name,
-        u32::try_from(rights.bits()).expect("capability could not fit into u32"),
-    ))
 }
 
 ////////////////////////////////////////////////////////////////////////////////

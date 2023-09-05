@@ -43,8 +43,7 @@ fn is_wasm_binary(path_string: &String) -> bool {
 pub fn execute_pipeline(
     strategy: &ExecutionStrategy,
     //caller_filesystem: &mut FileSystem,
-    //pipeline_filesystem: &FileSystem,
-    preopened_dir: &HashSet<PathBuf>,
+    pipeline_preopened_dir: &HashSet<PathBuf>,
     pipeline: Box<Expr>,
     env: &Environment,
 ) -> Result<u32> {
@@ -63,7 +62,7 @@ pub fn execute_pipeline(
                 let binary = fs::read(path_string)?;
                 info!("Successful to read binary");
                 let return_code =
-                    execute_program(strategy, preopened_dir, binary, env)?;
+                    execute_program(strategy, pipeline_preopened_dir, binary, env)?;
                 Ok(return_code)
             } else {
                 // Treat program as a provisioned native module
@@ -90,7 +89,7 @@ pub fn execute_pipeline(
         Seq(vec) => {
             info!("Seq {:?}", vec);
             for expr in vec {
-                let return_code = execute_pipeline(strategy, preopened_dir, expr, env)?;
+                let return_code = execute_pipeline(strategy, pipeline_preopened_dir, expr, env)?;
 
                 // An error occurs
                 if return_code != 0 {
@@ -104,10 +103,10 @@ pub fn execute_pipeline(
         IfElse(cond, true_branch, false_branch) => {
             info!("IfElse {:?} true -> {:?} false -> {:?}", cond, true_branch, false_branch);
             let return_code = if Path::new(&cond).exists() {
-                execute_pipeline(strategy, preopened_dir, true_branch, env)?
+                execute_pipeline(strategy, pipeline_preopened_dir, true_branch, env)?
             } else {
                 match false_branch {
-                    Some(f) => execute_pipeline(strategy, preopened_dir, f, env)?,
+                    Some(f) => execute_pipeline(strategy, pipeline_preopened_dir, f, env)?,
                     None => 0,
                 }
             };
@@ -120,7 +119,6 @@ pub fn execute_pipeline(
 fn execute_program(
     strategy: &ExecutionStrategy,
     preopened_dir: &HashSet<PathBuf>,
-    //filesystem: FileSystem,
     program: Vec<u8>,
     env: &Environment,
 ) -> Result<u32> {
@@ -132,7 +130,7 @@ fn execute_program(
         ExecutionStrategy::JIT => {
             cfg_if::cfg_if! {
                 if #[cfg(any(feature = "std", feature = "nitro"))] {
-                    Box::new(WasmtimeRuntimeState::new(preopened_dir, env.clone())?)
+                    Box::new(WasmtimeRuntimeState::new(preopened_dir, env)?)
                 } else {
                     return Err(anyhow::anyhow!(crate::engines::common::FatalEngineError::EngineIsNotReady));
                 }
