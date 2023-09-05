@@ -9,12 +9,13 @@
 //! See the `LICENSE.md` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::fs::{FileSystem, FileSystemResult};
+use crate::fs::{FileSystemResult};
 use crate::native_modules::common::StaticNativeModule;
 use mbedtls::cipher::{Authenticated, Cipher, Decryption, Encryption, Fresh};
 use serde::Deserialize;
 use std::path::PathBuf;
 use wasi_types::ErrNo;
+use std::fs::{write, read};
 
 #[derive(Deserialize, Debug)]
 pub(crate) struct AeadService {
@@ -42,9 +43,9 @@ impl StaticNativeModule for AeadService {
     /// Triggers the service. The details of the service can be found in function
     /// `encryption_decryption`.
     /// Here is the enter point. It also erase the state unconditionally afterwards.
-    fn serve(&mut self, fs: &mut FileSystem, _input: &[u8]) -> FileSystemResult<()> {
+    fn serve(&mut self, _input: &[u8]) -> FileSystemResult<()> {
         // when reaching here, the `input` bytes are already parsed.
-        let result = self.encryption_decryption(fs);
+        let result = self.encryption_decryption();
         // NOTE: erase all the states.
         self.reset();
         result
@@ -79,7 +80,7 @@ impl AeadService {
 
     /// The core service. It encrypts or decrypts, depending on the flag `is_encryption`, the input read
     /// from the path `input_path` using the `key` and `iv`, and writes the result to the file at `output_path`.
-    fn encryption_decryption(&mut self, fs: &mut FileSystem) -> FileSystemResult<()> {
+    fn encryption_decryption(&mut self) -> FileSystemResult<()> {
         let tag_len = 16; // standard default
         let AeadService {
             key,
@@ -91,7 +92,7 @@ impl AeadService {
         } = self;
 
         // Read the input. The service must have the permission.
-        let input = fs.read_file_by_absolute_path(&input_path)?;
+        let input = read(&input_path)?;
 
         let mut output = Vec::new();
 
@@ -129,7 +130,8 @@ impl AeadService {
             output.resize(n, 0);
         }
 
-        fs.write_file_by_absolute_path(&output_path, output, true)
+        write(&output_path, output)?;
+        Ok(())
     }
 
     /// Reset the state, and erase the sensitive information.

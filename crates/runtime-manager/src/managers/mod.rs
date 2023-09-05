@@ -10,11 +10,11 @@
 //! information on licensing and copyright.
 
 use anyhow::{anyhow, Result};
-use execution_engine::{execute, fs::FileSystem};
+use execution_engine::{execute};
 use lazy_static::lazy_static;
 use log::info;
 use policy_utils::{
-    pipeline::Expr, policy::Policy, principal::Principal, CANONICAL_STDIN_FILE_PATH,
+    pipeline::Expr, policy::Policy, principal::{Principal, FilePermissions},
 };
 use std::{
     collections::{HashSet, HashMap},
@@ -25,9 +25,11 @@ use std::{
         Mutex,
     },
     vec::Vec,
+    fs::{self, OpenOptions},
+    io::Write,
 };
 use veracruz_utils::sha256::sha256;
-use wasi_types::{ErrNo, Rights};
+use wasi_types::{ErrNo};
 
 pub mod error;
 pub mod execution_engine_manager;
@@ -72,8 +74,8 @@ pub(crate) struct ProtocolState {
     /// The list of clients (their IDs) that can request shutdown of the
     /// Veracruz platform.
     expected_shutdown_sources: Vec<u64>,
-    /// The ref to the VFS, this is a FS handler with super user capability.
-    vfs: FileSystem,
+    ///// The ref to the VFS, this is a FS handler with super user capability.
+    //vfs: FileSystem,
     /// Digest table. Certain files must match the digest before writing to
     /// the filesystem.
     digest_table: HashMap<PathBuf, Vec<u8>>,
@@ -91,18 +93,18 @@ impl ProtocolState {
         // Grant the super user read access to any file under the root. This is
         // used internally to read the program on behalf of the executing party
         let mut su_read_rights = HashMap::new();
-        su_read_rights.insert(PathBuf::from("/"), Rights::all());
+        su_read_rights.insert(PathBuf::from("/"), FilePermissions{read: true, write: true, execute: true});
         rights_table.insert(Principal::InternalSuperUser, su_read_rights);
 
         let digest_table = global_policy.get_file_hash_table()?;
         let native_modules = global_policy.native_modules();
-        let vfs = FileSystem::new(rights_table, native_modules.to_vec())?;
+        //let vfs = FileSystem::new(rights_table, native_modules.to_vec())?;
 
         Ok(ProtocolState {
             global_policy,
             global_policy_hash,
             expected_shutdown_sources,
-            vfs,
+            //vfs,
             digest_table,
         })
     }
@@ -137,13 +139,15 @@ impl ProtocolState {
             }
         }
 
-        if file_name == CANONICAL_STDIN_FILE_PATH {
-            self.vfs.spawn(client_id)?.write_stdin(&data)?;
-        } else {
-            self.vfs
-                .spawn(client_id)?
-                .write_file_by_absolute_path(file_name, data, false)?;
-        }
+        fs::write(file_name, data)?;
+
+        //if file_name == CANONICAL_STDIN_FILE_PATH {
+            //self.vfs.spawn(client_id)?.write_stdin(&data)?;
+        //} else {
+            //self.vfs
+                //.spawn(client_id)?
+                //.write_file_by_absolute_path(file_name, data, false)?;
+        //}
 
         Ok(())
     }
@@ -160,10 +164,17 @@ impl ProtocolState {
         if self.digest_table.contains_key(&PathBuf::from(file_name)) {
             return Err(anyhow!(RuntimeManagerError::FileSystemError(ErrNo::Access)));
         }
-        self.vfs.spawn(client_id)?.write_file_by_absolute_path(
-            file_name, data, // set the append flag to true
-            true,
-        )?;
+
+        let mut file = OpenOptions::new()
+            .append(true)
+            .open(file_name)?;
+
+        file.write_all(&data)?;
+
+        //self.vfs.spawn(client_id)?.write_file_by_absolute_path(
+            //file_name, data, // set the append flag to true
+            //true,
+        //)?;
         Ok(())
     }
 
@@ -173,12 +184,7 @@ impl ProtocolState {
         client_id: &Principal,
         file_name: &str,
     ) -> Result<Option<Vec<u8>>> {
-        let mut vfs = self.vfs.spawn(client_id)?;
-        let rst = match file_name {
-            "stderr" => vfs.read_stderr()?,
-            "stdout" => vfs.read_stdout()?,
-            _otherwise => vfs.read_file_by_absolute_path(file_name)?,
-        };
+        let rst = fs::read(file_name)?;
         if rst.len() == 0 {
             return Ok(None);
         }

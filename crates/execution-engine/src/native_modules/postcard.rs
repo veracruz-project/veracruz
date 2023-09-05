@@ -10,11 +10,12 @@
 //! See the `LICENSE.md` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::fs::{FileSystem, FileSystemResult};
+use crate::fs::{FileSystemResult};
 use crate::native_modules::common::StaticNativeModule;
 use postcard::from_bytes;
 use serde::{Deserialize, Serialize};
 use wasi_types::ErrNo;
+use std::fs::write;
 
 pub(crate) struct PostcardService;
 
@@ -75,15 +76,14 @@ impl StaticNativeModule for PostcardService {
         "Postcard Service"
     }
 
-    fn serve(&mut self, fs: &mut FileSystem, inputs: &[u8]) -> FileSystemResult<()> {
+    fn serve(&mut self, inputs: &[u8]) -> FileSystemResult<()> {
         let v = from_bytes::<Vec<Struct3>>(inputs).map_err(|_| ErrNo::Inval)?;
-        fs.write_file_by_absolute_path(
+        write(
             "/services/postcard_result.dat",
             serde_json::to_string(&v)
                 .map_err(|_| ErrNo::Inval)?
                 .as_bytes()
                 .to_vec(),
-            false,
         )?;
         Ok(())
     }

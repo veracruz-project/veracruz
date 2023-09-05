@@ -15,9 +15,9 @@
 use super::error::PolicyError;
 use crate::{parsers::parse_pipeline, pipeline::Expr};
 use anyhow::{anyhow, Result};
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug, path::PathBuf, string::String, vec::Vec};
-use wasi_types::Rights;
+use serde::{Deserialize, Serialize, Serializer, Deserializer};
+use std::{collections::HashMap, fmt::Debug, path::PathBuf, string::String};
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // File operation and capabilities.
@@ -42,46 +42,56 @@ pub enum Principal {
 
 /// The Right Table, contains the `Right`, i.e.
 /// the allowed operations of a Principal on a file
-pub type RightsTable = HashMap<Principal, HashMap<PathBuf, Rights>>;
+pub type PermissionTable = HashMap<Principal, HashMap<PathBuf, FilePermissions>>;
 
 /// Defines a file entry in the policy, containing the name and `Right`, the allowed op.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct FileRights {
-    /// The file name
-    file_name: String,
-    /// The associated right, when someone open the file
-    rights: u32,
+#[derive(Clone, Debug, PartialEq)]
+pub struct FilePermissions {
+    pub read: bool,
+    pub write: bool,
+    pub execute: bool,
 }
 
-impl FileRights {
+impl FilePermissions {
     /// Creates a new file permission.
     #[inline]
-    pub fn new(file_name: String, rights: u32) -> Self {
-        Self { file_name, rights }
+    pub fn new(read: bool, write: bool, execute: bool) -> Self {
+        Self { read, write, execute }
     }
+}
 
-    /// Returns the file_name.
-    #[inline]
-    pub fn file_name(&self) -> &str {
-        self.file_name.as_str()
+/// Custom serialize and deserialize to "rwx"
+impl Serialize for FilePermissions {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut permission = String::new();
+        if self.read {
+            permission.push('r');
+        } 
+        if self.write {
+            permission.push('w');
+        }
+        if self.execute {
+            permission.push('x');
+        }
+
+        serializer.serialize_str(&permission)
     }
+}
 
-    /// Returns the rights.
-    #[inline]
-    pub fn rights(&self) -> &u32 {
-        &self.rights
-    }
-
-    /// Convert a vec of FileRights to a Hashmap from filenames to Rights.
-    #[inline]
-    pub fn compute_right_map(file_right_vec: &[FileRights]) -> HashMap<PathBuf, Rights> {
-        file_right_vec.iter().fold(
-            HashMap::new(),
-            |mut acc, FileRights { file_name, rights }| {
-                acc.insert(file_name.into(), Rights::from_bits_truncate(*rights as u64));
-                acc
-            },
-        )
+impl<'de> Deserialize<'de> for FilePermissions {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: &str = Deserialize::deserialize(deserializer)?;
+        Ok(Self {
+            read: s.contains('r'),
+            write: s.contains('w'),
+            execute: s.contains('x'),
+        })
     }
 }
 
@@ -96,7 +106,7 @@ pub struct Program {
     /// The program ID
     id: u32,
     /// The file permission that specifies the program's ability to read, write and execute files.
-    file_rights: Vec<FileRights>,
+    file_rights: HashMap<PathBuf, FilePermissions>,
 }
 
 impl Program {
@@ -105,7 +115,7 @@ impl Program {
     pub fn new<T: Into<u32>>(
         program_file_name: String,
         id: T,
-        file_rights: Vec<FileRights>,
+        file_rights: HashMap<PathBuf, FilePermissions>,
     ) -> Self {
         Self {
             program_file_name,
@@ -128,8 +138,8 @@ impl Program {
 
     /// Return file rights map associated to the program.
     #[inline]
-    pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
-        FileRights::compute_right_map(&self.file_rights)
+    pub fn file_rights_map(&self) -> HashMap<PathBuf, FilePermissions> {
+        self.file_rights.clone()
     }
 }
 
@@ -233,7 +243,7 @@ pub struct Pipeline {
     /// The pipeline ID
     id: u32,
     /// The file permission that specifies the program's ability to read, write and execute files.
-    file_rights: Vec<FileRights>,
+    file_rights: HashMap<PathBuf, FilePermissions>,
 }
 
 impl Pipeline {
@@ -243,7 +253,7 @@ impl Pipeline {
         name: String,
         id: T,
         preparsed_pipeline: String,
-        file_rights: Vec<FileRights>,
+        file_rights: HashMap<PathBuf, FilePermissions>,
     ) -> Result<Self> {
         let parsed_pipeline = Some(parse_pipeline(&preparsed_pipeline)?);
         Ok(Self {
@@ -272,8 +282,8 @@ impl Pipeline {
 
     /// Return file rights map associated to the program.
     #[inline]
-    pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
-        FileRights::compute_right_map(&self.file_rights)
+    pub fn file_rights_map(&self) -> HashMap<PathBuf, FilePermissions> {
+        self.file_rights.clone()
     }
 
     /// Return the pipeline AST.
@@ -321,14 +331,14 @@ pub struct Identity<U> {
     id: u32,
     /// The file capabilities that specifies this principal's ability to read,
     /// write and execute files.
-    file_rights: Vec<FileRights>,
+    file_rights: HashMap<PathBuf, FilePermissions>,
 }
 
 impl<U> Identity<U> {
     /// Creates a new identity from a certificate, and identifier.  Initially,
     /// we keep the set of roles empty.
     #[inline]
-    pub fn new<T>(certificate: U, id: T, file_rights: Vec<FileRights>) -> Self
+    pub fn new<T>(certificate: U, id: T, file_rights: HashMap<PathBuf, FilePermissions>) -> Self
     where
         T: Into<u32>,
     {
@@ -341,14 +351,8 @@ impl<U> Identity<U> {
 
     /// Return file rights map associated to the program.
     #[inline]
-    pub fn file_rights(&self) -> &Vec<FileRights> {
-        &self.file_rights
-    }
-
-    /// Return file rights map associated to the program.
-    #[inline]
-    pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
-        FileRights::compute_right_map(&self.file_rights)
+    pub fn file_rights_map(&self) -> HashMap<PathBuf, FilePermissions> {
+        self.file_rights.clone()
     }
 
     /// Returns the certificate associated with this identity.

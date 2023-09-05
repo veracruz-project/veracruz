@@ -10,8 +10,8 @@
 //! information on licensing and copyright.
 
 use crate::{
-    fs::{FileSystem, FileSystemResult},
-    native_modules::{aead::AeadService, aes::AesCounterModeService, postcard::PostcardService},
+    fs::{FileSystemResult},
+    native_modules::{aead::AeadService, aes::AesCounterModeService, postcard::PostcardService}
 };
 use lazy_static::lazy_static;
 use std::{collections::HashMap, sync::Mutex};
@@ -24,7 +24,8 @@ pub trait StaticNativeModule: Send {
     //fn configure(&mut self, config: Self::Configuration) -> FileSystemResult<()>;
     // The FS will prepare the Input and call the serve function at an appropriate time.
     // Result may depend on the configure.
-    fn serve(&mut self, fs: &mut FileSystem, input: &[u8]) -> FileSystemResult<()>;
+    // TODO
+    fn serve(&mut self, input: &[u8]) -> FileSystemResult<()>;
     // try_parse may buffer any result, hence we pass a mutable self here.
     fn try_parse(&mut self, input: &[u8]) -> FileSystemResult<bool>;
 }

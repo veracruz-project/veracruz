@@ -13,7 +13,6 @@
 
 use crate::{
     engines::common::ExecutionEngine,
-    fs::FileSystemResult,
     Environment,
 };
 use anyhow::Result;
@@ -188,6 +187,7 @@ pub struct WasmtimeRuntimeState {
     ///// WasiWrapper.
     //filesystem: SharedMutableWasiWrapper,
     preopened_dir: HashSet<PathBuf>,
+    environment: Environment,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -196,9 +196,10 @@ pub struct WasmtimeRuntimeState {
 
 impl WasmtimeRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
-    pub fn new(preopened_dir: &HashSet<PathBuf>, _options: Environment) -> Result<Self> {
+    pub fn new(preopened_dir: &HashSet<PathBuf>, env: &Environment) -> Result<Self> {
         Ok(Self {
             preopened_dir: preopened_dir.clone(),
+            environment: env.clone(),
         })
     }
 
@@ -236,8 +237,8 @@ impl WasmtimeRuntimeState {
             //.args([....]) argument passed in
             .inherit_stdio()
             //TODO add more
-            //.envs()?
-            //.args()?
+            .envs(&self.environment.environment_variables)?
+            .args(&self.environment.program_arguments)?
             .inherit_env()?
             .inherit_args()?;
 

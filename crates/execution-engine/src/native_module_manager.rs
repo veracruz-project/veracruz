@@ -34,7 +34,7 @@
 //! information on licensing and copyright.
 
 use crate::{
-    fs::{FileSystemResult, strip_root_slash_path, strip_root_slash_str},
+    fs::{FileSystemResult},
     native_modules::common::STATIC_NATIVE_MODULES
 };
 use log::info;
@@ -69,7 +69,7 @@ pub struct NativeModuleManager {
 impl NativeModuleManager {
     //pub fn new(native_module: NativeModule, native_module_vfs: FileSystem) -> Self {
     pub fn new(native_module: NativeModule) -> Self {
-        let native_module_directory = PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT).join(strip_root_slash_str(native_module.name()));
+        let native_module_directory = PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT).join(native_module.name());
         Self {
             native_module,
             native_module_directory,
@@ -86,7 +86,7 @@ impl NativeModuleManager {
         for f in unprefixed_files {
             let mapping = self
                 .native_module_directory
-                .join(strip_root_slash_path(&f))
+                .join(&f)
                 .to_str()
                 .ok_or(ErrNo::Inval)?
                 .to_owned()
@@ -97,14 +97,13 @@ impl NativeModuleManager {
 
         // Add the execution configuration file
         mappings = mappings
-            + &self
-                .native_module_directory
-                .join(strip_root_slash_str(EXECUTION_CONFIGURATION_FILE))
-                .to_str()
-                .ok_or(ErrNo::Inval)?
-                .to_owned()
-            + "=>/"
-            + EXECUTION_CONFIGURATION_FILE;
+                   + &self.native_module_directory
+                     .join(EXECUTION_CONFIGURATION_FILE)
+                     .to_str()
+                     .ok_or(ErrNo::Inval)?
+                     .to_owned()
+                   + "=>/"
+                   + EXECUTION_CONFIGURATION_FILE;
         Ok(mappings)
     }
 
@@ -240,10 +239,7 @@ impl NativeModuleManager {
             info!("OK");
 
             // Inject execution configuration into the native module's directory
-            let mut file = File::create(
-                self.native_module_directory
-                    .join(strip_root_slash_str(EXECUTION_CONFIGURATION_FILE)),
-            )?;
+            let mut file = File::create(self.native_module_directory.join(EXECUTION_CONFIGURATION_FILE))?;
             file.write_all(&input)?;
 
             // Enable SIGCHLD handling in order to synchronously execute the
@@ -272,9 +268,7 @@ impl NativeModuleManager {
                     entry_point,
                 } => entry_point.to_str().ok_or(ErrNo::Inval)?,
                 NativeModuleType::Provisioned { entry_point } => {
-                    entry_point_tmp = self
-                        .native_module_directory
-                        .join(strip_root_slash_path(entry_point));
+                    entry_point_tmp = self.native_module_directory.join(entry_point);
                     entry_point_tmp.to_str().ok_or(ErrNo::Inval)?
                 }
                 _ => panic!("should not happen"),
