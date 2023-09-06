@@ -12,6 +12,11 @@ We use Docker to provide a consistent build environment.  Follow this guide to [
 
 ## Local build setup
 
+This repository uses git submodule, use the following command to clone:
+```
+git clone --recursive https://github.com/veracruz-project/veracruz.git
+```
+
 Enter this directory in a local copy of the Veracruz source:
 ```
 cd veracruz/docker
