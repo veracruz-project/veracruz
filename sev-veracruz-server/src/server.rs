@@ -53,35 +53,35 @@ impl VeracruzServer for VeracruzServerSev {
         let port: u32 = 5005;
         let start = Instant::now();
         println!("VeracruzServerSev::new calling qemu");
-        let handle = Command::new("/work/veracruz/SEVImage/snp-release/usr/local/bin/qemu-system-x86_64")
-            .arg("-enable-kvm")
+        let mut command = Command::new("/work/veracruz/SEVImage/snp-release/usr/local/bin/qemu-system-x86_64");
+        command.arg("-enable-kvm")
             .arg("-cpu").arg("EPYC-v4")
             .arg("-machine").arg("q35")
             .arg("-smp").arg("4,maxcpus=64")
             .arg("-m").arg("2048M,slots=5,maxmem=30G")
             .arg("-no-reboot")
             .arg("-drive").arg("if=pflash,format=raw,unit=0,file=/work/veracruz/SEVImage/snp-release/usr/local/share/qemu/OVMF_CODE.fd,readonly")
-        //     .arg("-drive").arg("if=pflash,format=raw,unit=1,file=/work/veracruz/SEVImage/sev-guest-dermil01-larger.fd")
-        //     //.arg("-drive").arg("file=/work/veracruz/SEVImage/sev-guest-dermil01-larger.img,if=none,id=disk0,format=raw")
-             .arg("-drive").arg("file=/work/veracruz/workspaces/sev-runtime/sev-guest-runtime-manager.img,if=none,id=disk0,format=raw")
-             .arg("-device").arg("virtio-scsi-pci,id=scsi0,disable-legacy=on,iommu_platform=true")
-             .arg("-device").arg("scsi-hd,drive=disk0")
-             .arg("-machine").arg("memory-encryption=sev0,vmport=off")
-             .arg("-object").arg("memory-backend-memfd-private,id=ram1,size=2048M,share=true")
-             .arg("-object").arg("sev-snp-guest,id=sev0,cbitpos=51,reduced-phys-bits=1,discard=none")
-             .arg("-machine").arg("memory-backend=ram1,kvm-type=protected")
-             .arg("-nographic")
-             //.arg("-monitor").arg("pty")
-             .arg("-monitor").arg("unix:monitor,server,nowait")
-             .arg("-serial").arg("mon:stdio")
-             .arg("-device").arg("vhost-vsock-pci,guest-cid=3")
-             .stdout(Stdio::null())
-             .stderr(Stdio::null())
-             .spawn()
-             .map_err(|err| {
-                 println!("qemu failed to start:{:?}", err);
-                 err
-             })?;
+          .arg("-device").arg("virtio-scsi-pci,id=scsi0,disable-legacy=on,iommu_platform=true")
+          .arg("-machine").arg("memory-encryption=sev0,vmport=off")
+          .arg("-object").arg("memory-backend-memfd-private,id=ram1,size=2048M,share=true")
+          .arg("-object").arg("sev-snp-guest,id=sev0,cbitpos=51,reduced-phys-bits=1,discard=none")
+          .arg("-machine").arg("memory-backend=ram1,kvm-type=protected")
+          .arg("-nographic")
+          .arg("-kernel").arg("/work/veracruz/workspaces/sev-runtime/bzImage")
+          .arg("-append").arg("console=ttyS0 earlyprintk=serial root=/dev/sda2")
+          .arg("-initrd").arg("/work/veracruz/workspaces/sev-runtime/initramfs_sev")
+          .arg("-monitor").arg("pty")
+          .arg("-serial").arg("mon:stdio")
+          .arg("-device").arg("vhost-vsock-pci,guest-cid=3");
+          println!("RUnning command:{:?}", command);
+         let handle = command
+              .stdout(Stdio::null())
+              .stderr(Stdio::null())
+              .spawn()
+              .map_err(|err| {
+                  println!("qemu failed to start:{:?}", err);
+                  err
+              })?;
         println!("VeracruzServerSev::new handle:{:?}", handle);
         println!("VeracruzServerSev::new calling VsockSocket::connect");
         let socket = VsockSocket::connect(cid, port)

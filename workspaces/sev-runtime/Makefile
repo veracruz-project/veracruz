@@ -19,16 +19,11 @@ include $(WORKSPACE_DIR)/common.mk
 
 unresolved_crates_path := $(shell pwd)/crates
 
-all: .guest_image_canary
+all: initramfs_sev
 
-.guest_image_canary: ./target/x86_64-unknown-linux-musl/debug/sev-runtime-manager
-	virt-sysprep -a sev-guest-runtime-manager.img \
-		-copy-in "./target/x86_64-unknown-linux-musl/debug/sev-runtime-manager:/root/" \
-		-copy-in veracruz.service:/etc/systemd/system/ \
-		-copy-in "./modules:/etc/" \
-		-copy-in "./sevtool:/root/" \
-		--link /etc/systemd/system/veracruz.service:/etc/systemd/system/multi-user.target.wants/veracruz.service
-	touch .guest_image_canary
+initramfs_sev: ./target/x86_64-unknown-linux-musl/debug/sev-runtime-manager
+	cp ./target/x86_64-unknown-linux-musl/debug/sev-runtime-manager ./init
+	echo -n init | cpio --null --create -V --format=newc -O ./initramfs_sev
 
 ./target/x86_64-unknown-linux-musl/debug/sev-runtime-manager: FORCE
 	RUSTFLAGS="--remap-path-prefix $(unresolved_crates_path)=$(shell readlink -f $(unresolved_crates_path))" \

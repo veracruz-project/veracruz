@@ -19,7 +19,7 @@ use uuid::Uuid;
 /// The Status value returned by the enclave/application for operations.
 /// This is intended to be received as a bincode serialized
 /// `RootEnclaveMessage::Status`
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum Status {
     /// The operation generating the message succeeded
     Success,

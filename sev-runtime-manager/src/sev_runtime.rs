@@ -58,14 +58,7 @@ impl PlatformRuntime for SevRuntime {
         let csr_hash = sha256(&csr);
         let mut attestation_report = Vec::with_capacity(ATTESTATION_REPORT_SIZE);
 
-        {
-            println!("sev-runtime-manager::SevRuntime::attestation writing csr file");
-            let mut file = std::fs::File::create("/root/csr.dat")?;
-            // Write a slice of bytes to the file
-            file.write_all(&csr)?;
-            println!("sev-runtime-manager::SevRuntime::attestation csr file completed write");
-        }
-        println!("sev-runtime-manager::SevRuntime::attestation calling get_report with 16");
+        println!("sev-runtime-manager::SevRuntime::attestation calling get_report");
         // let mut certs: *mut u8 = std::ptr::null_mut();
         // let certs_ptr: *mut *mut u8 = &mut certs;
         // let mut certs_size: usize = 0;

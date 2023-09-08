@@ -11,8 +11,18 @@
 
 use anyhow::Result;
 
-use nix::sys::socket::{
-    accept, bind, listen as listen_vsock, socket, AddressFamily, SockAddr, SockFlag, SockType,
+use nix::{
+    mount::{
+        mount,
+        MsFlags,
+    },
+    sys::{
+        socket::{
+            accept, bind, listen as listen_vsock, socket, AddressFamily, SockAddr, SockFlag, SockType,
+        },
+        stat::Mode,
+    },
+    unistd::mkdir,
 };
 use raw_fd::{receive_buffer, send_buffer};
 
@@ -28,11 +38,47 @@ const PORT: u32 = 5005;
 /// max number of outstanding connections in the socket listen queue
 const BACKLOG: usize = 128;
 
+fn init() {
+    // These cannot currently be constants
+    let chmod_0555: Mode = Mode::S_IRUSR
+        | Mode::S_IXUSR
+        | Mode::S_IRGRP
+        | Mode::S_IXGRP
+        | Mode::S_IROTH
+        | Mode::S_IXOTH;
+    let chmod_0755: Mode =
+        Mode::S_IRWXU | Mode::S_IRGRP | Mode::S_IXGRP | Mode::S_IROTH | Mode::S_IXOTH;
+    let common_mnt_flags: MsFlags = MsFlags::MS_NODEV | MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID;
+
+    // /dev/urandom is required very early
+    mkdir("/dev", chmod_0755).ok();
+    let devtmpfs = Some("devtmpfs");
+    mount(
+        devtmpfs,
+        "/dev",
+        devtmpfs,
+        MsFlags::MS_NOSUID,
+        Some("mode=0755"),
+    ).unwrap();
+
+    // Initialize logging
+    //env_logger::builder().parse_filters(filters).init();
+
+    // Log retroactively :)
+    println!("Starting init");
+    println!("Mounting /dev");
+
+    println!("Mounting /proc");
+    mkdir("/proc", chmod_0555).ok();
+    mount::<_, _, _, [u8]>(Some("proc"), "/proc", Some("proc"), common_mnt_flags, None).unwrap();
+}
+
 fn main() -> Result<(), String> {
     encap().map_err(|err| format!("SEV-SNP Runtime Manager::main encap returned error:{:?}", err))
 }
 
 fn encap() -> Result<()> {
+    init();
     let socket_fd = socket(
         AddressFamily::Vsock,
         SockType::Stream,
@@ -59,7 +105,6 @@ fn encap() -> Result<()> {
         loop {
             let received_buffer = receive_buffer(fd)?;
             let response_buffer = runtime.decode_dispatch(&received_buffer)?;
-            println!("AMD SEV Runtime Manager::main_loop received:{:02x?}", response_buffer);
             send_buffer(fd, &response_buffer)?;
         }
     }
