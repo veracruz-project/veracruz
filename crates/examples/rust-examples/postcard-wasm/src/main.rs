@@ -67,9 +67,9 @@ pub struct Struct3 {
 }
 
 fn main() -> anyhow::Result<()> {
-    let input = fs::read("/input/postcard.dat")?;
+    let input = fs::read("./input/postcard.dat")?;
     let rst: Vec<Struct3> = from_bytes(&input)?;
     let rst = serde_json::to_string(&rst)?;
-    fs::write("/output/postcard_wasm.txt", rst)?;
+    fs::write("./output/postcard_wasm.txt", rst)?;
     Ok(())
 }

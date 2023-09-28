@@ -35,7 +35,7 @@ use std::fs;
 /// and fails with `return_code::ErrorCode::BadInput` if the input cannot be
 /// decoded from `postcard` into a Rust vector of floating-point pairs.
 fn read_input() -> anyhow::Result<Vec<(f64, f64)>> {
-    let input = fs::read("/input/linear-regression.dat")?;
+    let input = fs::read("./input/linear-regression.dat")?;
     Ok(postcard::from_bytes(&input)?)
 }
 
@@ -93,6 +93,6 @@ fn main() -> anyhow::Result<()> {
     let data = read_input()?;
     let result = linear_regression(&data);
     let result_encode = postcard::to_allocvec(&result)?;
-    fs::write("/output/linear-regression.dat", result_encode)?;
+    fs::write("./output/linear-regression.dat", result_encode)?;
     Ok(())
 }

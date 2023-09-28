@@ -25,9 +25,10 @@ use std::fs;
 
 /// Write 32 random bytes to 'output'. The result is a Postcard-encoded vector of u8.
 fn main() -> anyhow::Result<()> {
-    let output = "/output/random.dat";
+    let output = "./output/random.dat";
     let bytes = rand::thread_rng().gen::<[u8; 32]>();
     let rst = postcard::to_allocvec(&bytes.to_vec())?;
+    fs::create_dir_all("output/")?;
     fs::write(output, rst)?;
     Ok(())
 }

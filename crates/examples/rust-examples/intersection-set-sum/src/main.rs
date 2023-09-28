@@ -62,8 +62,8 @@ struct Customer {
 /// structs.  Fails with [`return_code::ErrorCode::BadInput`] if the number of inputs provided is
 /// not equal to 2, or if the inputs cannot be deserialized from Bincode.
 fn read_inputs() -> anyhow::Result<(Vec<AdvertisementViewer>, Vec<Customer>)> {
-    let adverts = fs::read("/input/intersection-advertisement-viewer.dat")?;
-    let customs = fs::read("/input/intersection-customer.dat")?;
+    let adverts = fs::read("./input/intersection-advertisement-viewer.dat")?;
+    let customs = fs::read("./input/intersection-customer.dat")?;
 
     let adverts = postcard::from_bytes(&adverts)?;
     let customs = postcard::from_bytes(&customs)?;
@@ -97,6 +97,6 @@ fn main() -> anyhow::Result<()> {
     let (adverts, customs) = read_inputs()?;
     let total = intersection_set_sum(&adverts, &customs);
     let result_encode = postcard::to_allocvec::<f64>(&total)?;
-    fs::write("/output/intersection-set-sum.dat", result_encode)?;
+    fs::write("./output/intersection-set-sum.dat", result_encode)?;
     Ok(())
 }

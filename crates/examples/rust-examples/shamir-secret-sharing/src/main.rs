@@ -194,7 +194,7 @@ fn shares_read_all() -> io::Result<Vec<Vec<u8>>> {
     // open files until one fails
     let mut shares = vec![];
     for i in 0.. {
-        let filename = format!("/input/shamir-{}.dat", i);
+        let filename = format!("./input/shamir-{}.dat", i);
         let share = match fs::read(filename) {
             Ok(share) => share,
             Err(err) => match err.kind() {
@@ -218,6 +218,6 @@ fn main() -> anyhow::Result<()> {
     let secret = shares_reconstruct(&shares);
 
     // write our output
-    fs::write("/output/shamir.dat", &secret)?;
+    fs::write("./output/shamir.dat", &secret)?;
     Ok(())
 }
