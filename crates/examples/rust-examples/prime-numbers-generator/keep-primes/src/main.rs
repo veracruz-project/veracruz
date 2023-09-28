@@ -16,7 +16,7 @@
 use anyhow;
 use std::fs;
 
-const FILENAME: &'static str = "/output/number-set.txt";
+const FILENAME: &'static str = "./output/number-set.txt";
 
 fn main() -> anyhow::Result<()> {
     let content = String::from_utf8(fs::read(FILENAME)?)?;

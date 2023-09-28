@@ -16,8 +16,8 @@
 use anyhow::{self, Ok};
 use std::fs;
 
-const INPUT_FILENAME: &'static str = "/input/hello-world-1.dat";
-const OUTPUT_FILENAME: &'static str = "/output/search_results.dat";
+const INPUT_FILENAME: &'static str = "./input/hello-world-1.dat";
+const OUTPUT_FILENAME: &'static str = "./output/search_results.dat";
 
 fn main() -> anyhow::Result<()> {
     let query = std::env::var("QUERY")?.to_string(); // search argument

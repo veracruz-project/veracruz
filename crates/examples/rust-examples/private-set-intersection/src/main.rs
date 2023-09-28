@@ -36,9 +36,9 @@ struct Person {
 /// returns a `Vec` of all hash-sets, one from each input provider.  Fails with
 /// `return_code::ErrorCode::BadInput` if any input cannot be deserialized from Bincode.
 fn read_inputs() -> anyhow::Result<Vec<HashSet<Person>>> {
-    let input0 = fs::read("/input/private-set-1.dat")?;
+    let input0 = fs::read("./input/private-set-1.dat")?;
     let data0 = postcard::from_bytes(&input0)?;
-    let input1 = fs::read("/input/private-set-2.dat")?;
+    let input1 = fs::read("./input/private-set-2.dat")?;
     let data1 = postcard::from_bytes(&input1)?;
     Ok(vec![data0, data1])
 }
@@ -70,6 +70,6 @@ fn main() -> anyhow::Result<()> {
     let inputs = read_inputs()?;
     let result = set_intersection(&inputs);
     let result_encode = postcard::to_allocvec::<HashSet<Person>>(&result)?;
-    fs::write("/output/private-set.dat", result_encode)?;
+    fs::write("./output/private-set.dat", result_encode)?;
     Ok(())
 }

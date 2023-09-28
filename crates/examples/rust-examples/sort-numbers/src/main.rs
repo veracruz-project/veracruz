@@ -16,8 +16,8 @@
 use anyhow;
 use std::fs;
 
-const INPUT_FILENAME: &'static str = "/output/unsorted_numbers.txt";
-const OUTPUT_FILENAME: &'static str = "/output/sorted_numbers.txt";
+const INPUT_FILENAME: &'static str = "./output/unsorted_numbers.txt";
+const OUTPUT_FILENAME: &'static str = "./output/sorted_numbers.txt";
 
 fn main() -> anyhow::Result<()> {
     let file_vec = fs::read(INPUT_FILENAME)?;

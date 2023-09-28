@@ -68,12 +68,13 @@ fn set_intersection_sum(data: Vec<((u64, u64), u32)>, sample: Vec<(u64, u64)>) -
 /// The program entry point: reads exactly one input, decodes it and computes the set
 /// intersection-sum before re-encoding it into Postcard and returning.
 fn main() -> anyhow::Result<()> {
-    for path in fs::read_dir("/input/private-set-inter-sum/")? {
+    for path in fs::read_dir("./input/private-set-inter-sum/")? {
         let path = path?.path();
         let (data, sample) = read_inputs(&path)?;
         let result = set_intersection_sum(data, sample);
         let result_encode = postcard::to_allocvec::<(usize, u64)>(&result)?;
-        let mut output = PathBuf::from("/output/private-set-inter-sum/");
+        fs::create_dir_all("./output/private-set-inter-sum/")?;
+        let mut output = PathBuf::from("./output/private-set-inter-sum/");
         output.push(path.file_name().ok_or(anyhow!("cannot get file name"))?);
         fs::write(output, result_encode)?;
     }

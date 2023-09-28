@@ -42,7 +42,7 @@ fn main() -> anyhow::Result<()> {
         count + 1,
         (last_result_or_init + stream1 + stream2),
     ))?;
-    fs::write("/output/accumulation.dat", result_encode)?;
+    fs::write("./output/accumulation.dat", result_encode)?;
     Ok(())
 }
 
@@ -69,13 +69,13 @@ fn read_last_result_or_init() -> anyhow::Result<(u64, f64)> {
 
 /// Read from 'stream-0' and 'stream-1' at `offset`
 fn read_stream(offset: u64) -> anyhow::Result<(f64, f64)> {
-    let mut stream0 = File::open("/input/number-stream-1.dat")?;
+    let mut stream0 = File::open("./input/number-stream-1.dat")?;
     stream0.seek(SeekFrom::Start(offset))?;
     let mut data0 = Vec::new();
     stream0.read_to_end(&mut data0)?;
     let n1: f64 = postcard::from_bytes(&data0)?;
 
-    let mut stream1 = File::open("/input/number-stream-2.dat")?;
+    let mut stream1 = File::open("./input/number-stream-2.dat")?;
     stream1.seek(SeekFrom::Start(offset))?;
     let mut data1 = Vec::new();
     stream1.read_to_end(&mut data1)?;
