@@ -9,8 +9,8 @@
 //! See the `LICENSE.md` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use anyhow::Result;
 use crate::{
-    fs::{FileSystemResult},
     native_modules::{aead::AeadService, aes::AesCounterModeService, postcard::PostcardService}
 };
 use lazy_static::lazy_static;
@@ -21,13 +21,11 @@ use std::{collections::HashMap, sync::Mutex};
 /// details on static native modules.
 pub trait StaticNativeModule: Send {
     fn name(&self) -> &str;
-    //fn configure(&mut self, config: Self::Configuration) -> FileSystemResult<()>;
-    // The FS will prepare the Input and call the serve function at an appropriate time.
-    // Result may depend on the configure.
-    // TODO
-    fn serve(&mut self, input: &[u8]) -> FileSystemResult<()>;
-    // try_parse may buffer any result, hence we pass a mutable self here.
-    fn try_parse(&mut self, input: &[u8]) -> FileSystemResult<bool>;
+    /// The FS will prepare the Input and call the serve function at an appropriate time.
+    /// Result may depend on the configure.
+    fn serve(&mut self, input: &[u8]) -> Result<()>;
+    /// try_parse may buffer any result, hence we pass a mutable self here.
+    fn try_parse(&mut self, input: &[u8]) -> Result<bool>;
 }
 
 // Static native modules table.

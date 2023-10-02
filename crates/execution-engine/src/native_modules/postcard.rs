@@ -10,11 +10,10 @@
 //! See the `LICENSE.md` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::fs::{FileSystemResult};
+use anyhow::Result;
 use crate::native_modules::common::StaticNativeModule;
 use postcard::from_bytes;
 use serde::{Deserialize, Serialize};
-use wasi_types::ErrNo;
 use std::fs::write;
 
 pub(crate) struct PostcardService;
@@ -76,12 +75,11 @@ impl StaticNativeModule for PostcardService {
         "Postcard Service"
     }
 
-    fn serve(&mut self, inputs: &[u8]) -> FileSystemResult<()> {
-        let v = from_bytes::<Vec<Struct3>>(inputs).map_err(|_| ErrNo::Inval)?;
+    fn serve(&mut self, inputs: &[u8]) -> Result<()> {
+        let v = from_bytes::<Vec<Struct3>>(inputs)?;
         write(
             "/services/postcard_result.dat",
-            serde_json::to_string(&v)
-                .map_err(|_| ErrNo::Inval)?
+            serde_json::to_string(&v)?
                 .as_bytes()
                 .to_vec(),
         )?;
@@ -91,7 +89,7 @@ impl StaticNativeModule for PostcardService {
     /// For the purpose of demonstration, we always return true. In reality,
     /// this function may check validity of the `input`, and even buffer the result
     /// for further uses.
-    fn try_parse(&mut self, _input: &[u8]) -> FileSystemResult<bool> {
+    fn try_parse(&mut self, _input: &[u8]) -> Result<bool> {
         Ok(true)
     }
 }

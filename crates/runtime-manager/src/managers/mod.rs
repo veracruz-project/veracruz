@@ -17,11 +17,11 @@ use policy_utils::{
     pipeline::Expr, policy::Policy, principal::{Principal, FilePermissions},
 };
 use std::{
-    collections::{HashSet, HashMap},
-    path::PathBuf,
+    collections::HashMap,
+    path::{Path, PathBuf},
     string::String,
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
+        atomic::AtomicU32,
         Mutex,
     },
     vec::Vec,
@@ -29,7 +29,6 @@ use std::{
     io::Write,
 };
 use veracruz_utils::sha256::sha256;
-use wasi_types::{ErrNo};
 
 pub mod error;
 pub mod execution_engine_manager;
@@ -47,7 +46,6 @@ lazy_static! {
     static ref SESSIONS: Mutex<HashMap<u32, ::session_manager::Session>> =
         Mutex::new(HashMap::new());
     static ref PROTOCOL_STATE: Mutex<Option<ProtocolState>> = Mutex::new(None);
-    static ref DEBUG_FLAG: AtomicBool = AtomicBool::new(false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -74,8 +72,6 @@ pub(crate) struct ProtocolState {
     /// The list of clients (their IDs) that can request shutdown of the
     /// Veracruz platform.
     expected_shutdown_sources: Vec<u64>,
-    ///// The ref to the VFS, this is a FS handler with super user capability.
-    //vfs: FileSystem,
     /// Digest table. Certain files must match the digest before writing to
     /// the filesystem.
     digest_table: HashMap<PathBuf, Vec<u8>>,
@@ -98,13 +94,11 @@ impl ProtocolState {
 
         let digest_table = global_policy.get_file_hash_table()?;
         let native_modules = global_policy.native_modules();
-        //let vfs = FileSystem::new(rights_table, native_modules.to_vec())?;
 
         Ok(ProtocolState {
             global_policy,
             global_policy_hash,
             expected_shutdown_sources,
-            //vfs,
             digest_table,
         })
     }
@@ -120,34 +114,39 @@ impl ProtocolState {
     ////////////////////////////////////////////////////////////////////////////
 
     /// Check if a client has capability to write to a file, and then overwrite it with new `data`.
-    pub(crate) fn write_file(
+    pub(crate) fn write_file<T: AsRef<Path>>(
         &mut self,
         client_id: &Principal,
-        file_name: &str,
+        path: T,
         data: Vec<u8>,
     ) -> Result<()> {
         // Check the digest, if necessary
-        if let Some(digest) = self.digest_table.get(&PathBuf::from(file_name)) {
+        let path = path.as_ref();
+        info!("write_file to path {:?}", path);
+        if let Some(digest) = self.digest_table.get(&PathBuf::from(path)) {
             let incoming_digest = sha256(&data);
             if incoming_digest.len() != digest.len() {
-                return Err(anyhow!(RuntimeManagerError::FileSystemError(ErrNo::Access)));
+                return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError));
             }
             for (lhs, rhs) in digest.iter().zip(incoming_digest.iter()) {
                 if lhs != rhs {
-                    return Err(anyhow!(RuntimeManagerError::FileSystemError(ErrNo::Access)));
+                    return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError));
+                }
+            }
+        }
+        
+        //TODO permission check
+        match path.parent() {
+            None => return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError)),
+            Some(parent_path) => {
+                if !parent_path.try_exists()? {
+                    fs::create_dir_all(parent_path)?;
                 }
             }
         }
 
-        fs::write(file_name, data)?;
-
-        //if file_name == CANONICAL_STDIN_FILE_PATH {
-            //self.vfs.spawn(client_id)?.write_stdin(&data)?;
-        //} else {
-            //self.vfs
-                //.spawn(client_id)?
-                //.write_file_by_absolute_path(file_name, data, false)?;
-        //}
+        info!("write_file to path {:?} after create dir", path);
+        fs::write(path, data)?;
 
         Ok(())
     }
@@ -162,19 +161,16 @@ impl ProtocolState {
         // If a file must match a digest, e.g. a program,
         // it is not permitted to append the file.
         if self.digest_table.contains_key(&PathBuf::from(file_name)) {
-            return Err(anyhow!(RuntimeManagerError::FileSystemError(ErrNo::Access)));
+            return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError));
         }
 
         let mut file = OpenOptions::new()
+            .create(true)
             .append(true)
             .open(file_name)?;
 
         file.write_all(&data)?;
 
-        //self.vfs.spawn(client_id)?.write_file_by_absolute_path(
-            //file_name, data, // set the append flag to true
-            //true,
-        //)?;
         Ok(())
     }
 
@@ -225,15 +221,15 @@ impl ProtocolState {
         );
         let execution_strategy = self.global_policy.execution_strategy();
         let env = execution_engine::Environment {
-            //enable_clock: *self.global_policy.enable_clock(),
             environment_variables,
             ..Default::default()
         };
+        let permission_table = self.global_policy.get_rights_table();
+        let permission = permission_table.get(execution_principal).ok_or(anyhow!("principal cannot be found"))?;
 
         let return_code = execute(
             &execution_strategy,
-            //TODO 
-            &HashSet::from([PathBuf::from("/")]),
+            &permission,
             pipeline,
             &env,
         )?;
@@ -250,40 +246,5 @@ impl ProtocolState {
             Some(error_code.to_le_bytes().to_vec()),
         )
         .unwrap_or_else(|err| panic!("{:?}", err))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Debug printing outside of the enclave.
-////////////////////////////////////////////////////////////////////////////////
-
-/// Prints a debug message, `message`, via our debug OCALL print mechanism, if
-/// the debug configuration flat is set for the enclave.  Has no effect,
-/// otherwise.
-pub fn debug_message(message: String) {
-    if DEBUG_FLAG.load(Ordering::SeqCst) {
-        print_message(message, 0);
-    }
-}
-
-/// Prints an error message, `message`, with a fixed error code, `error_code`,
-/// via our debug OCALL print mechanism, if the debug configuration flat is set
-/// for the enclave.  Has no effect, otherwise.
-pub fn error_message(message: String, error_code: u32) {
-    print_message(message, error_code);
-}
-
-/// Base function for printing messages outside of the enclave.  Note that this
-/// should only print something to *stdout* on the host's machine if the debug
-/// configuration flag is set in the Veracruz global policy.
-fn print_message(#[allow(unused)] message: String, #[allow(unused)] code: u32) {
-    #[cfg(feature = "linux")]
-    if code == 0 {
-        eprintln!("Enclave debug message \"{}\"", message);
-    } else {
-        eprintln!(
-            "Enclave returns error code {} and message \"{}\"",
-            code, message
-        );
     }
 }

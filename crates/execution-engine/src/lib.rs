@@ -19,21 +19,16 @@
 #[macro_use]
 extern crate std;
 
-#[macro_use]
-extern crate num_derive;
-
 mod engines;
-pub mod fs;
 mod native_module_manager;
 mod native_modules;
 mod pipeline;
 // Expose the error to the external.
-pub use engines::common::FatalEngineError;
+//pub use engines::common::FatalEngineError;
 
 use policy_utils::{pipeline::Expr, principal::ExecutionStrategy};
 use std::boxed::Box;
-use std::collections::HashSet;
-use std::path::PathBuf;
+use policy_utils::principal::PrincipalPermission;
 
 /// Runtime environment for a program.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Default)]
@@ -42,12 +37,6 @@ pub struct Environment {
     pub environment_variables: Vec<(String, String)>,
     /// The program arguments of the executable being executed.
     pub program_arguments: Vec<String>,
-    ///// Whether clock-related functionality is enabled for the program.  If not
-    ///// enabled, clock- and time-related WASI host-calls return an unimplemented
-    ///// status code.
-    //pub enable_clock: bool,
-    ///// Whether strace-like output is enabled.
-    //pub enable_strace: bool,
 }
 
 /// The top-level function executes the pipeline of programs, `pipeline`, on
@@ -63,9 +52,9 @@ pub struct Environment {
 /// such as `freestanding-execution-engine` and `runtime-manager` can rely on.
 pub fn execute(
     strategy: &ExecutionStrategy,
-    preopened_dir: &HashSet<PathBuf>,
+    permissions: &PrincipalPermission,
     pipeline: Box<Expr>,
     env: &Environment,
 ) -> anyhow::Result<u32> {
-    Ok(pipeline::execute_pipeline(strategy, preopened_dir, pipeline, env)?)
+    Ok(pipeline::execute_pipeline(strategy, permissions, pipeline, env)?)
 }

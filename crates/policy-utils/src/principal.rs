@@ -40,9 +40,9 @@ pub enum Principal {
     NoCap,
 }
 
-/// The Right Table, contains the `Right`, i.e.
-/// the allowed operations of a Principal on a file
-pub type PermissionTable = HashMap<Principal, HashMap<PathBuf, FilePermissions>>;
+/// The Permission Table, i.e. the allowed operations, `rwx`, of a Principal on directories.
+pub type PrincipalPermission = HashMap<PathBuf, FilePermissions>;
+pub type PermissionTable = HashMap<Principal, PrincipalPermission>;
 
 /// Defines a file entry in the policy, containing the name and `Right`, the allowed op.
 #[derive(Clone, Debug, PartialEq)]
@@ -106,7 +106,7 @@ pub struct Program {
     /// The program ID
     id: u32,
     /// The file permission that specifies the program's ability to read, write and execute files.
-    file_rights: HashMap<PathBuf, FilePermissions>,
+    file_rights: PrincipalPermission,
 }
 
 impl Program {
@@ -115,7 +115,7 @@ impl Program {
     pub fn new<T: Into<u32>>(
         program_file_name: String,
         id: T,
-        file_rights: HashMap<PathBuf, FilePermissions>,
+        file_rights: PrincipalPermission,
     ) -> Self {
         Self {
             program_file_name,
@@ -138,7 +138,7 @@ impl Program {
 
     /// Return file rights map associated to the program.
     #[inline]
-    pub fn file_rights_map(&self) -> HashMap<PathBuf, FilePermissions> {
+    pub fn file_rights_map(&self) -> PrincipalPermission {
         self.file_rights.clone()
     }
 }
@@ -243,7 +243,7 @@ pub struct Pipeline {
     /// The pipeline ID
     id: u32,
     /// The file permission that specifies the program's ability to read, write and execute files.
-    file_rights: HashMap<PathBuf, FilePermissions>,
+    file_rights: PrincipalPermission,
 }
 
 impl Pipeline {
@@ -253,7 +253,7 @@ impl Pipeline {
         name: String,
         id: T,
         preparsed_pipeline: String,
-        file_rights: HashMap<PathBuf, FilePermissions>,
+        file_rights: PrincipalPermission,
     ) -> Result<Self> {
         let parsed_pipeline = Some(parse_pipeline(&preparsed_pipeline)?);
         Ok(Self {
@@ -282,7 +282,7 @@ impl Pipeline {
 
     /// Return file rights map associated to the program.
     #[inline]
-    pub fn file_rights_map(&self) -> HashMap<PathBuf, FilePermissions> {
+    pub fn file_rights_map(&self) -> PrincipalPermission {
         self.file_rights.clone()
     }
 
@@ -331,14 +331,14 @@ pub struct Identity<U> {
     id: u32,
     /// The file capabilities that specifies this principal's ability to read,
     /// write and execute files.
-    file_rights: HashMap<PathBuf, FilePermissions>,
+    file_rights: PrincipalPermission,
 }
 
 impl<U> Identity<U> {
     /// Creates a new identity from a certificate, and identifier.  Initially,
     /// we keep the set of roles empty.
     #[inline]
-    pub fn new<T>(certificate: U, id: T, file_rights: HashMap<PathBuf, FilePermissions>) -> Self
+    pub fn new<T>(certificate: U, id: T, file_rights: PrincipalPermission) -> Self
     where
         T: Into<u32>,
     {
@@ -351,7 +351,7 @@ impl<U> Identity<U> {
 
     /// Return file rights map associated to the program.
     #[inline]
-    pub fn file_rights_map(&self) -> HashMap<PathBuf, FilePermissions> {
+    pub fn file_rights_map(&self) -> PrincipalPermission {
         self.file_rights.clone()
     }
 
