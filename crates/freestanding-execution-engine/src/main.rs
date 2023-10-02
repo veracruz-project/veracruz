@@ -30,10 +30,10 @@ use log::*;
 use policy_utils::{
     parsers::parse_pipeline,
     pipeline::Expr, 
-    principal::{ExecutionStrategy, NativeModule, NativeModuleType},
+    principal::{FilePermissions, ExecutionStrategy, NativeModule, NativeModuleType},
 };
 use std::{
-    collections::HashSet,
+    collections::HashMap,
     error::Error,
     path::PathBuf,
     time::Instant,
@@ -312,43 +312,6 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
     })
 }
 
-///// Loads the specified data sources, as provided on the command line, for
-///// reading and massages them into metadata frames, ready for
-///// the computation.  May abort the program if something goes wrong when reading
-///// any data source.
-//fn load_input_sources(
-    //input_sources: &[String],
-    //vfs: &mut FileSystem,
-//) -> Result<(), Box<dyn Error>> {
-    //for file_path in input_sources.iter() {
-        //let file_path = Path::new(file_path);
-        //load_input_source(&file_path, vfs)?;
-    //}
-    //Ok(())
-//}
-
-//fn load_input_source<T: AsRef<Path>>(
-    //file_path: T,
-    //vfs: &mut FileSystem,
-//) -> Result<(), Box<dyn Error>> {
-    //let file_path = file_path.as_ref();
-    //info!("Loading data source '{:?}'.", file_path);
-    //if file_path.is_file() {
-        //let mut file = File::open(file_path)?;
-        //let mut buffer = Vec::new();
-        //file.read_to_end(&mut buffer)?;
-
-        //vfs.write_file_by_absolute_path(&Path::new("/").join(file_path), buffer, false)?;
-    //} else if file_path.is_dir() {
-        //for dir in file_path.read_dir()? {
-            //load_input_source(&dir?.path(), vfs)?;
-        //}
-    //} else {
-        //return Err(format!("Error on load {:?}", file_path).into());
-    //}
-    //Ok(())
-//}
-
 /// Entry: reads the static configuration and the command line parameters,
 /// parsing both and then starts provisioning the Veracruz host state, before
 /// invoking the entry point.
@@ -357,63 +320,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cmdline = parse_command_line()?;
     info!("Command line read successfully.");
 
-    // Convert the program paths to absolute if needed.
-
-    // Construct file table for all programs
-
-    //let mut file_table = HashMap::new();
-
-    //let read_right = Rights::PATH_OPEN | Rights::FD_READ | Rights::FD_SEEK | Rights::FD_READDIR;
-    //let write_right = read_right
-        //| Rights::FD_WRITE
-        //| Rights::PATH_CREATE_FILE
-        //| Rights::PATH_FILESTAT_SET_SIZE
-        //| Rights::PATH_CREATE_DIRECTORY;
-
-    // Set up standard streams table
-
-    //file_table.insert(PathBuf::from(CANONICAL_STDIN_FILE_PATH), read_right);
-    //file_table.insert(PathBuf::from(CANONICAL_STDOUT_FILE_PATH), write_right);
-    //file_table.insert(PathBuf::from(CANONICAL_STDERR_FILE_PATH), write_right);
-
-    // Set up services
-    
-    //file_table.insert(PathBuf::from("/services"), read_right);
-    //file_table.insert(PathBuf::from("/services"), write_right);
-
-    // Add read permission to input path
-
-    //for file_path in cmdline.input_sources.iter() {
-        //// NOTE: inject the root path.
-        //file_table.insert(Path::new("/").join(file_path), read_right);
-    //}
-
-    let preopened_dir = HashSet::from_iter(cmdline.input_sources.iter().map(|s| PathBuf::from(s)));
-
-    // Add write permission to output path
-
-    //for file_path in cmdline.output_sources.iter() {
-        //// NOTE: inject the root path.
-        //file_table.insert(Path::new("/").join(file_path), write_right);
-    //}
-
-    // Construct the rights table
-
-    //let mut right_table = HashMap::new();
-
-    // Insert the file right for all programs
-
-    // Grant the super user read access to any file under the root. This is
-    // used internally to read the program on behalf of the executing party
-
-    //let mut su_read_rights = HashMap::new();
-    //su_read_rights.insert(
-        //PathBuf::from("/"),
-        //write_right,
-    //);
-    //right_table.insert(Principal::InternalSuperUser, su_read_rights);
-
-    //info!("The final rights table: {:?}", right_table);
+    let permission = cmdline.input_sources.iter().map(|s| (PathBuf::from(s), FilePermissions{read: true, write: true, execute: true})).collect::<HashMap<_, _>>();
 
     // Construct the native module table
     info!("Serializing native modules.");
@@ -474,7 +381,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let return_code = execute(
         &cmdline.execution_strategy,
-        &preopened_dir,
+        &permission,
         cmdline.pipeline.clone(),
         &env,
     )?;
@@ -490,63 +397,5 @@ fn main() -> Result<(), Box<dyn Error>> {
         main_time.elapsed().as_micros()
     );
 
-    // Dump the contents of the 'stdout' file
-
-    //if cmdline.dump_stdout {
-        //let buf = vfs.read_stdout()?;
-        //let stdout_dump = std::str::from_utf8(&buf)?;
-
-        //print!(
-            //"---- stdout dump ----\n{}---- stdout dump end ----\n",
-            //stdout_dump
-        //);
-
-        //std::io::stdout().flush()?;
-    //}
-
-    //// Dump the contents of the 'stderr' file
-
-    //if cmdline.dump_stderr {
-        //let buf = vfs.read_stderr()?;
-        //let stderr_dump = std::str::from_utf8(&buf)?;
-
-        //eprint!(
-            //"---- stderr dump ----\n{}---- stderr dump end ----\n",
-            //stderr_dump
-        //);
-
-        //std::io::stderr().flush()?;
-    //}
-
-    // Map all output directories
-
-    //for file_path in cmdline.output_sources.iter() {
-        //for (output_path, buf) in vfs
-            //.read_all_files_by_absolute_path(Path::new("/").join(file_path))?
-            //.iter()
-        //{
-            //let output_path = output_path.strip_prefix("/").unwrap_or(output_path);
-
-            //if let Some(parent_path) = output_path.parent() {
-                //if parent_path != Path::new("") {
-                    //create_dir_all(parent_path)?;
-                //}
-            //}
-
-            //let mut to_write = File::create(output_path)?;
-            //to_write.write_all(&buf)?;
-
-            //// Try to decode
-            //let decode: String = match postcard::from_bytes(buf) {
-                //Ok(o) => o,
-                //Err(_) => match std::str::from_utf8(buf) {
-                    //Ok(oo) => oo.to_string(),
-                    //Err(_) => "(Cannot parse as a UTF-8 string)".to_string(),
-                //},
-            //};
-
-            //info!("{:?}: {:?}", output_path, decode);
-        //}
-    //}
     Ok(())
 }

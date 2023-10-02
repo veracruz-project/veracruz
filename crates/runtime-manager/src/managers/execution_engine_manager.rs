@@ -20,6 +20,7 @@ use transport_protocol::{
     },
     TransportProtocolError,
 };
+use log::info;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Protocol response messages.
@@ -143,6 +144,7 @@ fn dispatch_on_request(client_id: u64, request: MESSAGE) -> ProvisioningResult {
         .as_mut()
         .ok_or(anyhow!(RuntimeManagerError::UninitializedProtocolState))?;
 
+    info!("Runtime dispatch on incoming a request.");
     match request {
         MESSAGE::WriteFile(data) => dispatch_on_write(protocol_state, data, client_id),
         MESSAGE::AppendFile(data) => dispatch_on_append(protocol_state, data, client_id),

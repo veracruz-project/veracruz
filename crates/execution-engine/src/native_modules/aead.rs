@@ -9,12 +9,11 @@
 //! See the `LICENSE.md` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::fs::{FileSystemResult};
+use anyhow::Result;
 use crate::native_modules::common::StaticNativeModule;
 use mbedtls::cipher::{Authenticated, Cipher, Decryption, Encryption, Fresh};
 use serde::Deserialize;
 use std::path::PathBuf;
-use wasi_types::ErrNo;
 use std::fs::{write, read};
 
 #[derive(Deserialize, Debug)]
@@ -43,7 +42,7 @@ impl StaticNativeModule for AeadService {
     /// Triggers the service. The details of the service can be found in function
     /// `encryption_decryption`.
     /// Here is the enter point. It also erase the state unconditionally afterwards.
-    fn serve(&mut self, _input: &[u8]) -> FileSystemResult<()> {
+    fn serve(&mut self, _input: &[u8]) -> Result<()> {
         // when reaching here, the `input` bytes are already parsed.
         let result = self.encryption_decryption();
         // NOTE: erase all the states.
@@ -54,9 +53,9 @@ impl StaticNativeModule for AeadService {
     /// For the purpose of demonstration, we always return true. In reality,
     /// this function may check validity of the `input`, and even buffer the result
     /// for further uses.
-    fn try_parse(&mut self, input: &[u8]) -> FileSystemResult<bool> {
+    fn try_parse(&mut self, input: &[u8]) -> Result<bool> {
         let deserialized_input: AeadService =
-            match postcard::from_bytes(&input).map_err(|_| ErrNo::Canceled) {
+            match postcard::from_bytes(&input) {
                 Ok(o) => o,
                 Err(_) => return Ok(false),
             };
@@ -80,7 +79,7 @@ impl AeadService {
 
     /// The core service. It encrypts or decrypts, depending on the flag `is_encryption`, the input read
     /// from the path `input_path` using the `key` and `iv`, and writes the result to the file at `output_path`.
-    fn encryption_decryption(&mut self) -> FileSystemResult<()> {
+    fn encryption_decryption(&mut self) -> Result<()> {
         let tag_len = 16; // standard default
         let AeadService {
             key,
@@ -101,32 +100,26 @@ impl AeadService {
                 mbedtls::cipher::raw::CipherId::Aes,
                 mbedtls::cipher::raw::CipherMode::GCM,
                 key.len() as u32 * 8,
-            )
-            .map_err(|_| ErrNo::Canceled)?;
+            )?;
 
             output.resize(input.len() + tag_len, 0);
 
             let (n, _) = cypher
-                .set_key_iv(&key[..], &iv[..])
-                .map_err(|_| ErrNo::Canceled)?
-                .encrypt_auth(&aad, &input, &mut output[..], tag_len)
-                .map_err(|_| ErrNo::Canceled)?;
+                .set_key_iv(&key[..], &iv[..])?
+                .encrypt_auth(&aad, &input, &mut output[..], tag_len)?;
             output.resize(n, 0);
         } else {
             let cypher: Cipher<Decryption, Authenticated, Fresh> = mbedtls::cipher::Cipher::new(
                 mbedtls::cipher::raw::CipherId::Aes,
                 mbedtls::cipher::raw::CipherMode::GCM,
                 key.len() as u32 * 8,
-            )
-            .map_err(|_| ErrNo::Canceled)?;
+            )?;
 
             output.resize(input.len() + tag_len, 0);
 
             let (n, _) = cypher
-                .set_key_iv(&key[..], &iv[..])
-                .map_err(|_| ErrNo::Canceled)?
-                .decrypt_auth(&aad, &input, &mut output, tag_len)
-                .map_err(|_| ErrNo::Canceled)?;
+                .set_key_iv(&key[..], &iv[..])?
+                .decrypt_auth(&aad, &input, &mut output, tag_len)?;
             output.resize(n, 0);
         }
 

@@ -10,7 +10,6 @@
 //! information on licensing and copyright.
 
 pub mod common;
-pub mod strace;
 //pub(crate) mod wasmi;
 #[cfg(feature = "std")]
 pub(crate) mod wasmtime;

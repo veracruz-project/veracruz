@@ -33,14 +33,20 @@
 //! See the `LICENSE.md` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
+use anyhow::{anyhow, Result};
 use crate::{
-    fs::{FileSystemResult},
     native_modules::common::STATIC_NATIVE_MODULES
 };
 use log::info;
+use policy_utils::principal::{NativeModule, NativeModuleType};
+use std::{
+    fs::{File, remove_dir_all},
+    io::{Write},
+    path::PathBuf,
+    process::Command
+};
 #[cfg(feature = "std")]
 use nix::sys::signal;
-use wasi_types::ErrNo;
 
 /// Path to the native module's manager sysroot on the kernel filesystem. Native
 /// module directories are created under this directory.
@@ -58,16 +64,12 @@ const EXECUTION_CONFIGURATION_FILE: &str = "execution_config";
 pub struct NativeModuleManager {
     /// Native module to execute.
     native_module: NativeModule,
-    ///// Native module's view of the VFS. This is used to copy files from the VFS
-    ///// to the kernel filesystem.
-    //native_module_vfs: FileSystem,
     /// Native module directory. Gets mounted into the sandbox environment
     /// before the native module is executed.
     native_module_directory: PathBuf,
 }
 
 impl NativeModuleManager {
-    //pub fn new(native_module: NativeModule, native_module_vfs: FileSystem) -> Self {
     pub fn new(native_module: NativeModule) -> Self {
         let native_module_directory = PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT).join(native_module.name());
         Self {
@@ -81,17 +83,19 @@ impl NativeModuleManager {
     /// Takes a list of unprefixed paths, i.e. not including the path to the
     /// native module's directory.
     /// Returns the mappings as a string.
-    fn build_mappings(&self, unprefixed_files: Vec<PathBuf>) -> FileSystemResult<String> {
+    fn build_mappings(&self, unprefixed_files: Vec<PathBuf>) -> Result<String> {
         let mut mappings = String::new();
         for f in unprefixed_files {
             let mapping = self
                 .native_module_directory
                 .join(&f)
                 .to_str()
-                .ok_or(ErrNo::Inval)?
+                .ok_or(anyhow!("Failed to convert native_module_directory to str"))?
                 .to_owned()
                 + "=>"
-                + &f.to_str().ok_or(ErrNo::Inval)?.to_owned();
+                + &f.to_str()
+                .ok_or(anyhow!("Failed to convert {:?} to str",f))?
+                .to_owned();
             mappings = mappings + &mapping + ",";
         }
 
@@ -100,114 +104,11 @@ impl NativeModuleManager {
                    + &self.native_module_directory
                      .join(EXECUTION_CONFIGURATION_FILE)
                      .to_str()
-                     .ok_or(ErrNo::Inval)?
+                     .ok_or(anyhow!("Failed to convert {} to str", EXECUTION_CONFIGURATION_FILE))?
                      .to_owned()
                    + "=>/"
                    + EXECUTION_CONFIGURATION_FILE;
         Ok(mappings)
-    }
-
-    ///// Prepare native module's filesystem by copying to the kernel filesystem
-    ///// all the part of the VFS visible to the native module.
-    ///// Returns a list of top-level files, i.e. files immediately under the
-    ///// root, that should be copied to the kernel filesystem.
-    ///// Fails if creating a new file or directory or writing to a file fails.
-    ///// To be useful, this function must be called after provisioning files to
-    ///// the VFS, and maybe even after the WASM program invokes the native module.
-    //fn prepare_fs(&mut self) -> FileSystemResult<Vec<PathBuf>> {
-        //create_dir_all(self.native_module_directory.as_path()).map_err(|_| ErrNo::Access)?;
-        //let (visible_files_and_dirs, top_level_files) = self.native_module_vfs.read_all_files_and_dirs_by_absolute_path("/")?;
-        //for (path, buffer) in visible_files_and_dirs {
-            //let path = self.native_module_directory.join(strip_root_slash_path(&path));
-
-            //// Create parent directories
-            //let parent_path = path.parent().ok_or(ErrNo::NoEnt)?;
-            //create_dir_all(parent_path)?;
-
-            //match buffer {
-                //Some(b) => {
-                    //let mut file = File::create(path)?;
-                    //file.write_all(&b)?;
-                //},
-                //None => {
-                    //create_dir(path)?
-                //}
-            //}
-        //}
-
-        // Make sure all top-level files exist on the kernel filesystem to avoid
-        // potential mount errors later on.
-        // This is a workaround. Ideally, only files accessible to the principal
-        // should be mounted, however these can't be easily identified.
-        // Let's assume every top-level file is a directory. We don't care if
-        // this results in errors later, since the native module is not supposed
-        // to access these files
-        //for f in &top_level_files {
-            //let path = self.native_module_directory.join(strip_root_slash_path(&f));
-            //let _ = create_dir(path);
-        //}
-
-        //Ok(top_level_files)
-    //}
-
-    /// Recursively copy a `path` under the native module's directory to the
-    /// VFS.
-    /// Takes an unprefixed path, i.e. not including the path to the native
-    /// module's  directory.
-    /// Access errors are ignored.
-    /// This function should be called after the native module's execution to
-    /// reflect the side effects of execution onto the VFS.
-    fn copy_fs_to_vfs(&mut self, path_unprefixed: &Path) -> FileSystemResult<()> {
-        //let path_prefixed = self.native_module_directory.join(strip_root_slash_path(&path_unprefixed));
-        //if path_prefixed.is_dir() {
-            //for entry in read_dir(path_prefixed)? {
-                //let entry = entry?;
-                //let path_prefixed = entry.path();
-                //let path_unprefixed = path_prefixed.strip_prefix(&self.native_module_directory).map_err(|_| ErrNo::Access)?;
-
-                //// Ignore execution configuration file
-                //if path_unprefixed == PathBuf::from(EXECUTION_CONFIGURATION_FILE) {
-                    //continue;
-                //}
-
-                //let path_unprefixed = PathBuf::from("/").join(path_unprefixed);
-                //if path_prefixed.is_dir() {
-                    //// Create directory on the VFS with `path_open()`
-                    //let prestat = self.native_module_vfs.find_prestat(&path_unprefixed);
-                    //if prestat.is_ok() {
-                        //let (fd, file_name) = prestat?;
-                        //self.native_module_vfs.path_open(
-                            //fd,
-                            //LookupFlags::empty(),
-                            //file_name,
-                            //OpenFlags::CREATE,
-                            //FileSystem::DEFAULT_RIGHTS,
-                            //FileSystem::DEFAULT_RIGHTS,
-                            //FdFlags::empty(),
-                        //)?;
-                        //self.copy_fs_to_vfs(&path_unprefixed)?;
-                    //}
-                //} else {
-                    //// Read file on the kernel fileystem by chunks of 1MiB
-                    //let mut f = File::open(&path_prefixed)?;
-                    //let mut buf: [u8; 1048576] = [0; 1048576];
-
-                    //// Copy file to the VFS. First truncate the VFS file then
-                    //// append to it. If the principal doesn't have write access,
-                    //// just ignore it
-                    //if self.native_module_vfs.write_file_by_absolute_path(&path_unprefixed, vec![], false).is_ok() {
-                        //loop {
-                            //let n = f.read(&mut buf)?;
-                            //if n == 0 {
-                                //break;
-                            //}
-                            //self.native_module_vfs.write_file_by_absolute_path(&path_unprefixed, buf[..n].to_vec(), true)?;
-                        //}
-                    //}
-                //}
-            //}
-        //}
-        Ok(())
     }
 
     /// Delete native module's filesystem on the kernel filesystem.
@@ -216,27 +117,27 @@ impl NativeModuleManager {
     /// native module executions stateful. In the future, we might consider
     /// giving native modules access to only a subset of the program's VFS with
     /// limited permissions.
-    fn teardown_fs(&self) -> FileSystemResult<()> {
+    fn teardown_fs(&self) -> Result<()> {
         remove_dir_all(self.native_module_directory.as_path())?;
         Ok(())
     }
 
     /// Run the native module. The input is passed by the WASM program via the
     /// native module's special file.
-    pub fn execute(&mut self, input: Vec<u8>) -> FileSystemResult<()> {
+    pub fn execute(&mut self, input: Vec<u8>) -> Result<()> {
         if self.native_module.is_static() {
             // Look up native module in the static native modules table
-            let mut nm = STATIC_NATIVE_MODULES.lock().map_err(|_| ErrNo::Inval)?;
+            let mut nm = STATIC_NATIVE_MODULES
+                .lock()
+                .map_err(|_| anyhow!("Failed to lock STATIC_NATIVE_MODULES"))?;
+            let native_module_name = self.native_module.name();
             let nm = nm
-                .get_mut(&self.native_module.name().to_string())
-                .ok_or(ErrNo::Inval)?;
-            //if nm.try_parse(&input)? {
-                //nm.serve(&mut self.native_module_vfs, &input)?;
-            //}
+                .get_mut(native_module_name)
+                .ok_or(anyhow!("cannot find native module: {}", native_module_name))?;
+            if nm.try_parse(&input)? {
+                nm.serve(&input)?;
+            }
         } else {
-            info!("Preparing the native module's filesystem...");
-            //let top_level_files = self.prepare_fs()?;
-            info!("OK");
 
             // Inject execution configuration into the native module's directory
             let mut file = File::create(self.native_module_directory.join(EXECUTION_CONFIGURATION_FILE))?;
@@ -261,25 +162,19 @@ impl NativeModuleManager {
 
             // TODO change in the future
             let mount_mappings = self.build_mappings(vec!["/".into()])?;
-            let entry_point_tmp;
             let entry_point = match self.native_module.r#type() {
-                NativeModuleType::Dynamic {
-                    special_file: _,
-                    entry_point,
-                } => entry_point.to_str().ok_or(ErrNo::Inval)?,
-                NativeModuleType::Provisioned { entry_point } => {
-                    entry_point_tmp = self.native_module_directory.join(entry_point);
-                    entry_point_tmp.to_str().ok_or(ErrNo::Inval)?
-                }
+                NativeModuleType::Dynamic { entry_point, .. } => entry_point.clone(),
+                NativeModuleType::Provisioned { entry_point } => self.native_module_directory.join(entry_point),
                 _ => panic!("should not happen"),
             };
+            let entry_point = entry_point.to_str().ok_or(anyhow!("Failed to convert entry point to str"))?;
 
             // Make sure the entry point is executable.
             // This is a temporary workaround that only works on Linux.
             Command::new("chmod").args(["500", entry_point]).output()?;
 
             info!("Calling sandboxer...");
-            let output = Command::new(NATIVE_MODULE_MANAGER_SANDBOXER_PATH)
+            Command::new(NATIVE_MODULE_MANAGER_SANDBOXER_PATH)
                 .args([
                     "--sandbox2tool_resolve_and_add_libraries",
                     "--sandbox2tool_mount_tmp",
@@ -291,12 +186,6 @@ impl NativeModuleManager {
                     entry_point,
                 ])
                 .output()?;
-
-            info!("Propagating side effects to the VFS (access errors are ignored)...");
-            self.copy_fs_to_vfs(&PathBuf::from(""))?;
-            //let _ = self.native_module_vfs.write_stdout(&output.stdout);
-            //let _ = self.native_module_vfs.write_stderr(&output.stderr);
-            info!("OK");
 
             self.teardown_fs()?;
         }

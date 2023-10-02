@@ -16,7 +16,7 @@ use data_encoding::HEXLOWER;
 use log::{info, warn};
 use policy_utils::{
     expiry::Timepoint,
-    parsers::{enforce_leading_slash, parse_renamable_paths},
+    parsers::parse_renamable_paths,
     policy::Policy,
     principal::{ExecutionStrategy, FileHash, FilePermissions, Identity, NativeModule, NativeModuleType, Pipeline, Program},
 };
@@ -594,9 +594,8 @@ impl Arguments {
             .enumerate()
         {
             let file_permissions = serialize_capability(capability)?;
-            let program_file_name = enforce_leading_slash(program_file_name).into_owned();
 
-            result.push(Program::new(program_file_name, id as u32, file_permissions));
+            result.push(Program::new(program_file_name.clone(), id as u32, file_permissions));
         }
         Ok(result)
     }
@@ -622,12 +621,10 @@ impl Arguments {
             .zip(&self.native_modules_special_files)
         {
             // Add a backslash (VFS requirement)
-            let special_file = enforce_leading_slash(
-                special_file
-                    .to_str()
-                    .ok_or(anyhow!("Fail to convert special_file to str."))?,
-            )
-            .into_owned();
+            let special_file = special_file.to_str()
+            .ok_or(
+                anyhow!("Fail to convert special_file to str."),
+            )?;
 
             let nm_type = if entry_point_path == &PathBuf::from("") {
                 NativeModuleType::Static {
@@ -756,9 +753,8 @@ impl Arguments {
         let mut result = Vec::new();
         for (file_name, file_path) in self.hashes.iter() {
             let hash = compute_file_hash(file_path)?;
-            let file_name = enforce_leading_slash(file_name).into_owned();
 
-            result.push(FileHash::new(file_name, hash));
+            result.push(FileHash::new(file_name.clone(), hash));
         }
         Ok(result)
     }

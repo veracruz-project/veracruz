@@ -29,13 +29,9 @@ pub fn init_session_manager() -> Result<()> {
 }
 
 pub fn load_policy(policy_json: &str) -> Result<()> {
-    info!("load_policy:{:?}", policy_json);
+    info!("Load policy: {:?}", policy_json);
     let policy_hash = sha256(&policy_json.as_bytes());
     let policy = Policy::from_json(policy_json)?;
-
-    if *policy.debug() {
-        super::DEBUG_FLAG.store(true, Ordering::SeqCst);
-    }
 
     let state = ProtocolState::new(policy.clone(), hex::encode(policy_hash))?;
     *super::PROTOCOL_STATE
