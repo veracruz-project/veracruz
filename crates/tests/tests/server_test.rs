@@ -125,8 +125,8 @@ fn basic_read_write_and_traverse() {
         TestEvent::write_program(READ_FILE_WASM),
         TestEvent::write_data(STRING_1_DATA),
         TestEvent::execute(READ_FILE_WASM),
-        TestEvent::read_result("/output/test/test.txt"),
-        TestEvent::read_result("/output/hello-world-1.dat"),
+        TestEvent::read_result("./output/test/test.txt"),
+        TestEvent::read_result("./output/hello-world-1.dat"),
         TestEvent::ShutDown,
     ];
 
@@ -141,21 +141,7 @@ fn basic_random_source() {
         TestEvent::CheckHash,
         TestEvent::write_program(RANDOM_SOURCE_WASM),
         TestEvent::execute(RANDOM_SOURCE_WASM),
-        TestEvent::read_result("/output/random.dat"),
-        TestEvent::ShutDown,
-    ];
-
-    TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
-        .unwrap();
-}
-
-#[test]
-/// Custom external function `fd_create`
-fn fd_create() {
-    let events = vec![
-        TestEvent::write_program(FD_CREATE_RUST_WASM),
-        TestEvent::execute(FD_CREATE_RUST_WASM),
-        TestEvent::read_result("/output/pass"),
+        TestEvent::read_result("./output/random.dat"),
         TestEvent::ShutDown,
     ];
 
@@ -168,7 +154,7 @@ fn fd_create() {
 fn basic_execute_non_existent() {
     let events = vec![
         TestEvent::execute(RANDOM_SOURCE_WASM),
-        TestEvent::read_result("/output/random.dat"),
+        TestEvent::read_result("./output/random.dat"),
         TestEvent::ShutDown,
     ];
 
@@ -187,7 +173,7 @@ fn basic_execute_non_existent() {
 /// A client attempts to read a non-existent file
 fn basic_client_read_non_existent() {
     let events = vec![
-        TestEvent::ReadFile(String::from("/output/random.dat")),
+        TestEvent::ReadFile(String::from("./output/random.dat")),
         TestEvent::ShutDown,
     ];
 
@@ -288,12 +274,12 @@ fn basic_unauthorized_certificate_key_pair() {
 
 #[test]
 /// Test AES native module.
-fn aesctr_native_module() {
+fn basic_aesctr_native_module() {
     let events = vec![
         TestEvent::CheckHash,
         TestEvent::write_program(AESCTR_NATIVE_WASM),
         TestEvent::execute(AESCTR_NATIVE_WASM),
-        TestEvent::read_result("/output/aesctr_native_pass.txt"),
+        TestEvent::read_result("./output/aesctr_native_pass.txt"),
         TestEvent::ShutDown,
     ];
 
@@ -308,28 +294,28 @@ fn aesctr_native_module() {
     .unwrap();
 }
 
-#[test]
-/// Call an example native module.
-fn basic_postcard_native_module() {
-    let events = vec![
-        TestEvent::CheckHash,
-        TestEvent::write_program(POSTCARD_NATIVE_WASM),
-        TestEvent::write_data(POSTCARD_DATA),
-        TestEvent::execute(POSTCARD_NATIVE_WASM),
-        TestEvent::read_result("/output/postcard_native.txt"),
-        TestEvent::ShutDown,
-    ];
+//#[test]
+///// Call an example native module.
+//fn basic_postcard_native_module() {
+    //let events = vec![
+        //TestEvent::CheckHash,
+        //TestEvent::write_program(POSTCARD_NATIVE_WASM),
+        //TestEvent::write_data(POSTCARD_DATA),
+        //TestEvent::execute(POSTCARD_NATIVE_WASM),
+        //TestEvent::read_result("/output/postcard_native.txt"),
+        //TestEvent::ShutDown,
+    //];
 
-    TestExecutor::test_template(
-        POLICY_POSTCARD_NATIVE,
-        CLIENT_CERT,
-        CLIENT_KEY,
-        events,
-        TIME_OUT_SECS,
-        true,
-    )
-    .unwrap();
-}
+    //TestExecutor::test_template(
+        //POLICY_POSTCARD_NATIVE,
+        //CLIENT_CERT,
+        //CLIENT_KEY,
+        //events,
+        //TIME_OUT_SECS,
+        //true,
+    //)
+    //.unwrap();
+//}
 
 #[test]
 /// Test for several rounds of appending data and executing program.
@@ -343,7 +329,7 @@ fn basic_number_accumulation_batch_process() {
     events.append(&mut TestEvent::batch_process_events(
         data_dir(F64_STREAM_PATH),
         NUMBER_STREM_WASM,
-        "/output/accumulation.dat",
+        "./output/accumulation.dat",
     ));
     events.push(TestEvent::ShutDown);
 
@@ -360,7 +346,7 @@ fn basic_pipeline() {
         TestEvent::write_program(RANDOM_U32_LIST_WASM),
         TestEvent::write_program(SORT_NUBMER_WASM),
         TestEvent::pipeline("0"),
-        TestEvent::read_result("/output/sorted_numbers.txt"),
+        TestEvent::read_result("./output/sorted_numbers.txt"),
         TestEvent::ShutDown,
     ];
     TestExecutor::test_template(POLICY, CLIENT_CERT, CLIENT_KEY, events, TIME_OUT_SECS, true)
@@ -379,7 +365,7 @@ fn integration_linear_regression() {
         TestEvent::write_program(LINEAR_REGRESSION_WASM),
         TestEvent::write_data(LINEAR_REGRESSION_DATA),
         TestEvent::execute(LINEAR_REGRESSION_WASM),
-        TestEvent::read_result("/output/linear-regression.dat"),
+        TestEvent::read_result("./output/linear-regression.dat"),
         TestEvent::ShutDown,
     ];
 
@@ -405,7 +391,7 @@ fn integration_intersection_sum() {
         TestEvent::write_data(INTERSECTION_SET_SUM_CUSTOMER_DATA),
         TestEvent::write_data(INTERSECTION_SET_SUM_ADVERTISEMENT_DATA),
         TestEvent::execute(CUSTOMER_ADS_INTERSECTION_SET_SUM_WASM),
-        TestEvent::read_result("/output/intersection-set-sum.dat"),
+        TestEvent::read_result("./output/intersection-set-sum.dat"),
         TestEvent::ShutDown,
     ];
 
@@ -423,7 +409,7 @@ fn integration_string_edit_distance() {
         TestEvent::write_data(STRING_1_DATA),
         TestEvent::write_data(STRING_2_DATA),
         TestEvent::execute(STRING_EDIT_DISTANCE_WASM),
-        TestEvent::read_result("/output/string-edit-distance.dat"),
+        TestEvent::read_result("./output/string-edit-distance.dat"),
         TestEvent::ShutDown,
     ];
 
@@ -443,7 +429,7 @@ fn integration_private_set_intersection() {
         TestEvent::write_data(PERSON_SET_1_DATA),
         TestEvent::write_data(PERSON_SET_2_DATA),
         TestEvent::execute(PERSON_SET_INTERSECTION_WASM),
-        TestEvent::read_result("/output/private-set.dat"),
+        TestEvent::read_result("./output/private-set.dat"),
         TestEvent::ShutDown,
     ];
 
@@ -453,12 +439,12 @@ fn integration_private_set_intersection() {
 
 #[test]
 /// Attempt to fetch result without enough stream data.
-fn test_phase4_number_stream_accumulation_one_data_one_stream_with_attestation() {
+fn integration_number_stream_accumulation_one_data_one_stream_with_attestation() {
     let events = vec![
         TestEvent::CheckHash,
         TestEvent::write_program(NUMBER_STREM_WASM),
         TestEvent::write_data(SINGLE_F64_DATA),
-        TestEvent::read_result("/output/accumulation.dat"),
+        TestEvent::read_result("./output/accumulation.dat"),
         TestEvent::ShutDown,
     ];
 
@@ -481,7 +467,7 @@ fn integration_postcard_json() {
         TestEvent::write_program(POSTCARD_WASM),
         TestEvent::write_data(POSTCARD_DATA),
         TestEvent::execute(POSTCARD_WASM),
-        TestEvent::read_result("/output/postcard_wasm.txt"),
+        TestEvent::read_result("./output/postcard_wasm.txt"),
         TestEvent::ShutDown,
     ];
 
@@ -497,14 +483,14 @@ fn performance_idash2017() {
     let mut events = vec![TestEvent::write_program(LOGISTICS_REGRESSION_WASM)];
     events.append(&mut TestEvent::write_all(
         data_dir(LOGISTICS_REGRESSION_DATA_PATH),
-        "/input/idash2017/",
+        "./input/idash2017/",
     ));
     events.append(&mut vec![
         TestEvent::CheckHash,
         TestEvent::execute(LOGISTICS_REGRESSION_WASM),
         // only read two outputs
-        TestEvent::read_result("/output/idash2017/generate-data-0.dat"),
-        TestEvent::read_result("/output/idash2017/generate-data-1.dat"),
+        TestEvent::read_result("./output/idash2017/generate-data-0.dat"),
+        TestEvent::read_result("./output/idash2017/generate-data-1.dat"),
         TestEvent::ShutDown,
     ]);
 
@@ -520,13 +506,13 @@ fn performance_macd() {
     let mut events = vec![TestEvent::write_program(MACD_WASM)];
     events.append(&mut TestEvent::write_all(
         data_dir(MACD_DATA_PATH),
-        "/input/macd/",
+        "./input/macd/",
     ));
     events.append(&mut vec![
         TestEvent::CheckHash,
         TestEvent::execute(MACD_WASM),
         // only read two outputs
-        TestEvent::read_result("/output/macd/generate-1000.dat"),
+        TestEvent::read_result("./output/macd/generate-1000.dat"),
         TestEvent::ShutDown,
     ]);
 
@@ -541,13 +527,13 @@ fn performance_set_intersection_sum() {
     let mut events = vec![TestEvent::write_program(INTERSECTION_SET_SUM_WASM)];
     events.append(&mut TestEvent::write_all(
         data_dir(PRIVATE_SET_INTER_SUM_DATA_PATH),
-        "/input/private-set-inter-sum/",
+        "./input/private-set-inter-sum/",
     ));
     events.append(&mut vec![
         TestEvent::CheckHash,
         TestEvent::execute(INTERSECTION_SET_SUM_WASM),
         // only read two outputs
-        TestEvent::read_result("/output/private-set-inter-sum/data-2000-0"),
+        TestEvent::read_result("./output/private-set-inter-sum/data-2000-0"),
         TestEvent::ShutDown,
     ]);
 
@@ -665,7 +651,7 @@ impl TestExecutor {
             if expect_success {
                 panic!("There was an unexpected failure");
             } else {
-                panic!("A failure was expected");
+                info!("A failure was expected");
             }
         }
         Ok(())

@@ -79,7 +79,7 @@ impl TestEvent {
         result_path: Q,
     ) -> Vec<TestEvent> {
         // Load the remote input path, otherwise use default `/input/`
-        let remote_dir_path = env::var("REMOTE_DATA_DIR").unwrap_or("/input/".to_string());
+        let remote_dir_path = env::var("REMOTE_DATA_DIR").unwrap_or("./input/".to_string());
 
         // Construct the TestEvent gradually and append to this vec.
         let mut rst = Vec::new();
