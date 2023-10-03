@@ -21,7 +21,11 @@ use std::{
         Command,
         Stdio,
     },
-    time::Instant,
+    thread::sleep,
+    time::{
+        Duration,
+        Instant,
+    },
 };
 use veracruz_server::{VeracruzServer, VeracruzServerError};
 use veracruz_utils::runtime_manager_message::{
@@ -61,19 +65,19 @@ impl VeracruzServer for VeracruzServerSev {
             .arg("-m").arg("2048M,slots=5,maxmem=30G")
             .arg("-no-reboot")
             .arg("-drive").arg("if=pflash,format=raw,unit=0,file=/work/veracruz/SEVImage/snp-release/usr/local/share/qemu/OVMF_CODE.fd,readonly")
-          .arg("-device").arg("virtio-scsi-pci,id=scsi0,disable-legacy=on,iommu_platform=true")
-          .arg("-machine").arg("memory-encryption=sev0,vmport=off")
-          .arg("-object").arg("memory-backend-memfd-private,id=ram1,size=2048M,share=true")
-          .arg("-object").arg("sev-snp-guest,id=sev0,cbitpos=51,reduced-phys-bits=1,discard=none")
-          .arg("-machine").arg("memory-backend=ram1,kvm-type=protected")
-          .arg("-nographic")
-          .arg("-kernel").arg("/work/veracruz/workspaces/sev-runtime/bzImage")
-          .arg("-append").arg("console=ttyS0 earlyprintk=serial root=/dev/sda2")
-          .arg("-initrd").arg("/work/veracruz/workspaces/sev-runtime/initramfs_sev")
-          .arg("-monitor").arg("pty")
-          .arg("-serial").arg("mon:stdio")
-          .arg("-device").arg("vhost-vsock-pci,guest-cid=3");
-          println!("RUnning command:{:?}", command);
+            .arg("-device").arg("virtio-scsi-pci,id=scsi0,disable-legacy=on,iommu_platform=true")
+            .arg("-machine").arg("memory-encryption=sev0,vmport=off")
+            .arg("-object").arg("memory-backend-memfd-private,id=ram1,size=2048M,share=true")
+            .arg("-object").arg("sev-snp-guest,id=sev0,cbitpos=51,reduced-phys-bits=1,discard=none")
+            .arg("-machine").arg("memory-backend=ram1,kvm-type=protected")
+            .arg("-nographic")
+            .arg("-kernel").arg("/work/veracruz/workspaces/sev-runtime/bzImage")
+            //.arg("-append").arg("console=ttyS0 earlyprintk=serial root=/dev/sda2")
+            .arg("-initrd").arg("/work/veracruz/workspaces/sev-runtime/initramfs_sev")
+            //.arg("-monitor").arg("pty")
+            //.arg("-serial").arg("mon:stdio")
+            .arg("-device").arg("vhost-vsock-pci,guest-cid=3");
+          println!("Running command:{:?}", command);
          let handle = command
               .stdout(Stdio::null())
               .stderr(Stdio::null())
@@ -157,6 +161,7 @@ impl Drop for VeracruzServerSev {
 impl VeracruzServerSev {
     fn shutdown_sev_vm(&mut self) -> Result<(), Box<dyn Error>> {
         self.vm_process.kill()?;
+        sleep(Duration::from_millis(500));
         return Ok(());
     }
 }
