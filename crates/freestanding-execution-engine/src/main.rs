@@ -23,7 +23,7 @@
 //! See the file `LICENSE.md` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use clap::{App, Arg};
+use clap::{ArgAction, Arg};
 use execution_engine::{execute, Environment};
 use log::*;
 use policy_utils::{
