@@ -23,7 +23,6 @@
 //! See the file `LICENSE.md` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use anyhow::anyhow;
 use clap::{App, Arg};
 use execution_engine::{execute, Environment};
 use log::*;
@@ -38,7 +37,6 @@ use std::{
     path::PathBuf,
     time::Instant,
     vec::Vec,
-    iter::FromIterator,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -66,21 +64,10 @@ const VERSION: &str = "alpha";
 struct CommandLineOptions {
     /// The list of file names passed as input data-sources.
     input_sources: Vec<String>,
-    ///// The list of file names passed as output.
-    //output_sources: Vec<String>,
     /// The execution strategy to use when performing the computation.
     execution_strategy: ExecutionStrategy,
-    ///// Whether the contents of `stdout` should be dumped before exiting.
-    //dump_stdout: bool,
-    ///// Whether the contents of `stderr` should be dumped before exiting.
-    //dump_stderr: bool,
-    ///// Whether clock functions (`clock_getres()`, `clock_gettime()`) should be
-    ///// enabled.
-    //enable_clock: bool,
     /// Environment variables for the program.
     environment_variables: Vec<(String, String)>,
-    ///// Whether strace is enabled.
-    //enable_strace: bool,
     /// A list of native module names.
     native_modules_names: Vec<String>,
     /// A list of paths to native module entry points.
@@ -111,17 +98,6 @@ fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
                 )
                 .num_args(0..),
         )
-        //.arg(
-            //Arg::with_name("output")
-                //.short("o")
-                //.long("output-source")
-                //.value_name("DIRECTORIES")
-                //.help(
-                    //"Space-separated paths to the output directories. The directories are copied \
-                     //into disk on the host. All program are granted with write capabilities.",
-                //)
-                //.multiple(true),
-        //)
         .arg(
             Arg::new("native-module-name")
                 .long("native-module-name")
@@ -170,27 +146,6 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
                      interpretation).",
                 ),
         )
-        //.arg(
-            //Arg::with_name("dump-stdout")
-                //.short("d")
-                //.long("dump-stdout")
-                //.help("Whether the contents of stdout should be dumped before exiting"),
-        //)
-        //.arg(
-            //Arg::with_name("dump-stderr")
-                //.short("e")
-                //.long("dump-stderr")
-                //.help("Whether the contents of stderr should be dumped before exiting"),
-        //)
-        //.arg(
-            //Arg::with_name("enable-clock")
-                //.short("c")
-                //.long("enable-clock")
-                //.help(
-                    //"Whether clock functions (`clock_getres()`, `clock_gettime()`) should be \
-                     //enabled.",
-                //),
-        //)
         .arg(
             Arg::new("env")
                 .long("env")
@@ -199,11 +154,6 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
                 .num_args(1)
                 .action(ArgAction::Append),
         )
-        //.arg(
-            //Arg::with_name("strace")
-                //.long("strace")
-                //.help("Enable strace-like output for WASI calls."),
-        //)
         .get_matches();
 
     info!("Parsed command line.");
@@ -269,21 +219,6 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
         Vec::new()
     };
 
-    //let output_sources = if let Some(data) = matches.values_of("output") {
-        //let output_sources: Vec<String> = data.map(|e| e.to_string()).collect();
-        //info!(
-            //"Selected {} data sources as input to computation.",
-            //output_sources.len()
-        //);
-        //output_sources
-    //} else {
-        //Vec::new()
-    //};
-
-    //let enable_clock = matches.is_present("enable-clock");
-    //let dump_stdout = matches.is_present("dump-stdout");
-    //let dump_stderr = matches.is_present("dump-stderr");
-
     let environment_variables = match matches.get_many::<String>("env") {
         None => Vec::new(),
         Some(x) => x
@@ -294,17 +229,10 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
             .collect(),
     };
 
-    //let enable_strace = matches.is_present("strace");
-
     Ok(CommandLineOptions {
         input_sources,
-        //output_sources,
         execution_strategy,
-        //dump_stdout,
-        //dump_stderr,
-        //enable_clock,
         environment_variables,
-        //enable_strace,
         native_modules_names,
         native_modules_entry_points,
         native_modules_special_files,
@@ -341,11 +269,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .zip(&cmdline.native_modules_entry_points)
         .zip(&cmdline.native_modules_special_files)
     {
-        // Add a backslash (VFS requirement)
-        //let special_file = enforce_leading_slash(special_file.to_str()
-        //.ok_or(
-            //anyhow!("Fail to convert special_file to str."),
-        //)?).into_owned();
 
         let nm_type = if entry_point_path == &PathBuf::from("") {
             NativeModuleType::Static {
@@ -360,8 +283,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         native_modules.push(NativeModule::new(name.to_string(), nm_type));
     }
 
-    //let mut vfs = FileSystem::new(right_table, native_modules)?;
-    //load_input_sources(&cmdline.input_sources, &mut vfs)?;
 
     info!("Data sources loaded.");
 
