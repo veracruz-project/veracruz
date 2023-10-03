@@ -23,7 +23,7 @@ include $(WORKSPACE_DIR)/common.mk
 OUT_DIR ?= $(abspath test-collateral)
 RUNTIME_ENCLAVE_BINARY_PATH = $(WORKSPACE_DIR)/sev-runtime/target/x86_64-unknown-linux-musl/$(PROFILE_PATH)/sev-runtime-manager
 MEASUREMENT_FILE = $(RUNTIME_ENCLAVE_BINARY_PATH)
-MEASUREMENT_PARAMETER = --sevsnp-hash a101bb6bd0ada6b64b2432d03a5c04a0ebffb59ef8a16992320d7bbbae13d839d379973e90e98afac35025f024e5627e
+MEASUREMENT_PARAMETER = --sevsnp-hash ff3104f509ca2b3fda436651f1e5d96438344359e179f0cb50e1ced36bc2200f04055491640536d42a289289f421adec
 include $(WORKSPACE_DIR)/shared.mk
 
 CC = CC_x86_64_unknown_linux_gnu=gcc CC_aarch64_unknown_linux_gnu=gcc
