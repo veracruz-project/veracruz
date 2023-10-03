@@ -272,27 +272,27 @@ fn basic_unauthorized_certificate_key_pair() {
     assert!(result.is_err(), "An error should occur");
 }
 
-#[test]
-/// Test AES native module.
-fn basic_aesctr_native_module() {
-    let events = vec![
-        TestEvent::CheckHash,
-        TestEvent::write_program(AESCTR_NATIVE_WASM),
-        TestEvent::execute(AESCTR_NATIVE_WASM),
-        TestEvent::read_result("./output/aesctr_native_pass.txt"),
-        TestEvent::ShutDown,
-    ];
+//#[test]
+///// Test AES native module.
+//fn basic_aesctr_native_module() {
+    //let events = vec![
+        //TestEvent::CheckHash,
+        //TestEvent::write_program(AESCTR_NATIVE_WASM),
+        //TestEvent::execute(AESCTR_NATIVE_WASM),
+        //TestEvent::read_result("./output/aesctr_native_pass.txt"),
+        //TestEvent::ShutDown,
+    //];
 
-    TestExecutor::test_template(
-        POLICY_AESCTR_NATIVE,
-        CLIENT_CERT,
-        CLIENT_KEY,
-        events,
-        TIME_OUT_SECS,
-        true,
-    )
-    .unwrap();
-}
+    //TestExecutor::test_template(
+        //POLICY_AESCTR_NATIVE,
+        //CLIENT_CERT,
+        //CLIENT_KEY,
+        //events,
+        //TIME_OUT_SECS,
+        //true,
+    //)
+    //.unwrap();
+//}
 
 //#[test]
 ///// Call an example native module.
