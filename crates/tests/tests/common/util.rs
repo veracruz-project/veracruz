@@ -40,14 +40,14 @@ pub fn data_dir<T: AsRef<str>>(filename: T) -> PathBuf {
 
 /// Add path prefix, `$REMOTE_PROGRAM_DIR` or the default `/program/`, to the program `filename`.
 pub fn runtime_program_dir<T: AsRef<str>>(filename: T) -> String {
-    let mut path_prefix = env::var("REMOTE_PROGRAM_DIR").unwrap_or("/program/".to_string());
+    let mut path_prefix = env::var("REMOTE_PROGRAM_DIR").unwrap_or("./program/".to_string());
     path_prefix.push_str(filename.as_ref());
     path_prefix
 }
 
 /// Add path prefix, `$REMOTE_DATA_DIR` or the default `/input/`, to the program `filename`.
 pub fn runtime_data_dir<T: AsRef<str>>(filename: T) -> String {
-    let mut path_prefix = env::var("REMOTE_DATA_DIR").unwrap_or("/input/".to_string());
+    let mut path_prefix = env::var("REMOTE_DATA_DIR").unwrap_or("./input/".to_string());
     path_prefix.push_str(filename.as_ref());
     path_prefix
 }
