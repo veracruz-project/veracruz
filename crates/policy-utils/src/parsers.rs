@@ -15,12 +15,10 @@
 
 #![allow(dead_code)]
 
-#[cfg(feature = "std")]
-use super::{CANONICAL_STDERR_FILE_PATH, CANONICAL_STDIN_FILE_PATH, CANONICAL_STDOUT_FILE_PATH};
 use crate::pipeline::Expr;
 use lalrpop_util::lalrpop_mod;
 #[cfg(feature = "std")]
-use std::{borrow::Cow, path};
+use std::{ffi, path};
 
 lalrpop_mod!(pipeline);
 
@@ -56,24 +54,6 @@ pub fn parse_renamable_paths(s: &str) -> Result<Vec<(String, path::PathBuf)>, &'
     s.split(',')
         .map(|s| parse_renamable_path(s.as_ref()))
         .collect::<Result<Vec<_>, _>>()
-}
-
-/// Insert a slash (/) if the path does not already have one
-///
-/// Veracruz currently doesn't have a concept of "current directory", so
-/// the "current directory" is always the root. This avoids easy typing
-/// mistakes.
-#[cfg(feature = "std")]
-pub fn enforce_leading_slash(path: &str) -> Cow<str> {
-    let is_special_file = path == CANONICAL_STDIN_FILE_PATH
-        || path == CANONICAL_STDOUT_FILE_PATH
-        || path == CANONICAL_STDERR_FILE_PATH;
-
-    if !path.starts_with('/') && !is_special_file {
-        Cow::Owned(format!("/{}", path))
-    } else {
-        Cow::Borrowed(path)
-    }
 }
 
 /// Parse a pineline string `pipeline_str` and return the syntax tree.

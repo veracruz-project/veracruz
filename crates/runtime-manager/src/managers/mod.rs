@@ -10,7 +10,7 @@
 //! information on licensing and copyright.
 
 use anyhow::{anyhow, Result};
-use execution_engine::{execute};
+use execution_engine::execute;
 use lazy_static::lazy_static;
 use log::info;
 use policy_utils::{
