@@ -7,12 +7,9 @@ version = "0.3.0"
 resolver = "2"
 
 [features]
-default = []
 linux = [
   "execution-engine/std",
   "io-utils/linux",
-  "nix",
-  "policy-utils/std",
   "psa-attestation/linux",
   "session-manager/std",
   "veracruz-utils/linux",
@@ -21,8 +18,6 @@ nitro = [
   "execution-engine/std",
   "execution-engine/nitro",
   "io-utils/nitro",
-  "policy-utils/std",
-  "nix",
   "nsm_api",
   "session-manager/nitro",
   "veracruz-utils/nitro",
@@ -32,17 +27,16 @@ nitro = [
 anyhow = "1"
 bincode = { version = "1.2.1", default-features = false }
 err-derive = "0.2"
-execution-engine = { path = "../execution-engine" }
+execution-engine = { path = "../execution-engine", features = ["std"] }
 hex = { version = "0.4.2" }
-io-utils = { path = "../io-utils", optional = true }
+io-utils = { path = "../io-utils" }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 log = "0.4.13"
-nix = { version = "0.26", optional = true }
+nix = { version = "0.26" }
 nsm_api = { package = "aws-nitro-enclaves-nsm-api", version = "0.3.0", optional = true }
-policy-utils = { path = "../policy-utils" }
+policy-utils = { path = "../policy-utils", features = ["std"] }
 protobuf = "3.2.0"
 psa-attestation = { path = "../psa-attestation", optional = true }
-serde = { version = "1.0.185", default-features = false, features = ["alloc", "derive"], optional = true }
 serde_json = "1.0"
 session-manager = { path = "../session-manager" }
 transport-protocol = { path = "../transport-protocol" }

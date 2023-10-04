@@ -11,9 +11,6 @@ nitro = [
   "veracruz-utils/nitro",
 ]
 std = [
-  "hex/std",
-  "serde/std",
-  "serde_json/std",
   "veracruz-utils/std",
 ]
 
