@@ -37,7 +37,7 @@
 use super::{
     error::PolicyError,
     expiry::Timepoint,
-    principal::{PermissionTable, FilePermissions, ExecutionStrategy, FileHash, Identity, NativeModule, Pipeline, Principal, Program},
+    principal::{PrincipalPermission, FilePermissions, ExecutionStrategy, FileHash, Identity, NativeModule, Pipeline, Principal, Program},
     Platform,
 };
 use anyhow::{anyhow, Result};
@@ -292,10 +292,10 @@ impl Policy {
             identity.assert_valid()?;
 
             // check IDs of all the participants
-            if client_ids.contains(identity.id()) {
+            if client_ids.contains(&identity.id()) {
                 return Err(anyhow!(PolicyError::FormatError));
             }
-            client_ids.push(*identity.id());
+            client_ids.push(identity.id());
         }
 
         // Check the ciphersuite
@@ -314,12 +314,10 @@ impl Policy {
     /// of requesting a shutdown of the computation.  At the moment, only the
     /// principals who can request the result can also request shutdown.
     pub fn expected_shutdown_list(&self) -> Vec<u64> {
-        self.identities()
+        self.identities
             .iter()
-            .fold(Vec::new(), |mut acc, identity| {
-                acc.push(*identity.id() as u64);
-                acc
-            })
+            .map(|identity| identity.id_u64())
+            .collect()
     }
 
     /// Returns `Ok(identity)` if a principal with a certificate matching the
@@ -327,9 +325,9 @@ impl Policy {
     /// identities/principals associated with this policy.  Otherwise, returns
     /// an error.
     pub fn check_client_id(&self, cert: &str) -> Result<u64> {
-        for identity in self.identities().iter() {
+        for identity in self.identities.iter() {
             if identity.certificate().as_str() == cert {
-                return Ok(*identity.id() as u64);
+                return Ok(identity.id_u64());
             }
         }
         Err(anyhow!(PolicyError::InvalidClientCertificateError(
@@ -337,26 +335,31 @@ impl Policy {
         )))
     }
 
-    /// Return the CapabilityTable in this policy. It contains capabilities related to all
-    /// participants and programs.
-    pub fn get_rights_table(&self) -> PermissionTable {
-        let mut table = HashMap::new();
-        for identity in self.identities() {
-            let id = Principal::Participant(*identity.id() as u64);
-            let right_map = identity.file_rights_map();
-            table.insert(id, right_map);
+    pub fn get_permission(&self, principal: &Principal) -> Result<PrincipalPermission> {
+        match principal {
+            Principal::InternalSuperUser | Principal::NoCap => return Err(anyhow!("SuperUser or NoCap")),
+            Principal::Participant(id) => {
+                if let Some(principal) = self.identities.iter().find(|x| *id == x.id_u64()) {
+                    return Ok(principal.file_rights_map())
+                }
+            },
+            Principal::Program(path) => {
+                if let Some(principal) = self.programs.iter().find(|x| path == x.program_file_name()) {
+                    return Ok(principal.file_rights_map())
+                }
+            },
+            Principal::Pipeline(name) => {
+                if let Some(principal) = self.pipelines.iter().find(|x| name == x.name()) {
+                    return Ok(principal.file_rights_map())
+                }
+            },
+            Principal::NativeModule(name) => {
+                if let Some(principal) = self.pipelines.iter().find(|x| name == x.name()) {
+                    return Ok(principal.file_rights_map())
+                }
+            },                   
         }
-        for program in &self.programs {
-            let id = Principal::Program(program.program_file_name().to_string());
-            let right_map = program.file_rights_map();
-            table.insert(id, right_map);
-        }
-        for program in &self.pipelines {
-            let id = Principal::Pipeline(program.name().to_string());
-            let right_map = program.file_rights_map();
-            table.insert(id, right_map);
-        }
-        table
+        Err(anyhow!("Cannot find {:?}", principal))
     }
 
     /// Return the file hash table, mapping filenames to their expected hashes.

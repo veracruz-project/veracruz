@@ -40,7 +40,7 @@ fn is_wasm_binary(path_string: &String) -> bool {
 /// The function will return the error code.
 pub fn execute_pipeline(
     strategy: &ExecutionStrategy,
-    permissions: &PrincipalPermission,
+    execution_permissions: &PrincipalPermission,
     pipeline: Box<Expr>,
     env: &Environment,
 ) -> Result<u32> {
@@ -53,7 +53,7 @@ pub fn execute_pipeline(
                 // Read and call execute_WASM program
                 let binary = fs::read(path)?;
                 let return_code =
-                    execute_program(strategy, permissions, binary, env)?;
+                    execute_program(strategy, execution_permissions, binary, env)?;
                 Ok(return_code)
             } else {
                 info!("Invoke native binary: {}", path);
@@ -79,7 +79,7 @@ pub fn execute_pipeline(
         Seq(vec) => {
             info!("Seq {:?}", vec);
             for expr in vec {
-                let return_code = execute_pipeline(strategy, permissions, expr, env)?;
+                let return_code = execute_pipeline(strategy, execution_permissions, expr, env)?;
 
                 // An error occurs
                 if return_code != 0 {
@@ -93,10 +93,10 @@ pub fn execute_pipeline(
         IfElse(cond, true_branch, false_branch) => {
             info!("IfElse {:?} true -> {:?} false -> {:?}", cond, true_branch, false_branch);
             let return_code = if Path::new(&cond).exists() {
-                execute_pipeline(strategy, permissions, true_branch, env)?
+                execute_pipeline(strategy, execution_permissions, true_branch, env)?
             } else {
                 match false_branch {
-                    Some(f) => execute_pipeline(strategy, permissions, f, env)?,
+                    Some(f) => execute_pipeline(strategy, execution_permissions, f, env)?,
                     None => 0,
                 }
             };

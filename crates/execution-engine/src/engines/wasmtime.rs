@@ -22,7 +22,7 @@ use std::{
     fs::{create_dir_all, File},
 };
 use wasmtime::{Config, Engine, Linker, Module, Store};
-use wasmtime_wasi::sync::{Dir, WasiCtxBuilder};
+use wasmtime_wasi::sync::{Dir, WasiCtxBuilder, TcpListener};
 use policy_utils::principal::PrincipalPermission;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -32,6 +32,8 @@ use policy_utils::principal::PrincipalPermission;
 pub struct WasmtimeRuntimeState {
     permissions: PrincipalPermission,
     environment: Environment,
+    // Careful on the type name conflict, here we want the TcpListener from std.
+    sockets: Vec<(u32,std::net::TcpListener)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -45,6 +47,7 @@ impl WasmtimeRuntimeState {
         Ok(Self {
             permissions,
             environment,
+            sockets: Vec::new(),
         })
     }
 }
@@ -96,6 +99,12 @@ impl ExecutionEngine for WasmtimeRuntimeState {
             let file = File::open(&path)?;
             info!("pre-opened directory {:?} created if necessary and opened", path);
             Ok(wasm_build.preopened_dir(Dir::from_std_file(file), path)?)
+        })?;
+
+        let wasm_build = self.sockets.iter().fold(Ok(wasm_build), |acc : Result<WasiCtxBuilder>, (fd,listener)| {
+            let wasm_build = acc?;
+            info!("bind fd {:?}", fd);
+            Ok(wasm_build.preopened_socket(*fd, TcpListener::from_std(listener.try_clone()?))?)
         })?;
 
         let wasi = wasm_build.build();

@@ -113,7 +113,7 @@ impl SessionContext {
             let cert = convert_cert_buffer(identity.certificate())?;
             let principal = Principal::new(
                 cert.clone(),
-                *identity.id(),
+                identity.id(),
                 identity.file_rights_map(),
             );
 

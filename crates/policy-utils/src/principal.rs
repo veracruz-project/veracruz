@@ -16,7 +16,7 @@ use super::error::PolicyError;
 use crate::{parsers::parse_pipeline, pipeline::Expr};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize, Serializer, Deserializer};
-use std::{collections::HashMap, fmt::Debug, path::PathBuf, string::String};
+use std::{collections::HashMap, fmt::Debug, path::{Path, PathBuf}, string::String};
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -44,6 +44,36 @@ pub enum Principal {
 pub type PrincipalPermission = HashMap<PathBuf, FilePermissions>;
 pub type PermissionTable = HashMap<Principal, PrincipalPermission>;
 
+/// Check if the `target_path` is allowed to perform `target_permission` in the `table`.
+pub fn check_permission<T: AsRef<Path>>(
+    table: &PrincipalPermission,
+    target_path: T,
+    target_permission: &FilePermissions,
+) -> bool {
+    table
+       .iter()
+       // Find the permission corresponding to the longest prefix.
+       .fold((0, false), |(max_length, result), (path, permission)|{
+           if !target_path.as_ref().starts_with(path){
+               // prefix of target_path does not match path
+               // return the previous result
+               return (max_length, result);
+           }  
+
+           let size = path.as_os_str().len();
+
+           if size <= max_length {
+               // The matched path is shorted than previous one
+               // return the previous result
+               return (max_length, result);
+           }
+
+           // If reaching here, find a longer prefix match
+           (size, permission.allows(target_permission))
+
+       }).1
+}
+
 /// Defines a file entry in the policy, containing the name and `Right`, the allowed op.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FilePermissions {
@@ -57,6 +87,20 @@ impl FilePermissions {
     #[inline]
     pub fn new(read: bool, write: bool, execute: bool) -> Self {
         Self { read, write, execute }
+    }
+
+    /// Check if the current permission allows `request`
+    pub fn allows(&self, request: &Self) -> bool {
+        // request -> (logic imply) self
+        // This means, if `request` needs a true, 
+        // then check the permission in `self`. Otherwise, `request` 
+        // is false and the entire formulae is true.
+        //
+        // Noting that A -> B is logically equivalent to
+        // ~(A /\ ~B) where ~ means negation and /\ means logical and.
+        !(request.read & !self.read)
+        & !(request.write & !self.write)
+        & !(request.execute & !self.execute)
     }
 }
 
@@ -363,8 +407,14 @@ impl<U> Identity<U> {
 
     /// Returns the ID associated with this identity.
     #[inline]
-    pub fn id(&self) -> &u32 {
-        &self.id
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    /// Returns the ID associated with this identity.
+    #[inline]
+    pub fn id_u64(&self) -> u64 {
+        self.id as u64
     }
 }
 

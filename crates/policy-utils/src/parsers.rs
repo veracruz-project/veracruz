@@ -18,7 +18,7 @@
 use crate::pipeline::Expr;
 use lalrpop_util::lalrpop_mod;
 #[cfg(feature = "std")]
-use std::{ffi, path};
+use std::path;
 
 lalrpop_mod!(pipeline);
 
