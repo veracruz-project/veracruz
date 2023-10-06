@@ -14,7 +14,7 @@ use execution_engine::execute;
 use lazy_static::lazy_static;
 use log::info;
 use policy_utils::{
-    pipeline::Expr, policy::Policy, principal::{Principal, FilePermissions},
+    pipeline::Expr, policy::Policy, principal::{Principal, FilePermissions, check_permission},
 };
 use std::{
     collections::HashMap,
@@ -84,14 +84,6 @@ impl ProtocolState {
     pub fn new(global_policy: Policy, global_policy_hash: String) -> Result<Self> {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
-        let mut rights_table = global_policy.get_rights_table();
-
-        // Grant the super user read access to any file under the root. This is
-        // used internally to read the program on behalf of the executing party
-        let mut su_read_rights = HashMap::new();
-        su_read_rights.insert(PathBuf::from("/"), FilePermissions{read: true, write: true, execute: true});
-        rights_table.insert(Principal::InternalSuperUser, su_read_rights);
-
         let digest_table = global_policy.get_file_hash_table()?;
         let native_modules = global_policy.native_modules();
 
@@ -135,13 +127,13 @@ impl ProtocolState {
             }
         }
         
-        //TODO permission check
-        match path.parent() {
-            None => return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError)),
-            Some(parent_path) => {
-                if !parent_path.try_exists()? {
-                    fs::create_dir_all(parent_path)?;
-                }
+        if !self.check_permission(client_id, path, FilePermissions{read: false, write: true, execute: false})? {
+            return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError))
+        }
+
+        if let Some(parent_path) = path.parent() {
+            if !parent_path.try_exists()? {
+                fs::create_dir_all(parent_path)?;
             }
         }
 
@@ -152,22 +144,33 @@ impl ProtocolState {
     }
 
     /// Check if a client has capability to write to a file, and then overwrite it with new `data`.
-    pub(crate) fn append_file(
+    pub(crate) fn append_file<T: AsRef<Path>>(
         &mut self,
         client_id: &Principal,
-        file_name: &str,
+        path: T,
         data: Vec<u8>,
     ) -> Result<()> {
         // If a file must match a digest, e.g. a program,
         // it is not permitted to append the file.
-        if self.digest_table.contains_key(&PathBuf::from(file_name)) {
+        let path = path.as_ref();
+        if self.digest_table.contains_key(&PathBuf::from(path)) {
             return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError));
+        }
+
+        if !self.check_permission(client_id, path, FilePermissions{read: false, write: true, execute: false})? {
+            return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError))
+        }
+
+        if let Some(parent_path) = path.parent() {
+            if !parent_path.try_exists()? {
+                fs::create_dir_all(parent_path)?;
+            }
         }
 
         let mut file = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(file_name)?;
+            .open(path)?;
 
         file.write_all(&data)?;
 
@@ -178,9 +181,14 @@ impl ProtocolState {
     pub(crate) fn read_file(
         &self,
         client_id: &Principal,
-        file_name: &str,
+        path: &str,
     ) -> Result<Option<Vec<u8>>> {
-        let rst = fs::read(file_name)?;
+
+        if !self.check_permission(client_id, path, FilePermissions{read: true, write: false, execute: false})? {
+            return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError))
+        }
+
+        let rst = fs::read(path)?;
         if rst.len() == 0 {
             return Ok(None);
         }
@@ -224,9 +232,9 @@ impl ProtocolState {
             environment_variables,
             ..Default::default()
         };
-        let permission_table = self.global_policy.get_rights_table();
-        let permission = permission_table.get(execution_principal).ok_or(anyhow!("principal cannot be found"))?;
 
+        let permission = self.global_policy.get_permission(execution_principal)?;
+                
         let return_code = execute(
             &execution_strategy,
             &permission,
@@ -246,5 +254,21 @@ impl ProtocolState {
             Some(error_code.to_le_bytes().to_vec()),
         )
         .unwrap_or_else(|err| panic!("{:?}", err))
+    }
+
+    /// Manually check permission on clients
+    pub(crate) fn check_permission<T: AsRef<Path>>(
+        &self, 
+        client_id: &Principal, 
+        target_path: T,
+        target_permission: FilePermissions,
+    ) -> Result<bool> 
+    {
+        let result = match client_id {
+            Principal::InternalSuperUser => true,
+            Principal::NoCap => false,
+            other => check_permission(&self.global_policy.get_permission(other)?, target_path, &target_permission),
+        };
+        Ok(result)
     }
 }
