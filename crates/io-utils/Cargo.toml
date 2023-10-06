@@ -11,9 +11,9 @@ nitro = ["nix"]
 
 [dependencies]
 anyhow = "1"
-base64 = { version = "0.13.0" }
+base64 = "0.13.0"
 bincode = { version = "1.2.1", default-features = false, optional = true }
-byteorder = { version = "1.4.3" }
+byteorder = "1.4.3"
 err-derive = "0.2"
 log = "0.4.13"
 nix = { version = "0.26", optional = true }

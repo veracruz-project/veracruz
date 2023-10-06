@@ -17,7 +17,7 @@ std = [
 [dependencies]
 anyhow = "1"
 err-derive = { version = "0.2", default-features = false }
-hex = { version = "0.4.2" }
+hex = "0.4.2"
 lalrpop-util = { version = "0.20.0", features = ["lexer"] }
 lexical-core = { version = "0.8.2", default-features = false }
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls", default-features = false, features = ["std", "aesni", "padlock", "tls13"] }
