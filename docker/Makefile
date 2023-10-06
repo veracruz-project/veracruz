@@ -55,11 +55,7 @@ base: base/Dockerfile
 		-t $(IMAGE)/$*/$(USER):$(VERSION) -f $< .
 
 .PHONY: all-base
-<<<<<<< HEAD
-all-base: base linux-base nitro-base
-=======
-all-base: base linux-base nitro-base icecap-base sev-base
->>>>>>> fd55d832 (Added SEV-SNP files. Building, but needs work)
+all-base: base linux-base nitro-base sev-base
 	echo 'All base docker images re-built from scratch'
 
 # Make sure the cargo registry directory exists to avoid permission issues
@@ -131,7 +127,7 @@ linux-exec:
 
 .PHONY:
 linux-base: linux/Dockerfile base
-	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/linux:$(VERSION) -f $< .
+	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/linux/$(USER):$(VERSION) -f $< .
 
 #####################################################################
 # Nitro-related targets

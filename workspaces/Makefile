@@ -57,15 +57,9 @@ nitro-clippy:
 	make -C nitro-runtime clippy
 	make -C nitro-host clippy
 
-<<<<<<< HEAD
-=======
-icecap-clippy:
-	make -C icecap-host clippy
-
 sev-clippy:
 	make -C sev-host clippy
 
->>>>>>> fd55d832 (Added SEV-SNP files. Building, but needs work)
 linux-clean:
 	$(MAKE) -C linux-host clean
 	$(MAKE) -C linux-runtime clean
@@ -74,17 +68,10 @@ nitro-clean:
 	$(MAKE) -C nitro-host clean
 	$(MAKE) -C nitro-runtime clean
 
-<<<<<<< HEAD
-=======
-icecap-clean:
-	$(MAKE) -C icecap-host clean
-	$(MAKE) -C icecap-runtime clean
-
 sev-clean:
 	$(MAKE) -C sev-runtime clean
 	$(MAKE) -C sev-host clean
 
->>>>>>> fd55d832 (Added SEV-SNP files. Building, but needs work)
 shared-clean:
 	$(MAKE) -C applications clean
 	$(MAKE) -C host clean

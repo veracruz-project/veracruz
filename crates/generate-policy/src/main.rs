@@ -226,15 +226,15 @@ impl Arguments {
                     .required(false)
             )
             .arg(
-                Arg::with_name("sevsnp-hash")
+                Arg::new("sevsnp-hash")
                     .long("sevsnp-hash")
                     .value_name("HASH")
                     .help("Hash of the SEV SNP measurment")
                     .required(false),
             )
             .arg(
-                Arg::with_name("output-policy-file")
-                    .short("o")
+                Arg::new("output-policy-file")
+                    .short('o')
                     .long("output-policy-file")
                     .value_name("FILE")
                     .help("Filename of the generated policy file.")
@@ -454,7 +454,7 @@ impl Arguments {
             .get_one::<String>("pcr-file")
             .map(|fname| PathBuf::from(fname));
         let sevsnp_hash = matches
-            .value_of("sevsnp-hash")
+            .get_one::<String>("sevsnp-hash")
             .map(|value| value.to_string());
         if css_file.is_none() && pcr0_file.is_none() && sevsnp_hash.is_none() {
             return Err(anyhow!(
