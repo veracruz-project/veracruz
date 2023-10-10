@@ -314,6 +314,7 @@ impl NativeModuleManager {
                     &mount_mappings,
                     "--sandbox2tool_file_size_creation_limit",
                     "1048576",
+                    "--sandbox2tool_need_networking",
                     entry_point,
                 ])
                 .output()?;
