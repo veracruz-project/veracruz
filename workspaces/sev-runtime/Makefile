@@ -38,6 +38,9 @@ linux-kernel: FORCE
 		git checkout 6e7765cb477a9753670d4351d14de93f1e9dbbd4; \
 		make
 
+OVMF: FORCE
+	git clone --branch snp-latest --depth 1 https://github.com/AMDESE/AMDSEV.git
+	cd AMDSEV; ./build.sh --package ovmf
 
 
 doc:

@@ -1,0 +1,29 @@
+diff --git a/common.sh b/common.sh
+index e4087d5..18ba1d0 100755
+--- a/common.sh
++++ b/common.sh
+@@ -71,7 +71,7 @@ build_kernel()
+ 			run_cmd git checkout current/${BRANCH}
+ 			COMMIT=$(git log --format="%h" -1 HEAD)
+ 
+-			run_cmd "cp /boot/config-$(uname -r) .config"
++			run_cmd "cp ../../.config .config"
+ 			run_cmd ./scripts/config --set-str LOCALVERSION "$VER-$COMMIT"
+ 			run_cmd ./scripts/config --disable LOCALVERSION_AUTO
+ 			run_cmd ./scripts/config --enable  EXPERT
+@@ -194,3 +194,15 @@ build_install_qemu()
+ 		run_cmd echo $COMMIT >../source-commit.qemu
+ 	popd >/dev/null
+ }
++
++build_install_sev_guest()
++{
++       DEST="$1"
++       [ -d sev-guest ] || {
++               run_cmd git clone --single-branch -b ${SEV_GUEST_BRANCH} ${SEV_GUEST_GIT_URL} sev-guest
++       }
++       pushd sev-guest > /dev/null
++               git apply ../get-report.patch
++               run_cmd make -f ../veracruz.mk
++       popd >/dev/null
++}

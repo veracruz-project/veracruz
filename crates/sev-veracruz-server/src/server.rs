@@ -57,22 +57,24 @@ impl VeracruzServer for VeracruzServerSev {
         let port: u32 = 5005;
         let start = Instant::now();
         println!("VeracruzServerSev::new calling qemu");
-        let mut command = Command::new("/work/veracruz/SEVImage/snp-release/usr/local/bin/qemu-system-x86_64");
+        //let mut command = Command::new("/work/veracruz/SEVImage/snp-release/usr/local/bin/qemu-system-x86_64");
+        let mut command = Command::new("/AMDSEV/snp-release/usr/local/bin/qemu-system-x86_64"); 
         command.arg("-enable-kvm")
             .arg("-cpu").arg("EPYC-v4")
             .arg("-machine").arg("q35")
             .arg("-smp").arg("4,maxcpus=64")
             .arg("-m").arg("2048M,slots=5,maxmem=30G")
             .arg("-no-reboot")
-            .arg("-drive").arg("if=pflash,format=raw,unit=0,file=/work/veracruz/SEVImage/snp-release/usr/local/share/qemu/OVMF_CODE.fd,readonly")
+            .arg("-drive").arg("if=pflash,format=raw,unit=0,file=/work/veracruz/snp-release/usr/local/share/qemu/OVMF_CODE.fd,readonly")
+            //.arg("-drive").arg("if=pflash,format=raw,unit=0,file=/work/veracruz/SEVImage/snp-release/usr/local/share/qemu/OVMF_CODE.fd,readonly")
             .arg("-device").arg("virtio-scsi-pci,id=scsi0,disable-legacy=on,iommu_platform=true")
             .arg("-machine").arg("memory-encryption=sev0,vmport=off")
             .arg("-object").arg("memory-backend-memfd-private,id=ram1,size=2048M,share=true")
             .arg("-object").arg("sev-snp-guest,id=sev0,cbitpos=51,reduced-phys-bits=1,discard=none")
             .arg("-machine").arg("memory-backend=ram1,kvm-type=protected")
             .arg("-nographic")
-            .arg("-kernel").arg("/work/veracruz/workspaces/sev-runtime/bzImage")
-            //.arg("-append").arg("console=ttyS0 earlyprintk=serial root=/dev/sda2")
+            .arg("-kernel").arg("/work/veracruz/snp-release/bzImage")
+            //.arg("-kernel").arg("/work/veracruz/workspaces/sev-runtime/bzImage")
             .arg("-initrd").arg("/work/veracruz/workspaces/sev-runtime/initramfs_sev")
             //.arg("-monitor").arg("pty")
             //.arg("-serial").arg("mon:stdio")

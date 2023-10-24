@@ -1,0 +1,11 @@
+diff --git a/stable-commits b/stable-commits
+index 9586a25..7bad1cc 100644
+--- a/stable-commits
++++ b/stable-commits
+@@ -21,3 +21,6 @@ QEMU_BRANCH="snp-latest"
+ #   SNP hypervisor/host kernels.
+ OVMF_GIT_URL="https://github.com/AMDESE/ovmf.git"
+ OVMF_BRANCH="snp-latest"
++
++SEV_GUEST_GIT_URL="https://github.com/AMDESE/sev-guest.git"
++SEV_GUEST_BRANCH="main"

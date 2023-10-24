@@ -32,7 +32,7 @@ nitro: shared
 	$(MAKE) -C nitro-runtime
 
 sev: shared
-	cd sev-host/crates/sev-runtime-manager && cargo build
+	cd sev-runtime && make
 	$(MAKE) -C sev-host build
 
 sev-tests:
