@@ -21,6 +21,7 @@ use crate::{
     Environment,
     engines::common::ExecutionEngine,
     native_module_manager::NativeModuleManager,
+    native_modules::common::initial_service,
 };
 use anyhow::{anyhow, Result};
 use log::info;
@@ -113,9 +114,9 @@ fn execute_program(
     env: &Environment,
 ) -> Result<u32> {
     info!("Execute program with permissions {:?}", permissions);
+    initial_service();
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
         ExecutionStrategy::Interpretation => {
-            //Box::new(WASMIRuntimeState::new(filesystem, options.clone())?),
             return Err(anyhow!("No interpretation engine."));
         }
         ExecutionStrategy::JIT => {
@@ -123,6 +124,7 @@ fn execute_program(
                 if #[cfg(any(feature = "std", feature = "nitro"))] {
                     info!("JIT engine initialising");
                     Box::new(WasmtimeRuntimeState::new(permissions.clone(), env.clone())?)
+                    
                 } else {
                     return Err(anyhow!("No JIT enine."));
                 }

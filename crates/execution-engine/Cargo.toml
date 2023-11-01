@@ -22,7 +22,7 @@ anyhow = "1"
 cfg-if = "1"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls", default-features = false, features = ["std", "aesni", "padlock", "tls13"] }
-nix = { version = "0.26", optional = true }
+nix = { version = "0.26", optional = true, features=["fs"] }
 postcard = { version = "1.0.0", features = [ "alloc", "use-std" ] }
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils", features = ["std"] }

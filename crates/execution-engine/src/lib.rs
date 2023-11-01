@@ -23,12 +23,9 @@ mod engines;
 mod native_module_manager;
 mod native_modules;
 mod pipeline;
-// Expose the error to the external.
-//pub use engines::common::FatalEngineError;
 
-use policy_utils::{pipeline::Expr, principal::ExecutionStrategy};
+use policy_utils::{pipeline::Expr, principal::{PrincipalPermission, ExecutionStrategy}};
 use std::boxed::Box;
-use policy_utils::principal::PrincipalPermission;
 
 /// Runtime environment for a program.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Default)]

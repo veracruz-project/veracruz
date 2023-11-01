@@ -14,7 +14,7 @@ use anyhow::Result;
 use crate::native_modules::common::StaticNativeModule;
 use postcard::from_bytes;
 use serde::{Deserialize, Serialize};
-use std::fs::write;
+use std::{path::Path, fs::{read, write}};
 
 pub(crate) struct PostcardService;
 
@@ -75,22 +75,17 @@ impl StaticNativeModule for PostcardService {
         "Postcard Service"
     }
 
-    fn serve(&mut self, inputs: &[u8]) -> Result<()> {
-        let v = from_bytes::<Vec<Struct3>>(inputs)?;
+    fn serve(&mut self, input: &Path, output: &Path) -> Result<()> {
+        let buf = read(input)?;
+        let v = from_bytes::<Vec<Struct3>>(&buf)?;
+
         write(
-            "/services/postcard_result.dat",
+            output,
             serde_json::to_string(&v)?
                 .as_bytes()
                 .to_vec(),
         )?;
         Ok(())
-    }
-
-    /// For the purpose of demonstration, we always return true. In reality,
-    /// this function may check validity of the `input`, and even buffer the result
-    /// for further uses.
-    fn try_parse(&mut self, _input: &[u8]) -> Result<bool> {
-        Ok(true)
     }
 }
 

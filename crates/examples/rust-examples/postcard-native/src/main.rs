@@ -15,11 +15,12 @@
 //! See the file `LICENSE.md` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use std::fs;
+use std::fs::{read, write};
+
 fn main() -> anyhow::Result<()> {
-    let input = fs::read("./input/postcard.dat")?;
-    fs::write("./services/postcard_string.dat", input)?;
-    let rst = fs::read("./services/postcard_result.dat")?;
-    fs::write("./output/postcard_native.txt", &rst)?;
+    let input = read("./input/postcard.dat")?;
+    write("/tmp/postcard/input", input)?;
+    let rst = read("/tmp/postcard/output")?;
+    write("./output/postcard_native.txt", &rst)?;
     Ok(())
 }

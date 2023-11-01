@@ -48,8 +48,6 @@ use veracruz_utils::VERACRUZ_RUNTIME_HASH_EXTENSION_ID;
 
 // Policy files
 const POLICY: &'static str = "single_client.json";
-const POLICY_POSTCARD_NATIVE: &'static str = "single_client_postcard_native.json";
-const POLICY_AESCTR_NATIVE: &'static str = "single_client_aesctr_native.json";
 const CLIENT_CERT: &'static str = "client_cert.pem";
 const CLIENT_KEY: &'static str = "client_key.pem";
 const UNAUTHORIZED_CERT: &'static str = "data_client_cert.pem";
@@ -272,50 +270,50 @@ fn basic_unauthorized_certificate_key_pair() {
     assert!(result.is_err(), "An error should occur");
 }
 
-//#[test]
-///// Test AES native module.
-//fn basic_aesctr_native_module() {
-    //let events = vec![
-        //TestEvent::CheckHash,
-        //TestEvent::write_program(AESCTR_NATIVE_WASM),
-        //TestEvent::execute(AESCTR_NATIVE_WASM),
-        //TestEvent::read_result("./output/aesctr_native_pass.txt"),
-        //TestEvent::ShutDown,
-    //];
+#[test]
+/// Test AES native module.
+fn basic_aesctr_native_module() {
+    let events = vec![
+        TestEvent::CheckHash,
+        TestEvent::write_program(AESCTR_NATIVE_WASM),
+        TestEvent::execute(AESCTR_NATIVE_WASM),
+        TestEvent::read_result("./output/aesctr_native_pass.txt"),
+        TestEvent::ShutDown,
+    ];
 
-    //TestExecutor::test_template(
-        //POLICY_AESCTR_NATIVE,
-        //CLIENT_CERT,
-        //CLIENT_KEY,
-        //events,
-        //TIME_OUT_SECS,
-        //true,
-    //)
-    //.unwrap();
-//}
+    TestExecutor::test_template(
+        POLICY,
+        CLIENT_CERT,
+        CLIENT_KEY,
+        events,
+        TIME_OUT_SECS,
+        true,
+    )
+    .unwrap();
+}
 
-//#[test]
-///// Call an example native module.
-//fn basic_postcard_native_module() {
-    //let events = vec![
-        //TestEvent::CheckHash,
-        //TestEvent::write_program(POSTCARD_NATIVE_WASM),
-        //TestEvent::write_data(POSTCARD_DATA),
-        //TestEvent::execute(POSTCARD_NATIVE_WASM),
-        //TestEvent::read_result("/output/postcard_native.txt"),
-        //TestEvent::ShutDown,
-    //];
+#[test]
+/// Call an example native module.
+fn basic_postcard_native_module() {
+    let events = vec![
+        TestEvent::CheckHash,
+        TestEvent::write_program(POSTCARD_NATIVE_WASM),
+        TestEvent::write_data(POSTCARD_DATA),
+        TestEvent::execute(POSTCARD_NATIVE_WASM),
+        TestEvent::read_result("./output/postcard_native.txt"),
+        TestEvent::ShutDown,
+    ];
 
-    //TestExecutor::test_template(
-        //POLICY_POSTCARD_NATIVE,
-        //CLIENT_CERT,
-        //CLIENT_KEY,
-        //events,
-        //TIME_OUT_SECS,
-        //true,
-    //)
-    //.unwrap();
-//}
+    TestExecutor::test_template(
+        POLICY,
+        CLIENT_CERT,
+        CLIENT_KEY,
+        events,
+        TIME_OUT_SECS,
+        true,
+    )
+    .unwrap();
+}
 
 #[test]
 /// Test for several rounds of appending data and executing program.
