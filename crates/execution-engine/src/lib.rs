@@ -49,9 +49,10 @@ pub struct Environment {
 /// such as `freestanding-execution-engine` and `runtime-manager` can rely on.
 pub fn execute(
     strategy: &ExecutionStrategy,
-    permissions: &PrincipalPermission,
+    caller_permissions: &PrincipalPermission,
+    execution_permissions: &PrincipalPermission,
     pipeline: Box<Expr>,
     env: &Environment,
-) -> anyhow::Result<u32> {
-    Ok(pipeline::execute_pipeline(strategy, permissions, pipeline, env)?)
+) -> anyhow::Result<()> {
+    pipeline::execute_pipeline(strategy, caller_permissions, execution_permissions, pipeline, env)
 }

@@ -37,7 +37,7 @@
 use super::{
     error::PolicyError,
     expiry::Timepoint,
-    principal::{PrincipalPermission, FilePermissions, ExecutionStrategy, FileHash, Identity, NativeModule, Pipeline, Principal, Program},
+    principal::{PrincipalPermission, ExecutionStrategy, FileHash, Identity, NativeModule, Pipeline, Principal, Program},
     Platform,
 };
 use anyhow::{anyhow, Result};
@@ -375,38 +375,10 @@ impl Policy {
         Ok(table)
     }
 
-    /// Return the program input table, mapping program filenames to their expected input filenames.
-    pub fn get_input_table(&self) -> Result<HashMap<String, Vec<PathBuf>>> {
-        let mut table = HashMap::new();
-        for program in &self.programs {
-            let program_file_name = program.program_file_name();
-            let file_rights_map = program.file_rights_map();
-            table.insert(
-                program_file_name.to_string(),
-                Self::get_required_inputs(&file_rights_map),
-            );
-        }
-        Ok(table)
-    }
-
     /// Return the pipeline of `pipeline_id`
     pub fn get_pipeline(&self, pipeline_id: usize) -> Result<&Pipeline> {
         self.pipelines
             .get(pipeline_id)
             .ok_or(anyhow!("Failed to find pipeline {}", pipeline_id))
-    }
-
-    /// Extract the input filenames from a right_map. If a program has rights call
-    /// fd_read and path_open, it is considered as an input file.
-    fn get_required_inputs(right_map: &HashMap<PathBuf, FilePermissions>) -> Vec<PathBuf> {
-        right_map
-            .iter()
-            .filter_map(|(k,v)| {
-                if v.read {
-                    Some(k.clone())
-                } else {
-                    None
-                }
-            }).collect()
     }
 }

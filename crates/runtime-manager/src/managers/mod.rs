@@ -233,16 +233,18 @@ impl ProtocolState {
             ..Default::default()
         };
 
-        let permission = self.global_policy.get_permission(execution_principal)?;
+        let caller_permission = self.global_policy.get_permission(caller_principal)?;
+        let execution_permission = self.global_policy.get_permission(execution_principal)?;
                 
-        let return_code = execute(
+        execute(
             &execution_strategy,
-            &permission,
+            &caller_permission,
+            &execution_permission,
             pipeline,
             &env,
         )?;
 
-        let response = Self::response_error_code_returned(return_code);
+        let response = Self::response_error_code_returned(0);
         Ok(Some(response))
     }
 

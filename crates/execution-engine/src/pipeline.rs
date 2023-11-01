@@ -27,9 +27,9 @@ use anyhow::{anyhow, Result};
 use log::info;
 use policy_utils::{
     pipeline::Expr,
-    principal::{PrincipalPermission, ExecutionStrategy, NativeModule, NativeModuleType},
+    principal::{PrincipalPermission, FilePermissions, ExecutionStrategy, NativeModule, NativeModuleType, check_permission},
 };
-use std::{boxed::Box, path::{Path, PathBuf}, fs};
+use std::{boxed::Box, path::{Path, PathBuf}};
 
 /// Returns whether the given path corresponds to a WASM binary.
 fn is_wasm_binary(path_string: &String) -> bool {
@@ -41,21 +41,23 @@ fn is_wasm_binary(path_string: &String) -> bool {
 /// The function will return the error code.
 pub fn execute_pipeline(
     strategy: &ExecutionStrategy,
+    caller_permissions: &PrincipalPermission,
     execution_permissions: &PrincipalPermission,
     pipeline: Box<Expr>,
     env: &Environment,
-) -> Result<u32> {
+) -> Result<()> {
     use policy_utils::pipeline::Expr::*;
     match *pipeline {
         Literal(path) => {
             info!("Literal {:?}", path);
+            // checker permission
+            if !check_permission(&caller_permissions, path.clone(), &FilePermissions{read: false, write: false, execute: true}) {
+                return Err(anyhow!("Permission denies"));
+            }
             if is_wasm_binary(&path) {
                 info!("Read wasm binary: {}", path);
                 // Read and call execute_WASM program
-                let binary = fs::read(path)?;
-                let return_code =
-                    execute_program(strategy, execution_permissions, binary, env)?;
-                Ok(return_code)
+                execute_program(strategy, execution_permissions, &Path::new(&path), env)
             } else {
                 info!("Invoke native binary: {}", path);
                 // Treat program as a provisioned native module
@@ -73,32 +75,27 @@ pub fn execute_pipeline(
                     NativeModuleManager::new(native_module);
                 native_module_manager
                     .execute(vec![])
-                    .map(|_| 0)
+                    .map(|_| ())
                     .map_err(|err| anyhow!(err))
             }
         }
         Seq(vec) => {
             info!("Seq {:?}", vec);
             for expr in vec {
-                let return_code = execute_pipeline(strategy, execution_permissions, expr, env)?;
-
-                // An error occurs
-                if return_code != 0 {
-                    return Ok(return_code);
-                }
+                execute_pipeline(strategy, caller_permissions, execution_permissions, expr, env)?;
             }
 
             // default return_code is zero.
-            Ok(0)
+            Ok(())
         }
         IfElse(cond, true_branch, false_branch) => {
             info!("IfElse {:?} true -> {:?} false -> {:?}", cond, true_branch, false_branch);
             let return_code = if Path::new(&cond).exists() {
-                execute_pipeline(strategy, execution_permissions, true_branch, env)?
+                execute_pipeline(strategy, caller_permissions, execution_permissions, true_branch, env)?
             } else {
                 match false_branch {
-                    Some(f) => execute_pipeline(strategy, execution_permissions, f, env)?,
-                    None => 0,
+                    Some(f) => execute_pipeline(strategy, caller_permissions, execution_permissions, f, env)?,
+                    None => (),
                 }
             };
             Ok(return_code)
@@ -109,11 +106,11 @@ pub fn execute_pipeline(
 /// Execute the `program`. All I/O operations in the program are through at `filesystem`.
 fn execute_program(
     strategy: &ExecutionStrategy,
-    permissions: &PrincipalPermission,
-    program: Vec<u8>,
+    execution_permissions: &PrincipalPermission,
+    program_path: &Path,
     env: &Environment,
-) -> Result<u32> {
-    info!("Execute program with permissions {:?}", permissions);
+) -> Result<()> {
+    info!("Execute program with permissions {:?}", execution_permissions);
     initial_service();
     let mut engine: Box<dyn ExecutionEngine> = match strategy {
         ExecutionStrategy::Interpretation => {
@@ -123,7 +120,7 @@ fn execute_program(
             cfg_if::cfg_if! {
                 if #[cfg(any(feature = "std", feature = "nitro"))] {
                     info!("JIT engine initialising");
-                    Box::new(WasmtimeRuntimeState::new(permissions.clone(), env.clone())?)
+                    Box::new(WasmtimeRuntimeState::new(execution_permissions.clone(), env.clone())?)
                     
                 } else {
                     return Err(anyhow!("No JIT enine."));
@@ -132,5 +129,5 @@ fn execute_program(
         }
     };
     info!("engine call");
-    engine.invoke_entry_point(program)
+    engine.serve(program_path)
 }

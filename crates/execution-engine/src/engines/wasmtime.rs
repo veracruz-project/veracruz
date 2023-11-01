@@ -18,7 +18,7 @@ use crate::{
 use anyhow::Result;
 use log::info;
 use std::{
-    vec::Vec,
+    path::Path,
     fs::{create_dir_all, File},
 };
 use wasmtime::{Config, Engine, Linker, Module, Store};
@@ -70,7 +70,7 @@ impl ExecutionEngine for WasmtimeRuntimeState {
     /// program, along with a host state capturing the result of the program's
     /// execution.
     #[inline]
-    fn invoke_entry_point(&mut self, program: Vec<u8>) -> Result<u32> {
+    fn serve(&mut self, input: &Path) -> Result<()> {
         info!("Initialize a wasmtime engine.");
 
         let mut config = Config::default();
@@ -98,7 +98,7 @@ impl ExecutionEngine for WasmtimeRuntimeState {
 
         let wasi = wasm_build.build();
         let mut store = Store::new(&engine, wasi);
-        let module = Module::new(&engine, program)?;
+        let module = Module::from_file(&engine, input)?;
         linker.module(&mut store, "", &module)?;
 
         info!("Engine readies.");
@@ -114,6 +114,6 @@ impl ExecutionEngine for WasmtimeRuntimeState {
 
         info!("Execution returns.");
 
-        Ok(0)
+        Ok(())
     }
 }
