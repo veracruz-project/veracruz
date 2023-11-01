@@ -17,7 +17,7 @@
 //! information on licensing and copyright.
 
 use anyhow::Result;
-use std::vec::Vec;
+use std::path::Path;
 
 ////////////////////////////////////////////////////////////////////////////////
 // The strategy trait.

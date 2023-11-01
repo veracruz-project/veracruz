@@ -303,6 +303,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let return_code = execute(
         &cmdline.execution_strategy,
         &permission,
+        &permission,
         cmdline.pipeline.clone(),
         &env,
     )?;

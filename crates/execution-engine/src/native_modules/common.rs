@@ -12,7 +12,6 @@
 use anyhow::Result;
 use crate::{
     native_modules::{echo::EchoService, postcard::PostcardService, aes::AesCounterModeService}
-
 };
 use std::{fs::{create_dir_all, remove_file}, sync::Once, path::{Path, PathBuf}, thread::{spawn, JoinHandle}};
 use log::info;
