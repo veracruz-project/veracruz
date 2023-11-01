@@ -124,9 +124,7 @@ POLICY_FILES ?= \
 	triple_policy_1.json \
 	triple_policy_2.json \
 	triple_policy_4.json \
-	quadruple_policy.json \
-	single_client_postcard_native.json \
-	single_client_aesctr_native.json
+	quadruple_policy.json 
 
 PGEN = $(WORKSPACE_DIR)/host/target/$(PROFILE_PATH)/generate-policy
 
@@ -141,16 +139,17 @@ PROGRAM_DIR = ./program/
 
 CREDENTIALS = $(CA_CRT) $(CLIENT_CRT) $(PROGRAM_CRT) $(DATA_CRT) $(RESULT_CRT) $(MEASUREMENT_FILE)
 
-PGEN_COMMON_PARAMS = --proxy-attestation-server-cert $(CA_CRT) $(MEASUREMENT_PARAMETER) \
-	--certificate-expiry $(CERTIFICATE_EXPIRY) --execution-strategy JIT
+PGEN_COMMON_PARAMS = 
 
-CLIENT_WRITE_PROG_CAPABILITY = "./input/ : $(WRITE_RIGHT), ./output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT)"
-CLIENT_READ_PROG_CAPABILITY = "./input/ : $(WRITE_RIGHT), ./output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(OPEN_EXECUTE_RIGHT)"
-DEFAULT_PROGRAM_LIST = $(foreach prog_name,$(WASM_PROG_FILES),--program-binary $(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) --capability "./input/ : $(READ_RIGHT), ./output/ : $(READ_WRITE_RIGHT), ./services/ : $(READ_WRITE_RIGHT)")
+CLIENT_WRITE_PROG_CAPABILITY = "./input/ : $(WRITE_RIGHT), ./output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT), /tmp/ : $(READ_WRITE_RIGHT)"
+CLIENT_READ_PROG_CAPABILITY = "./input/ : $(WRITE_RIGHT), ./output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(OPEN_EXECUTE_RIGHT), /tmp/ : $(READ_WRITE_RIGHT)"
+DEFAULT_PROGRAM_LIST = $(foreach prog_name,$(WASM_PROG_FILES),--program-binary $(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) --capability "./input/ : $(READ_RIGHT), ./output/ : $(READ_WRITE_RIGHT), /tmp/ : $(READ_WRITE_RIGHT)")
 
 MAX_MEMORY_MIB = 256
 DEFAULT_FLAGS = --proxy-attestation-server-ip 127.0.0.1:3010 \
-			    $(PGEN_COMMON_PARAMS) \
+			    --proxy-attestation-server-cert $(CA_CRT) $(MEASUREMENT_PARAMETER) \
+				--certificate-expiry $(CERTIFICATE_EXPIRY) \
+				--execution-strategy JIT \
  				--max-memory-mib $(MAX_MEMORY_MIB) 
 
 $(OUT_DIR)/single_client.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
@@ -206,23 +205,4 @@ $(OUT_DIR)/quadruple_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RU
 		$(DEFAULT_PROGRAM_LIST) \
 		--veracruz-server-ip 127.0.0.1:3030 \
 		$(DEFAULT_FLAGS) \
-		--output-policy-file $@
-
-$(OUT_DIR)/single_client_postcard_native.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
-	cd $(OUT_DIR) ; $(PGEN) --certificate $(CLIENT_CRT) \
-		--capability $(CLIENT_WRITE_PROG_CAPABILITY) \
-		$(DEFAULT_PROGRAM_LIST) \
-		--pipeline "$(PROGRAM_DIR)random-u32-list.wasm ; if /output/unsorted_numbers.txt { $(PROGRAM_DIR)sort-numbers.wasm ; }" --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT), /services/ : $(READ_WRITE_RIGHT)" \
-		--veracruz-server-ip 127.0.0.1:3011 \
-		--native-module-name "Postcard Service" --native-module-special-file "/services/postcard_string.dat" --native-module-entry-point "" \
-		$(DEFAULT_FLAGS) \
-		--output-policy-file $@
-
-$(OUT_DIR)/single_client_aesctr_native.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
-	cd $(OUT_DIR) ; $(PGEN) --certificate $(CLIENT_CRT) \
-	    --capability "/input/: $(WRITE_RIGHT), /output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT), stdin : $(WRITE_RIGHT), stderr : $(READ_RIGHT), stdout : $(READ_RIGHT)" \
-	    $(foreach prog_name,$(WASM_PROG_FILES),--program-binary $(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) --capability "/input/ : $(READ_RIGHT), /output/ : $(READ_WRITE_RIGHT), stdin : $(READ_RIGHT), stderr : $(WRITE_RIGHT), stdout : $(WRITE_RIGHT), /services/ : $(READ_WRITE_RIGHT)") \
-            --veracruz-server-ip 127.0.0.1:3011 --proxy-attestation-server-ip 127.0.0.1:3010 \
-	    --enclave-debug-mode $(PGEN_COMMON_PARAMS) --max-memory-mib $(MAX_MEMORY_MIB) \
-		--native-module-name "Counter mode AES Service" --native-module-special-file "/services/aesctr.dat" --native-module-entry-point "" \
 		--output-policy-file $@

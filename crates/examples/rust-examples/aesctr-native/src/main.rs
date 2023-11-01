@@ -57,13 +57,15 @@ fn main() -> anyhow::Result<()> {
     let aes_ctr_enc_input = AesCtrInput {
         key,
         iv,
-        input_path: PathBuf::from("/output/data.dat"),
-        output_path: PathBuf::from("/output/enc.dat"),
+        input_path: PathBuf::from("./output/data.dat"),
+        output_path: PathBuf::from("./output/enc.dat"),
         is_encryption: true,
     };
     write(&aes_ctr_enc_input.input_path, input)?;
     let aes_ctr_enc_input_bytes = postcard::to_allocvec(&aes_ctr_enc_input)?;
-    write("/services/aesctr.dat", aes_ctr_enc_input_bytes)?;
+    write("/tmp/aes/input", aes_ctr_enc_input_bytes)?;
+    // wait the service finish
+    let _ = read("/tmp/aes/output");
     let output = read(aes_ctr_enc_input.output_path)?;
     if output != expected_output {
         failed = true;
@@ -82,20 +84,22 @@ fn main() -> anyhow::Result<()> {
     let aes_ctr_enc_input = AesCtrInput {
         key,
         iv,
-        input_path: PathBuf::from("/output/data.dat"),
-        output_path: PathBuf::from("/output/dec.dat"),
+        input_path: PathBuf::from("./output/data.dat"),
+        output_path: PathBuf::from("./output/dec.dat"),
         is_encryption: false,
     };
     write(&aes_ctr_enc_input.input_path, input)?;
     let aes_ctr_enc_input_bytes = postcard::to_allocvec(&aes_ctr_enc_input)?;
-    write("/services/aesctr.dat", aes_ctr_enc_input_bytes)?;
+    write("/tmp/aes/input", aes_ctr_enc_input_bytes)?;
+    // wait the service finish
+    let _ = read("/tmp/aes/output");
     let output = read(aes_ctr_enc_input.output_path)?;
     if output != expected_output {
         failed = true;
     }
 
     if !failed {
-        write("/output/aesctr_native_pass.txt", [])?;
+        write("./output/aesctr_native_pass.txt", [])?;
     }
     Ok(())
 }

@@ -30,9 +30,9 @@ use std::vec::Vec;
 /// added to this trait and implemented for all supported implementation
 /// strategies.
 pub trait ExecutionEngine: Send {
-    /// Entry point for the execution engine: invokes the `program` binary,
-    /// Returns `Ok(c)` if it successfully executed and returned a
-    /// success/error code, `c`, or returns `Err(e)` if some fatal execution
+    /// Entry point for the execution engine: invokes the program at `path`,
+    /// Returns `Ok(())` if it successfully executed, 
+    /// or returns `Err(e)` if some fatal execution
     /// engine error occurred at runtime causing the pipeline to abort.
-    fn invoke_entry_point(&mut self, program: Vec<u8>) -> Result<u32>;
+    fn serve(&mut self, path: &Path) -> Result<()>;
 }

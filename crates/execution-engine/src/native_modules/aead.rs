@@ -13,7 +13,7 @@ use anyhow::Result;
 use crate::native_modules::common::StaticNativeModule;
 use mbedtls::cipher::{Authenticated, Cipher, Decryption, Encryption, Fresh};
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::fs::{write, read};
 
 #[derive(Deserialize, Debug)]
@@ -42,25 +42,17 @@ impl StaticNativeModule for AeadService {
     /// Triggers the service. The details of the service can be found in function
     /// `encryption_decryption`.
     /// Here is the enter point. It also erase the state unconditionally afterwards.
-    fn serve(&mut self, _input: &[u8]) -> Result<()> {
+    fn serve(&mut self, input: &Path, output: &Path) -> Result<()> {
+        let buf = read(input)?;
+        let deserialized_input: AeadService = postcard::from_bytes(&buf)?;
+        *self = deserialized_input;
         // when reaching here, the `input` bytes are already parsed.
         let result = self.encryption_decryption();
         // NOTE: erase all the states.
         self.reset();
+        // Write an output to inform the callee
+        let _ = write(output, "0");
         result
-    }
-
-    /// For the purpose of demonstration, we always return true. In reality,
-    /// this function may check validity of the `input`, and even buffer the result
-    /// for further uses.
-    fn try_parse(&mut self, input: &[u8]) -> Result<bool> {
-        let deserialized_input: AeadService =
-            match postcard::from_bytes(&input) {
-                Ok(o) => o,
-                Err(_) => return Ok(false),
-            };
-        *self = deserialized_input;
-        Ok(true)
     }
 }
 

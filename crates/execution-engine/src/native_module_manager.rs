@@ -34,9 +34,6 @@
 //! information on licensing and copyright.
 
 use anyhow::{anyhow, Result};
-use crate::{
-    native_modules::common::STATIC_NATIVE_MODULES
-};
 use log::info;
 use policy_utils::principal::{NativeModule, NativeModuleType};
 use std::{
@@ -50,7 +47,7 @@ use nix::sys::signal;
 
 /// Path to the native module's manager sysroot on the kernel filesystem. Native
 /// module directories are created under this directory.
-const NATIVE_MODULE_MANAGER_SYSROOT: &str = "/tmp/nmm";
+const NATIVE_MODULE_MANAGER_SYSROOT: &str = "/tmp/nmm/foo/execute";
 
 /// Path to the native module sandboxer. This is the program that actually prepares
 /// the sandbox environment and runs the native module in it.
@@ -126,19 +123,9 @@ impl NativeModuleManager {
     /// native module's special file.
     pub fn execute(&mut self, input: Vec<u8>) -> Result<()> {
         if self.native_module.is_static() {
-            // Look up native module in the static native modules table
-            let mut nm = STATIC_NATIVE_MODULES
-                .lock()
-                .map_err(|_| anyhow!("Failed to lock STATIC_NATIVE_MODULES"))?;
-            let native_module_name = self.native_module.name();
-            let nm = nm
-                .get_mut(native_module_name)
-                .ok_or(anyhow!("cannot find native module: {}", native_module_name))?;
-            if nm.try_parse(&input)? {
-                nm.serve(&input)?;
-            }
         } else {
 
+            // XXX Create file in kernel 
             // Inject execution configuration into the native module's directory
             let mut file = File::create(self.native_module_directory.join(EXECUTION_CONFIGURATION_FILE))?;
             file.write_all(&input)?;
@@ -163,6 +150,7 @@ impl NativeModuleManager {
             // TODO change in the future
             let mount_mappings = self.build_mappings(vec!["/".into()])?;
             let entry_point = match self.native_module.r#type() {
+                // directly mounted in the kernel file system
                 NativeModuleType::Dynamic { entry_point, .. } => entry_point.clone(),
                 NativeModuleType::Provisioned { entry_point } => self.native_module_directory.join(entry_point),
                 _ => panic!("should not happen"),

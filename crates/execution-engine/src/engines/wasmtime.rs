@@ -22,7 +22,7 @@ use std::{
     fs::{create_dir_all, File},
 };
 use wasmtime::{Config, Engine, Linker, Module, Store};
-use wasmtime_wasi::sync::{Dir, WasiCtxBuilder, TcpListener};
+use wasmtime_wasi::sync::{Dir, WasiCtxBuilder};
 use policy_utils::principal::PrincipalPermission;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -32,8 +32,6 @@ use policy_utils::principal::PrincipalPermission;
 pub struct WasmtimeRuntimeState {
     permissions: PrincipalPermission,
     environment: Environment,
-    // Careful on the type name conflict, here we want the TcpListener from std.
-    sockets: Vec<(u32,std::net::TcpListener)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -42,12 +40,12 @@ pub struct WasmtimeRuntimeState {
 
 impl WasmtimeRuntimeState {
     /// Creates a new initial `HostProvisioningState`.
-    pub fn new(permissions: PrincipalPermission, environment: Environment) -> Result<Self> {
+    pub fn new(permissions: PrincipalPermission, environment: Environment
+        ) -> Result<Self> {
         info!("Wasmtime is initialised");
         Ok(Self {
             permissions,
             environment,
-            sockets: Vec::new(),
         })
     }
 }
@@ -90,21 +88,12 @@ impl ExecutionEngine for WasmtimeRuntimeState {
             .inherit_env()?
             .inherit_args()?;
 
-        // NOTE: the preview1 version API do not take in the permission, while the newer version
-        // in preview2 needs to give permission parameter. We can provide extra check over preview1
-        // API though it is does not worth the time.
         let wasm_build = self.permissions.keys().fold(Ok(wasm_build), |acc : Result<WasiCtxBuilder>, path| {
             let wasm_build = acc?;
             create_dir_all(path)?;
             let file = File::open(&path)?;
             info!("pre-opened directory {:?} created if necessary and opened", path);
             Ok(wasm_build.preopened_dir(Dir::from_std_file(file), path)?)
-        })?;
-
-        let wasm_build = self.sockets.iter().fold(Ok(wasm_build), |acc : Result<WasiCtxBuilder>, (fd,listener)| {
-            let wasm_build = acc?;
-            info!("bind fd {:?}", fd);
-            Ok(wasm_build.preopened_socket(*fd, TcpListener::from_std(listener.try_clone()?))?)
         })?;
 
         let wasi = wasm_build.build();
