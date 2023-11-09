@@ -1,5 +1,5 @@
 diff --git a/common.sh b/common.sh
-index e4087d5..18ba1d0 100755
+index e4087d5..7c50bbc 100755
 --- a/common.sh
 +++ b/common.sh
 @@ -71,7 +71,7 @@ build_kernel()
@@ -11,19 +11,21 @@ index e4087d5..18ba1d0 100755
  			run_cmd ./scripts/config --set-str LOCALVERSION "$VER-$COMMIT"
  			run_cmd ./scripts/config --disable LOCALVERSION_AUTO
  			run_cmd ./scripts/config --enable  EXPERT
-@@ -194,3 +194,15 @@ build_install_qemu()
- 		run_cmd echo $COMMIT >../source-commit.qemu
- 	popd >/dev/null
- }
-+
-+build_install_sev_guest()
-+{
-+       DEST="$1"
-+       [ -d sev-guest ] || {
-+               run_cmd git clone --single-branch -b ${SEV_GUEST_BRANCH} ${SEV_GUEST_GIT_URL} sev-guest
-+       }
-+       pushd sev-guest > /dev/null
-+               git apply ../get-report.patch
-+               run_cmd make -f ../veracruz.mk
-+       popd >/dev/null
-+}
+@@ -84,7 +84,7 @@ build_kernel()
+ 			run_cmd ./scripts/config --disable SYSTEM_TRUSTED_KEYS
+ 			run_cmd ./scripts/config --disable SYSTEM_REVOCATION_KEYS
+ 			run_cmd ./scripts/config --disable MODULE_SIG_KEY
+-			run_cmd ./scripts/config --module  SEV_GUEST
++			run_cmd ./scripts/config --enable  SEV_GUEST
+ 			run_cmd ./scripts/config --disable IOMMU_DEFAULT_PASSTHROUGH
+ 			run_cmd ./scripts/config --disable PREEMPT_COUNT
+ 			run_cmd ./scripts/config --disable PREEMPTION
+@@ -175,7 +175,7 @@ build_install_qemu()
+ 		fi
+ 		popd >/dev/null
+ 	else
+-		run_cmd git clone --single-branch -b ${QEMU_BRANCH} ${QEMU_GIT_URL} qemu
++		run_cmd git clone --single-branch -c http.sslVerify=false -b ${QEMU_BRANCH} ${QEMU_GIT_URL} qemu
+ 		pushd qemu >/dev/null
+ 		run_cmd git remote add current ${QEMU_GIT_URL}
+ 		popd >/dev/null

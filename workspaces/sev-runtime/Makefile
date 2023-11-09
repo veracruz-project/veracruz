@@ -27,6 +27,10 @@ initramfs_sev: ./target/x86_64-unknown-linux-musl/debug/sev-runtime-manager linu
 
 ./target/x86_64-unknown-linux-musl/debug/sev-runtime-manager: FORCE
 	RUSTFLAGS="--remap-path-prefix $(unresolved_crates_path)=$(shell readlink -f $(unresolved_crates_path))" \
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	OPENSSL_STATIC=true \
+	OPENSSL_DIR=/musl \
+	PKG_CONFIG_SYSROOT_DIR=/usr/lib/x86_64-linux-musl/ \
 	cargo build --target x86_64-unknown-linux-musl $(PROFILE_FLAG) $(V_FLAG)
 FORCE:
 

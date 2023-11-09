@@ -21,6 +21,7 @@ use runtime_manager::{
     },
     platform_runtime::PlatformRuntime
 };
+use sev_snp_utils::{AttestationReport, Requester};
 use std::io::Write;
 use veracruz_utils::{
     runtime_manager_message::RuntimeManagerResponse,
@@ -56,22 +57,9 @@ impl PlatformRuntime for SevRuntime {
                 err
             })?;
         let csr_hash = sha256(&csr);
-        let mut attestation_report = Vec::with_capacity(ATTESTATION_REPORT_SIZE);
-
-        println!("sev-runtime-manager::SevRuntime::attestation calling get_report");
-        // let mut certs: *mut u8 = std::ptr::null_mut();
-        // let certs_ptr: *mut *mut u8 = &mut certs;
-        // let mut certs_size: usize = 0;
-        let retval = unsafe { get_report(csr_hash.as_ptr() as *const u8, csr_hash.len(), attestation_report.as_mut_ptr() as *mut u8) };
-        //let retval = unsafe { get_extended_report(csr_hash.as_ptr() as *const u8, csr_hash.len(), attestation_report.as_mut_ptr() as *mut u8, certs_ptr, &mut certs_size as *mut usize) };
-        println!("sev-runtime-manager::SevRuntime::attestation get_report returned");
-        if retval != 0 {
-            println!("sev-runtime-manager::SevRuntime::attestation get_report returned:{:?}", retval);
-            return Err(anyhow!(RuntimeManagerError::FirmwareError));
-        }
-        unsafe { attestation_report.set_len(ATTESTATION_REPORT_SIZE as usize)};
-        println!("sev-runtime-manager::SevRuntime::attestation get_report suceeded");
-
+        let mut user_data: [u8; 64] = [0; 64];
+        user_data[0..32].copy_from_slice(&csr_hash[0..32]);
+        let attestation_report = AttestationReport::request_raw(&user_data).unwrap();
         let response = RuntimeManagerResponse::AttestationData(attestation_report, csr);
         return Ok(response);
     }

@@ -57,7 +57,6 @@ RUN apt-get update && \
         ghc \
         git \
         gnupg \
-	    guestfs-tools \
         haskell-stack \
 	    iasl \
         jq \
@@ -113,6 +112,14 @@ RUN wget https://musl.cc/${ARCH}-linux-musl-native.tgz && \
     rm ${ARCH}-linux-musl-native.tgz
 RUN rustup target add x86_64-unknown-linux-musl
 
+RUN wget https://github.com/openssl/openssl/archive/OpenSSL_1_1_1f.tar.gz
+RUN tar -zxvf OpenSSL_1_1_1f.tar.gz; \
+         cd openssl-OpenSSL_1_1_1f/; \
+         CC="musl-gcc -fPIE -pie" ./Configure no-shared no-async --prefix=/musl --openssldir=/musl/ssl linux-x86_64; \
+         make depend; \
+         make -j$(nproc); \
+         make install;
+
 WORKDIR /
 RUN git clone --branch snp-latest https://github.com/AMDESE/AMDSEV.git
 WORKDIR /AMDSEV
@@ -128,9 +135,7 @@ WORKDIR AMDSEV
 RUN git apply common.patch
 RUN git apply build.patch
 RUN git apply stable-commits.patch
-RUN ./build.sh --package kernel guest
 RUN ./build.sh --package qemu
+RUN ./build.sh --package kernel guest
 RUN ./build.sh --package ovmf
-COPY veracruz.mk /AMDSEV/veracruz.mk
-#RUN ./build.sh --package sev_guest
 
