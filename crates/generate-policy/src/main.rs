@@ -284,7 +284,7 @@ fn parse_permission_entry(cap_string: &str) -> Result<(PathBuf, FilePermissions)
                  return Err(anyhow!("Failed to parse permission entry"));
             }
 
-            Ok((PathBuf::from(file_name), FilePermissions {
+            Ok((PathBuf::from(file_name.trim()), FilePermissions {
                 read: permission.contains("r"),
                 write: permission.contains("w"),
                 execute: permission.contains("x"),
