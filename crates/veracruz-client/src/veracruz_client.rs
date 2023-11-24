@@ -149,7 +149,7 @@ impl VeracruzClient {
         Self::check_certificate_validity(&client_cert_filename, &mut client_priv_key)?;
 
         let proxy_service_cert = {
-            let mut certs_pem = policy.proxy_service_cert().clone();
+            let mut certs_pem = policy.proxy_service_cert().to_string();
             certs_pem.push('\0');
             let certs = Certificate::from_pem_multiple(certs_pem.as_bytes())?;
             certs
@@ -159,7 +159,7 @@ impl VeracruzClient {
         let mut config = Config::new(Endpoint::Client, Transport::Stream, Preset::Default);
         config.set_min_version(Version::Tls13)?;
         config.set_max_version(Version::Tls13)?;
-        let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(policy.ciphersuite().as_str())
+        let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(policy.ciphersuite())
             .ok_or(anyhow!(VeracruzClientError::UnexpectedCiphersuite))?;
         let cipher_suites: Vec<i32> = vec![policy_ciphersuite.into(), 0];
         config.set_ciphersuites(Arc::new(cipher_suites));
