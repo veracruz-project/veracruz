@@ -124,7 +124,7 @@ impl SessionContext {
         // create the configuration
         let policy_ciphersuite =
             veracruz_utils::lookup_ciphersuite(&policy.ciphersuite()).ok_or(anyhow!(
-                SessionManagerError::TLSInvalidCiphersuiteError(policy.ciphersuite().clone())
+                SessionManagerError::TLSInvalidCiphersuiteError(policy.ciphersuite().to_string())
             ))?;
 
         self.cipher_suites = vec![policy_ciphersuite, 0];

@@ -85,7 +85,7 @@ impl ProtocolState {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
         let digest_table = global_policy.get_file_hash_table()?;
-        let native_modules = global_policy.native_modules();
+        //let native_modules = global_policy.native_modules();
 
         Ok(ProtocolState {
             global_policy,

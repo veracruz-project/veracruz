@@ -20,9 +20,10 @@
 extern crate std;
 
 mod engines;
-mod native_module_manager;
-mod native_modules;
+mod service;
 mod pipeline;
+mod common;
+
 
 use policy_utils::{pipeline::Expr, principal::{PrincipalPermission, ExecutionStrategy}};
 use std::boxed::Box;

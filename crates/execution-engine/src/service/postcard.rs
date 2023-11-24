@@ -11,7 +11,7 @@
 //! information on licensing and copyright.
 
 use anyhow::Result;
-use crate::native_modules::common::StaticNativeModule;
+use crate::common::Execution;
 use postcard::from_bytes;
 use serde::{Deserialize, Serialize};
 use std::{path::Path, fs::{read, write}};
@@ -70,12 +70,14 @@ pub struct Struct3 {
     e3: Enum2,
 }
 
-impl StaticNativeModule for PostcardService {
+impl Execution for PostcardService {
     fn name(&self) -> &str {
         "Postcard Service"
     }
 
-    fn serve(&mut self, input: &Path, output: &Path) -> Result<()> {
+    fn execute(&mut self, dir: &Path) -> Result<()> {
+        let input = dir.join("input");
+        let output = dir.join("output");
         let buf = read(input)?;
         let v = from_bytes::<Vec<Struct3>>(&buf)?;
 
