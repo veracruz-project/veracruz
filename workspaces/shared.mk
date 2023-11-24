@@ -33,7 +33,6 @@ WASM_PROG_LIST = random-source.wasm \
 				random-u32-list.wasm \
 				shamir-secret-sharing.wasm \
 				sort-numbers.wasm \
-				fd-create.wasm \
 				aesctr-native.wasm
 
 WASM_PROG_FILES = $(patsubst %.wasm, $(OUT_DIR)/%.wasm, $(WASM_PROG_LIST))
@@ -118,7 +117,6 @@ endif
 
 POLICY_FILES ?= \
 	single_client.json \
-	single_client_no_debug.json \
 	dual_policy.json \
 	dual_parallel_policy.json \
 	triple_policy_1.json \
@@ -141,9 +139,10 @@ CREDENTIALS = $(CA_CRT) $(CLIENT_CRT) $(PROGRAM_CRT) $(DATA_CRT) $(RESULT_CRT) $
 
 PGEN_COMMON_PARAMS = 
 
-CLIENT_WRITE_PROG_CAPABILITY = "./input/ : $(WRITE_RIGHT), ./output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT), /tmp/ : $(READ_WRITE_RIGHT)"
-CLIENT_READ_PROG_CAPABILITY = "./input/ : $(WRITE_RIGHT), ./output/ : $(READ_RIGHT), $(PROGRAM_DIR) : $(OPEN_EXECUTE_RIGHT), /tmp/ : $(READ_WRITE_RIGHT)"
-DEFAULT_PROGRAM_LIST = $(foreach prog_name,$(WASM_PROG_FILES),--program-binary $(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) --capability "./input/ : $(READ_RIGHT), ./output/ : $(READ_WRITE_RIGHT), /tmp/ : $(READ_WRITE_RIGHT)")
+CLIENT_WRITE_PROG_CAPABILITY = "./input/:$(WRITE_RIGHT),./output/:$(READ_RIGHT),$(PROGRAM_DIR):$(WRITE_EXECUTE_RIGHT),/tmp/:$(READ_WRITE_RIGHT)"
+CLIENT_READ_PROG_CAPABILITY = "./input/:$(WRITE_RIGHT),./output/:$(READ_RIGHT),$(PROGRAM_DIR):$(OPEN_EXECUTE_RIGHT),/tmp/:$(READ_WRITE_RIGHT)"
+DEFAULT_PROGRAM_LIST = $(foreach prog_name,$(WASM_PROG_FILES),--program-binary "$(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) => ./input/:$(READ_RIGHT),./output/:$(READ_WRITE_RIGHT),/tmp/:$(READ_WRITE_RIGHT)")
+DEFAULT_NATIVE_MODULE_LIST = --service "Postcard Service => /services/postcard_string.dat" --service "Postcard Service => /services/postcard_string.dat"
 
 MAX_MEMORY_MIB = 256
 DEFAULT_FLAGS = --proxy-attestation-server-ip 127.0.0.1:3010 \
@@ -153,24 +152,18 @@ DEFAULT_FLAGS = --proxy-attestation-server-ip 127.0.0.1:3010 \
  				--max-memory-mib $(MAX_MEMORY_MIB) 
 
 $(OUT_DIR)/single_client.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
-	cd $(OUT_DIR) ; $(PGEN) --certificate $(CLIENT_CRT) --capability  $(CLIENT_WRITE_PROG_CAPABILITY) \
+	cd $(OUT_DIR) ; $(PGEN) --certificate "$(CLIENT_CRT) => $(CLIENT_WRITE_PROG_CAPABILITY)" \
 	    $(DEFAULT_PROGRAM_LIST) \
-	    --pipeline "$(PROGRAM_DIR)random-u32-list.wasm ; if ./output/unsorted_numbers.txt { $(PROGRAM_DIR)sort-numbers.wasm ; }" --capability "./input/ : $(READ_RIGHT), ./output/ : $(READ_WRITE_RIGHT), ./services/ : $(READ_WRITE_RIGHT)" \
+	    --pipeline "$(PROGRAM_DIR)random-u32-list.wasm ; if ./output/unsorted_numbers.txt { $(PROGRAM_DIR)sort-numbers.wasm ; } => ./input/:$(READ_RIGHT),./output/:$(READ_WRITE_RIGHT),./services/:$(READ_WRITE_RIGHT)" \
+		$(DEFAULT_NATIVE_MODULE_LIST) \
         --veracruz-server-ip 127.0.0.1:3011 \
 		$(DEFAULT_FLAGS) \
 	    --output-policy-file $@
 
-$(OUT_DIR)/single_client_no_debug.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
-	cd $(OUT_DIR) ; $(PGEN) --certificate $(CLIENT_CRT) --capability $(CLIENT_WRITE_PROG_CAPABILITY) \
-		${DEFAULT_PROGRAM_LIST} \
-		--veracruz-server-ip 127.0.0.1:3011  \
-		$(DEFAULT_FLAGS) \
-		--output-policy-file $@
-
 $(OUT_DIR)/dual_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
 	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT)" \
-		--certificate $(DATA_CRT) --capability "./input/ : $(WRITE_RIGHT), ./output/ : $(READ_RIGHT)" \
+		--certificate "$(PROGRAM_CRT) => $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT)" \
+		--certificate "$(DATA_CRT) => ./input/ : $(WRITE_RIGHT), ./output/ : $(READ_RIGHT)" \
 		$(DEFAULT_PROGRAM_LIST) \
 		--veracruz-server-ip 127.0.0.1:3012 \
 		$(DEFAULT_FLAGS) \
@@ -178,8 +171,8 @@ $(OUT_DIR)/dual_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME
 
 $(OUT_DIR)/dual_parallel_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
 	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT)" \
-		--certificate $(DATA_CRT) --capability $(CLIENT_READ_PROG_CAPABILITY) \
+		--certificate "$(PROGRAM_CRT) => $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT)" \
+		--certificate "$(DATA_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
 		$(DEFAULT_PROGRAM_LIST) \
 		--veracruz-server-ip 127.0.0.1:3013 \
 		$(DEFAULT_FLAGS) \
@@ -188,9 +181,9 @@ $(OUT_DIR)/dual_parallel_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) 
 # Generate all the triple policy but on different port.
 $(OUT_DIR)/triple_policy_%.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
 	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT)" \
-		--certificate $(DATA_CRT) --capability $(CLIENT_READ_PROG_CAPABILITY) \
-		--certificate $(RESULT_CRT) --capability $(CLIENT_READ_PROG_CAPABILITY) \
+		--certificate "$(PROGRAM_CRT) => $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT)" \
+		--certificate "$(DATA_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
+		--certificate "$(RESULT_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
 		$(DEFAULT_PROGRAM_LIST) \
 		--veracruz-server-ip 127.0.0.1:$(shell echo "3020 + $*" | bc) \
 		$(DEFAULT_FLAGS) \
@@ -198,10 +191,10 @@ $(OUT_DIR)/triple_policy_%.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUN
 
 $(OUT_DIR)/quadruple_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
 	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate $(PROGRAM_CRT) --capability "$(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT)" \
-		--certificate $(DATA_CRT) --capability $(CLIENT_READ_PROG_CAPABILITY) \
-		--certificate $(NEVER_CRT) --capability $(CLIENT_READ_PROG_CAPABILITY) \
-		--certificate $(RESULT_CRT) --capability $(CLIENT_READ_PROG_CAPABILITY) \
+		--certificate "$(PROGRAM_CRT) => $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT)" \
+		--certificate "$(DATA_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
+		--certificate "$(NEVER_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
+		--certificate "$(RESULT_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
 		$(DEFAULT_PROGRAM_LIST) \
 		--veracruz-server-ip 127.0.0.1:3030 \
 		$(DEFAULT_FLAGS) \
