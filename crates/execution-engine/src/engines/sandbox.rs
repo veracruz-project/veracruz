@@ -35,13 +35,13 @@
 
 use anyhow::{anyhow, Result};
 use log::info;
-use policy_utils::principal::NativeModule;
 use std::{
-    fs::{File, remove_dir_all},
+    fs::{self, File, remove_dir_all},
     io::{Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command
 };
+use crate::common::Execution;
 #[cfg(feature = "std")]
 use nix::sys::signal;
 
@@ -58,77 +58,23 @@ const NATIVE_MODULE_MANAGER_SANDBOXER_PATH: &str = "/tmp/nmm/native-module-sandb
 /// the native module.
 const EXECUTION_CONFIGURATION_FILE: &str = "execution_config";
 
-pub struct NativeModuleManager {
-    /// Native module to execute.
-    native_module: NativeModule,
-    /// Native module directory. Gets mounted into the sandbox environment
-    /// before the native module is executed.
+pub struct Sandbox {
     native_module_directory: PathBuf,
 }
 
-impl NativeModuleManager {
-    pub fn new(native_module: NativeModule) -> Self {
-        let native_module_directory = PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT).join(native_module.name());
-        Self {
-            native_module,
-            native_module_directory,
-        }
+impl Execution for Sandbox {
+    /// name of this execution.
+    fn name(&self) -> &str {
+        "Executing binary in sandbox."
     }
 
-    /// Build kernel-to-sandbox filesystem mappings palatable to the native
-    /// module sandboxer.
-    /// Takes a list of unprefixed paths, i.e. not including the path to the
-    /// native module's directory.
-    /// Returns the mappings as a string.
-    fn build_mappings(&self, unprefixed_files: Vec<PathBuf>) -> Result<String> {
-        let mut mappings = String::new();
-        for f in unprefixed_files {
-            let mapping = self
-                .native_module_directory
-                .join(&f)
-                .to_str()
-                .ok_or(anyhow!("Failed to convert native_module_directory to str"))?
-                .to_owned()
-                + "=>"
-                + &f.to_str()
-                .ok_or(anyhow!("Failed to convert {:?} to str",f))?
-                .to_owned();
-            mappings = mappings + &mapping + ",";
-        }
+    /// Execute the native binary program at `program_path`.
+    fn execute(&mut self, program_path: &Path) -> Result<()> {
 
-        // Add the execution configuration file
-        mappings = mappings
-                   + &self.native_module_directory
-                     .join(EXECUTION_CONFIGURATION_FILE)
-                     .to_str()
-                     .ok_or(anyhow!("Failed to convert {} to str", EXECUTION_CONFIGURATION_FILE))?
-                     .to_owned()
-                   + "=>/"
-                   + EXECUTION_CONFIGURATION_FILE;
-        Ok(mappings)
-    }
-
-    /// Delete native module's filesystem on the kernel filesystem.
-    /// As of now, there is no point in doing this, since native modules have
-    /// read and write access to the entire program's VFS, potentially making
-    /// native module executions stateful. In the future, we might consider
-    /// giving native modules access to only a subset of the program's VFS with
-    /// limited permissions.
-    fn teardown_fs(&self) -> Result<()> {
-        remove_dir_all(self.native_module_directory.as_path())?;
-        Ok(())
-    }
-
-    /// Run the native module. The input is passed by the WASM program via the
-    /// native module's special file.
-    pub fn execute(&mut self, input: Vec<u8>) -> Result<()> {
-        //if self.native_module.is_static() {
-        //} else {
-
-        // XXX Create file in kernel 
         // Inject execution configuration into the native module's directory
-        let mut file = File::create(self.native_module_directory.join(EXECUTION_CONFIGURATION_FILE))?;
-        file.write_all(&input)?;
+        let mut config_file = File::create(self.native_module_directory.join(EXECUTION_CONFIGURATION_FILE))?;
+        // TODO: it was an input
+        config_file.write_all(&vec![])?;
 
         // Enable SIGCHLD handling in order to synchronously execute the
         // sandboxer.
@@ -143,19 +89,15 @@ impl NativeModuleManager {
                     signal::SaFlags::empty(),
                     signal::SigSet::empty(),
                 ),
-            )
-            .expect("sigaction failed");
+            )?;
         }
 
-        // TODO change in the future
-        let mount_mappings = self.build_mappings(vec!["/".into()])?;
-        //let entry_point = match self.native_module.r#type() {
-            //// directly mounted in the kernel file system
-            //NativeModuleType::Dynamic { entry_point } => entry_point.clone(),
-            //NativeModuleType::Provisioned { entry_point } => self.native_module_directory.join(entry_point),
-            ////_ => panic!("should not happen"),
-        //};
-        let entry_point = &self.native_module.entry_point;
+        let mount_mappings = build_mappings(&self.native_module_directory, vec!["/".into()])?;
+
+
+        let program_name = program_path.file_name().and_then(|os_str| os_str.to_str()).ok_or(anyhow!("Failed to extract program name from program path to a native binary."))?;
+        let entry_point = self.native_module_directory.join(program_name);
+        fs::copy(program_path, &entry_point)?;
         let entry_point = entry_point.to_str().ok_or(anyhow!("Failed to convert entry point to str"))?;
 
         // Make sure the entry point is executable.
@@ -175,16 +117,64 @@ impl NativeModuleManager {
             ])
             .output()?;
 
-        self.teardown_fs()?;
-        //}
+        //self.teardown_fs()?;
 
         Ok(())
     }
 }
+ 
+impl Sandbox {
+    /// Create a sandbox at the (sub-)directory `dir_name` 
+    /// on the path `${NATIVE_MODULE_MANAGER_SYSROOT}`, i.e., `/tmp/nmm/`.
+    pub(crate) fn new(dir_name: &str) -> Self {
+        let native_module_directory = PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT).join(dir_name);
+        Self {
+            native_module_directory
+        }
+    }
 
-impl Drop for NativeModuleManager {
+    fn teardown_fs(&self) -> Result<()> {
+        remove_dir_all(self.native_module_directory.as_path())?;
+        Ok(())
+    }
+}
+
+impl Drop for Sandbox {
     /// Drop the native module manager.
     fn drop(&mut self) {
         let _ = self.teardown_fs();
     }
+}
+
+/// Build kernel-to-sandbox filesystem mappings palatable to the native
+/// module sandboxer.
+/// Takes a list of unprefixed paths, i.e. not including the path to the
+/// native module's directory.
+/// Returns the mappings as a string.
+fn build_mappings(native_module_directory: &PathBuf, unprefixed_files: Vec<PathBuf>) -> Result<String> {
+    let mut mappings = String::new();
+    let native_module_directory = native_module_directory.clone();
+    for f in unprefixed_files {
+        let mapping = native_module_directory
+            .join(&f)
+            .to_str()
+            .ok_or(anyhow!("Failed to convert native_module_directory to str"))?
+            .to_owned()
+            + "=>"
+            + &f.to_str()
+            .ok_or(anyhow!("Failed to convert {:?} to str",f))?
+            .to_owned();
+        mappings = mappings + &mapping + ",";
+    }
+
+    // Add the execution configuration file
+    mappings = mappings
+               + &native_module_directory
+                 .join(EXECUTION_CONFIGURATION_FILE)
+                 .to_str()
+                 .ok_or(anyhow!("Failed to convert {} to str", EXECUTION_CONFIGURATION_FILE))?
+                 .to_owned()
+               + "=>/"
+               + EXECUTION_CONFIGURATION_FILE;
+    Ok(mappings)
 }

@@ -62,7 +62,6 @@ const PERSON_SET_INTERSECTION_WASM: &'static str = "private-set-intersection.was
 const LOGISTICS_REGRESSION_WASM: &'static str = "idash2017-logistic-regression.wasm";
 const MACD_WASM: &'static str = "moving-average-convergence-divergence.wasm";
 const INTERSECTION_SET_SUM_WASM: &'static str = "private-set-intersection-sum.wasm";
-const FD_CREATE_RUST_WASM: &'static str = "fd-create.wasm";
 const NUMBER_STREM_WASM: &'static str = "number-stream-accumulation.wasm";
 const POSTCARD_NATIVE_WASM: &'static str = "postcard-native.wasm";
 const AESCTR_NATIVE_WASM: &'static str = "aesctr-native.wasm";
@@ -94,7 +93,7 @@ fn basic_init_destroy_enclave() {
     timeout(Duration::from_secs(TIME_OUT_SECS), || {
         let (policy, policy_json, _) = read_policy(policy_dir(POLICY)).unwrap();
         let _children = proxy_attestation_setup(
-            policy.proxy_attestation_server_url().clone(),
+            policy.proxy_attestation_server_url().to_string(),
             &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
         );
         VeracruzServerEnclave::new(&policy_json).unwrap();
@@ -108,7 +107,7 @@ fn basic_new_session() {
         let (policy, policy_json, _) = read_policy(policy_dir(POLICY)).unwrap();
         // start the proxy attestation server
         let _children = proxy_attestation_setup(
-            policy.proxy_attestation_server_url().clone(),
+            policy.proxy_attestation_server_url().to_string(),
             &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
         );
         init_veracruz_server_and_tls_session(policy_json).unwrap();
@@ -673,7 +672,7 @@ impl TestExecutor {
 
         // start the proxy attestation server
         let _proxy_children = proxy_attestation_setup(
-            policy.proxy_attestation_server_url().clone(),
+            policy.proxy_attestation_server_url().to_string(),
             &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
         );
 

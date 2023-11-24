@@ -37,7 +37,7 @@
 use super::{
     error::PolicyError,
     expiry::Timepoint,
-    principal::{PrincipalPermission, ExecutionStrategy, FileHash, Identity, NativeModule, Pipeline, Principal, Program},
+    principal::{PrincipalPermission, ExecutionStrategy, FileHash, Identity, Service, Pipeline, Principal, Program},
     Platform,
 };
 use anyhow::{anyhow, Result};
@@ -67,7 +67,7 @@ pub struct Policy {
     /// The candidate programs that can be loaded in the execution engine.
     programs: Vec<Program>,
     /// The candidate native modules that can be loaded.
-    native_modules: Vec<NativeModule>,
+    native_modules: Vec<Service>,
     /// The list of files, e.g. binaries and configurations, that must match given hashes.
     file_hashes: Vec<FileHash>,
     /// The list of pipelines.
@@ -92,15 +92,8 @@ pub struct Policy {
     /// The PEM encoded certificate for the proxy service that matches the chosen
     /// platform constraints for the policy
     proxy_service_cert: String,
-    /// The debug configuration flag.  This dictates whether the WASM program
-    /// will be able to print debug configuration messages to `stdout` on the
-    /// host's machine.
-    debug: bool,
     /// The execution strategy that will be used to execute the WASM binary.
     execution_strategy: ExecutionStrategy,
-    /// The clock flag.  This dictates whether the WASM program will be able to
-    /// call clock functions to e.g. get a clock's time or resolution.
-    enable_clock: bool,
     /// The maximum amount of memory in MiB available to the isolate. Only
     /// enforced in Nitro for now.
     max_memory_mib: u32,
@@ -117,7 +110,7 @@ impl Policy {
     pub fn new(
         identities: Vec<Identity<String>>,
         programs: Vec<Program>,
-        native_modules: Vec<NativeModule>,
+        native_modules: Vec<Service>,
         mut pipelines: Vec<Pipeline>,
         veracruz_server_url: String,
         enclave_cert_expiry: Timepoint,
@@ -127,10 +120,8 @@ impl Policy {
         runtime_manager_hash_sevsnp: Option<String>,
         proxy_attestation_server_url: String,
         proxy_service_cert: String,
-        debug: bool,
         execution_strategy: ExecutionStrategy,
         file_hashes: Vec<FileHash>,
-        enable_clock: bool,
         max_memory_mib: u32,
     ) -> Result<Self> {
         for p in pipelines.iter_mut() {
@@ -150,9 +141,7 @@ impl Policy {
             runtime_manager_hash_nitro,
             runtime_manager_hash_sevsnp,
             proxy_attestation_server_url,
-            debug,
             execution_strategy,
-            enable_clock,
             max_memory_mib,
             policy_hash: None,
             file_hashes,
@@ -186,24 +175,24 @@ impl Policy {
 
     /// Returns the identities associated with this policy.
     #[inline]
-    pub fn identities(&self) -> &Vec<Identity<String>> {
+    pub fn identities(&self) -> &[Identity<String>] {
         &self.identities
     }
 
     /// Returns the native modules associated with this policy.
     #[inline]
-    pub fn native_modules(&self) -> &Vec<NativeModule> {
+    pub fn services(&self) -> &[Service] {
         &self.native_modules
     }
 
     /// Returns the URL of the Veracruz server associated with this policy.
     #[inline]
-    pub fn veracruz_server_url(&self) -> &String {
+    pub fn veracruz_server_url(&self) -> &str {
         &self.veracruz_server_url
     }
 
     /// Returns the proxy service certificate associated with this policy
-    pub fn proxy_service_cert(&self) -> &String {
+    pub fn proxy_service_cert(&self) -> &str {
         &self.proxy_service_cert
     }
     /// Returns the enclave certificate expiry moment associated with this
@@ -216,14 +205,14 @@ impl Policy {
     /// Returns the permissible ciphersuites for TLS links associated with this
     /// policy.
     #[inline]
-    pub fn ciphersuite(&self) -> &String {
+    pub fn ciphersuite(&self) -> &str {
         &self.ciphersuite
     }
 
     /// Returns the hash of the trusted Veracruz runtime, associated with this
     /// policy.
     #[inline]
-    pub fn runtime_manager_hash(&self, platform: &Platform) -> Result<&String> {
+    pub fn runtime_manager_hash(&self, platform: &Platform) -> Result<&str> {
         let hash = match platform {
             Platform::Linux => self
                 .runtime_manager_hash_linux
@@ -248,26 +237,14 @@ impl Policy {
     /// Returns the URL of the proxy attestation service, associated with this
     /// policy.
     #[inline]
-    pub fn proxy_attestation_server_url(&self) -> &String {
+    pub fn proxy_attestation_server_url(&self) -> &str {
         &self.proxy_attestation_server_url
-    }
-
-    /// Returns the debug configuration flag associated with this policy.
-    #[inline]
-    pub fn debug(&self) -> &bool {
-        &self.debug
     }
 
     /// Returns the execution strategy associated with this policy.
     #[inline]
     pub fn execution_strategy(&self) -> &ExecutionStrategy {
         &self.execution_strategy
-    }
-
-    /// Returns the clock flag associated with this policy.
-    #[inline]
-    pub fn enable_clock(&self) -> &bool {
-        &self.enable_clock
     }
 
     /// Returns the maximum amount of memory available to the isolate associated
@@ -348,16 +325,11 @@ impl Policy {
                     return Ok(principal.file_rights_map())
                 }
             },
-            Principal::Pipeline(name) => {
+            Principal::Pipeline(name) | Principal::NativeModule(name)  => {
                 if let Some(principal) = self.pipelines.iter().find(|x| name == x.name()) {
                     return Ok(principal.file_rights_map())
                 }
             },
-            Principal::NativeModule(name) => {
-                if let Some(principal) = self.pipelines.iter().find(|x| name == x.name()) {
-                    return Ok(principal.file_rights_map())
-                }
-            },                   
         }
         Err(anyhow!("Cannot find {:?}", principal))
     }

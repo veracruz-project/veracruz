@@ -216,7 +216,7 @@ fn veracruz_phase4_linear_regression_two_clients_parallel() {
     let policy = Policy::from_json(&policy_json).unwrap();
 
     let _children = proxy_attestation_setup(
-        policy.proxy_attestation_server_url().clone(),
+        policy.proxy_attestation_server_url().to_string(),
         &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
     );
 
@@ -327,7 +327,7 @@ impl TestExecutor {
 
         // start the proxy attestation server
         let proxy_children = proxy_attestation_setup(
-            policy.proxy_attestation_server_url().clone(),
+            policy.proxy_attestation_server_url().to_string(),
             &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
         );
 

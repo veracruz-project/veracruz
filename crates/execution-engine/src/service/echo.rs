@@ -1,15 +1,17 @@
-use crate::native_modules::common::StaticNativeModule;
+use crate::common::Execution;
 use anyhow::Result;
 use std::{path::Path, fs::{read, write}};
 
 pub(crate) struct EchoService;
 
-impl StaticNativeModule for EchoService {
+impl Execution for EchoService {
     fn name(&self) -> &str {
         "Echo Service"
     }
 
-    fn serve(&mut self, input: &Path, output: &Path) -> Result<()> {
+    fn execute(&mut self, dir: &Path) -> Result<()> {
+        let input = dir.join("input");
+        let output = dir.join("output");
         let buf = read(input)?;
         write(output, buf)?;
         Ok(())

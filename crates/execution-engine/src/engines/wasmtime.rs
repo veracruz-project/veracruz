@@ -12,7 +12,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::{
-    engines::common::ExecutionEngine,
+    common::Execution,
     Environment,
 };
 use anyhow::Result;
@@ -51,8 +51,13 @@ impl WasmtimeRuntimeState {
 }
 
 /// The `WasmtimeHostProvisioningState` implements everything needed to create a
-/// compliant instance of `ExecutionEngine`.
-impl ExecutionEngine for WasmtimeRuntimeState {
+/// compliant instance of `Execution`.
+impl Execution for WasmtimeRuntimeState {
+    /// name of this execution.
+    fn name(&self) -> &str {
+        "Wasmtime Webassembly JIT engine with WASI support."
+    }
+
     /// Executes the entry point of the WASM program provisioned into the
     /// Veracruz host.
     ///
@@ -69,8 +74,7 @@ impl ExecutionEngine for WasmtimeRuntimeState {
     /// Otherwise, returns the return value of the entry point function of the
     /// program, along with a host state capturing the result of the program's
     /// execution.
-    #[inline]
-    fn serve(&mut self, input: &Path) -> Result<()> {
+    fn execute(&mut self, program_path: &Path) -> Result<()> {
         info!("Initialize a wasmtime engine.");
 
         let mut config = Config::default();
@@ -98,7 +102,7 @@ impl ExecutionEngine for WasmtimeRuntimeState {
 
         let wasi = wasm_build.build();
         let mut store = Store::new(&engine, wasi);
-        let module = Module::from_file(&engine, input)?;
+        let module = Module::from_file(&engine, program_path)?;
         linker.module(&mut store, "", &module)?;
 
         info!("Engine readies.");

@@ -16,7 +16,8 @@ use super::error::PolicyError;
 use crate::{parsers::parse_pipeline, pipeline::Expr};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize, Serializer, Deserializer};
-use std::{collections::HashMap, fmt::Debug, path::{Path, PathBuf}, string::String};
+use std::{collections::HashMap, fmt::Debug, path::{Path, PathBuf}, string::String, str::FromStr};
+
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -187,86 +188,42 @@ impl Program {
     }
 }
 
-/// Defines a native module type.
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
-pub enum NativeModuleType {
-    /// Native module that is part of the Veracruz runtime and invoked as a
-    /// function call by a WASM program via a write to the native module's
-    /// special file on the VFS.
-    /// This type does not define an entry point, it is looked up by name in the
-    /// static native modules table.
-    /// Despite its static behaviour, a static native module must be explicitly
-    /// declared in the policy file to be used in a computation. See
-    /// `generate-policy` for more details.
-    Static { special_file: PathBuf },
-    /// Native module that is a separate binary built independently from
-    /// Veracruz and residing on the kernel's filesystem.
-    /// Defines an entry point, i.e. path to the main binary relative to the
-    /// native module's root directory.
-    /// Invoked by a WASM program via a write to the native module's special
-    /// file on the VFS and executed in a sandbox environment on the kernel's
-    /// filesystem. The environment's filesystem is copied back to the VFS after
-    /// execution.
-    /// Dynamic linking is supported if the shared libraries can be found.
-    Dynamic {
-        special_file: PathBuf,
-        entry_point: PathBuf,
-    },
-    /// Native module that is provisioned to the enclave and executed just like
-    /// a regular WASM program, i.e. via a result request from a participant.
-    /// Dynamic linking is supported if the shared libraries can be found.
-    /// The execution principal corresponding to the native module should have
-    /// read access to every directory containing the execution artifacts
-    /// (binary and optional shared libraries).
-    Provisioned { entry_point: PathBuf },
-}
-
 /// Defines a native module that can be loaded directly (provisioned native
 /// module) or indirectly (static and dynamic native modules) in the execution
 /// environment.
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub struct NativeModule {
-    /// Native module's name
-    name: String,
-    /// Native's module type
-    r#type: NativeModuleType,
-    // TODO: add sandbox policy
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Service {
+    /// The source (executable) of the service
+    pub source: ServiceSource,
+    /// The root directory used by this service
+    pub special_dir: PathBuf,
 }
 
-impl NativeModule {
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ServiceSource {
+    Internal(String),
+    Provision(PathBuf),
+}
+
+impl Service {
     /// Creates a Veracruz native module.
     #[inline]
-    pub fn new(name: String, r#type: NativeModuleType) -> Self {
-        Self { name, r#type }
+    pub fn new(source: ServiceSource, special_dir: PathBuf) -> Self {
+        Self { source, special_dir }
     }
 
     /// Return the name.
     #[inline]
-    pub fn name(&self) -> &str {
-        self.name.as_str()
-    }
-
-    /// Return the type.
-    #[inline]
-    pub fn r#type(&self) -> &NativeModuleType {
-        &self.r#type
-    }
-
-    /// Return whether the native module is static
-    #[inline]
-    pub fn is_static(&self) -> bool {
-        match self.r#type {
-            NativeModuleType::Static { .. } => true,
-            _ => false,
-        }
+    pub fn source(&self) -> &ServiceSource {
+        &self.source
     }
 }
 
-impl Debug for NativeModule {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "\"{}\" {:?}", self.name(), self.r#type)
-    }
-}
+//impl Debug for NativeModule {
+    //fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        //write!(f, "\"{}\" {:?}", self.name(), self.entry_point)
+    //}
+//}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Pipeline
@@ -351,6 +308,20 @@ pub enum ExecutionStrategy {
     Interpretation,
     /// JIT compilation will be used to execute the WASM binary.
     JIT,
+}
+
+
+impl FromStr for ExecutionStrategy {
+    type Err = anyhow::Error;
+
+    // Required method
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "Interpretation" => Ok(ExecutionStrategy::Interpretation),
+            "JIT" => Ok(ExecutionStrategy::JIT),
+            _otherwise => Err(anyhow!("Could not parse execution strategy argument.")),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

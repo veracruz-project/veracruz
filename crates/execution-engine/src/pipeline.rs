@@ -19,17 +19,17 @@
 use crate::engines::wasmtime::WasmtimeRuntimeState;
 use crate::{
     Environment,
-    engines::common::ExecutionEngine,
-    native_module_manager::NativeModuleManager,
-    native_modules::common::initial_service,
+    common::Execution,
+    service::common::initial_service,
+    engines::sandbox::Sandbox,
 };
 use anyhow::{anyhow, Result};
 use log::info;
 use policy_utils::{
     pipeline::Expr,
-    principal::{PrincipalPermission, FilePermissions, ExecutionStrategy, NativeModule, NativeModuleType, check_permission},
+    principal::{PrincipalPermission, FilePermissions, ExecutionStrategy, check_permission},
 };
-use std::{boxed::Box, path::{Path, PathBuf}};
+use std::{boxed::Box, path::Path};
 
 /// Returns whether the given path corresponds to a WASM binary.
 fn is_wasm_binary(path_string: &String) -> bool {
@@ -46,6 +46,8 @@ pub fn execute_pipeline(
     pipeline: Box<Expr>,
     env: &Environment,
 ) -> Result<()> {
+    // Iniital internal services
+    initial_service();
     use policy_utils::pipeline::Expr::*;
     match *pipeline {
         Literal(path) => {
@@ -55,28 +57,12 @@ pub fn execute_pipeline(
                 return Err(anyhow!("Permission denies"));
             }
             if is_wasm_binary(&path) {
-                info!("Read wasm binary: {}", path);
+                info!("Invoke wasm binary: {path}");
                 // Read and call execute_WASM program
-                execute_program(strategy, execution_permissions, &Path::new(&path), env)
-            } else {
-                info!("Invoke native binary: {}", path);
-                // Treat program as a provisioned native module
-                let native_module = NativeModule::new(
-                    path.clone(),
-                    NativeModuleType::Provisioned { entry_point: PathBuf::from(&path) },
-                );
-
-                // Invoke native module in the native module manager with no input.
-                // The execution principal (native module) should have read access
-                // to the directory containing the execution artifacts (binaries and
-                // shared libraries), or the native module manager won't be able to
-                // prepare the sandbox
-                let mut native_module_manager =
-                    NativeModuleManager::new(native_module);
-                native_module_manager
-                    .execute(vec![])
-                    .map(|_| ())
-                    .map_err(|err| anyhow!(err))
+                execute_wasm(strategy, execution_permissions, &Path::new(&path), env)
+            } else { // Sandbox
+                info!("Invoke native binary: {path}");
+                execute_native_binary(&Path::new(&path))
             }
         }
         Seq(vec) => {
@@ -84,8 +70,6 @@ pub fn execute_pipeline(
             for expr in vec {
                 execute_pipeline(strategy, caller_permissions, execution_permissions, expr, env)?;
             }
-
-            // default return_code is zero.
             Ok(())
         }
         IfElse(cond, true_branch, false_branch) => {
@@ -104,15 +88,14 @@ pub fn execute_pipeline(
 }
 
 /// Execute the `program`. All I/O operations in the program are through at `filesystem`.
-fn execute_program(
+fn execute_wasm(
     strategy: &ExecutionStrategy,
     execution_permissions: &PrincipalPermission,
     program_path: &Path,
     env: &Environment,
 ) -> Result<()> {
     info!("Execute program with permissions {:?}", execution_permissions);
-    initial_service();
-    let mut engine: Box<dyn ExecutionEngine> = match strategy {
+    let mut engine: Box<dyn Execution> = match strategy {
         ExecutionStrategy::Interpretation => {
             return Err(anyhow!("No interpretation engine."));
         }
@@ -129,5 +112,10 @@ fn execute_program(
         }
     };
     info!("engine call");
-    engine.serve(program_path)
+    engine.execute(program_path)
+}
+
+fn execute_native_binary(program_path: &Path) -> Result<()> {
+    let program_name = program_path.file_name().and_then(|os_str| os_str.to_str()).ok_or(anyhow!("Failed to extract program name from program path to a native binary."))?;
+    Sandbox::new(&program_name).execute(program_path)
 }

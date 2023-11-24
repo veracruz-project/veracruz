@@ -10,7 +10,7 @@
 //! information on licensing and copyright.
 
 use anyhow::Result;
-use crate::native_modules::common::StaticNativeModule;
+use crate::common::Execution;
 use mbedtls::cipher::{Authenticated, Cipher, Decryption, Encryption, Fresh};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
@@ -33,7 +33,7 @@ pub(crate) struct AeadService {
     is_encryption: bool,
 }
 
-impl StaticNativeModule for AeadService {
+impl Execution for AeadService {
     /// Return the name of this service
     fn name(&self) -> &str {
         "AEAD Service"
@@ -42,7 +42,9 @@ impl StaticNativeModule for AeadService {
     /// Triggers the service. The details of the service can be found in function
     /// `encryption_decryption`.
     /// Here is the enter point. It also erase the state unconditionally afterwards.
-    fn serve(&mut self, input: &Path, output: &Path) -> Result<()> {
+    fn execute(&mut self, dir: &Path) -> Result<()> {
+        let input = dir.join("input");
+        let output = dir.join("output");
         let buf = read(input)?;
         let deserialized_input: AeadService = postcard::from_bytes(&buf)?;
         *self = deserialized_input;
