@@ -162,8 +162,8 @@ $(OUT_DIR)/single_client.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTI
 
 $(OUT_DIR)/dual_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
 	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate "$(PROGRAM_CRT) => $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT)" \
-		--certificate "$(DATA_CRT) => ./input/ : $(WRITE_RIGHT), ./output/ : $(READ_RIGHT)" \
+		--certificate "$(PROGRAM_CRT) => $(PROGRAM_DIR):$(WRITE_EXECUTE_RIGHT)" \
+		--certificate "$(DATA_CRT) => ./input/:$(WRITE_RIGHT),./output/:$(READ_RIGHT)" \
 		$(DEFAULT_PROGRAM_LIST) \
 		--veracruz-server-ip 127.0.0.1:3012 \
 		$(DEFAULT_FLAGS) \
@@ -171,7 +171,7 @@ $(OUT_DIR)/dual_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME
 
 $(OUT_DIR)/dual_parallel_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
 	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate "$(PROGRAM_CRT) => $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT)" \
+		--certificate "$(PROGRAM_CRT) => $(PROGRAM_DIR):$(WRITE_EXECUTE_RIGHT)" \
 		--certificate "$(DATA_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
 		$(DEFAULT_PROGRAM_LIST) \
 		--veracruz-server-ip 127.0.0.1:3013 \
@@ -181,7 +181,7 @@ $(OUT_DIR)/dual_parallel_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) 
 # Generate all the triple policy but on different port.
 $(OUT_DIR)/triple_policy_%.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
 	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate "$(PROGRAM_CRT) => $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT)" \
+		--certificate "$(PROGRAM_CRT) => $(PROGRAM_DIR):$(WRITE_EXECUTE_RIGHT)" \
 		--certificate "$(DATA_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
 		--certificate "$(RESULT_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
 		$(DEFAULT_PROGRAM_LIST) \
@@ -191,7 +191,7 @@ $(OUT_DIR)/triple_policy_%.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUN
 
 $(OUT_DIR)/quadruple_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
 	cd $(OUT_DIR) ; $(PGEN) \
-		--certificate "$(PROGRAM_CRT) => $(PROGRAM_DIR) : $(WRITE_EXECUTE_RIGHT)" \
+		--certificate "$(PROGRAM_CRT) => $(PROGRAM_DIR):$(WRITE_EXECUTE_RIGHT)" \
 		--certificate "$(DATA_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
 		--certificate "$(NEVER_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
 		--certificate "$(RESULT_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
