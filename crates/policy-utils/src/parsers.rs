@@ -19,6 +19,7 @@ use crate::pipeline::Expr;
 use lalrpop_util::lalrpop_mod;
 #[cfg(feature = "std")]
 use std::path;
+use anyhow::Result;
 
 lalrpop_mod!(pipeline);
 
@@ -31,7 +32,7 @@ lalrpop_mod!(pipeline);
 /// sort of mistakes should still be caught by a later
 /// "file-not-found" error.
 #[cfg(feature = "std")]
-pub fn parse_renamable_path(s: &str) -> Result<(String, path::PathBuf), &'static str> {
+pub fn parse_renamable_path(s: &str) -> Result<(String, path::PathBuf)> {
     match s.splitn(2, '=').collect::<Vec<_>>().as_slice() {
         [name, path] => Ok((String::from(*name), path::PathBuf::from(*path))),
         [path] => Ok((String::from(*path), path::PathBuf::from(*path))),
@@ -50,7 +51,7 @@ pub fn parse_renamable_path(s: &str) -> Result<(String, path::PathBuf), &'static
 /// sort of mistakes should still be caught by a later
 /// "file-not-found" error.
 #[cfg(feature = "std")]
-pub fn parse_renamable_paths(s: &str) -> Result<Vec<(String, path::PathBuf)>, &'static str> {
+pub fn parse_renamable_paths(s: &str) -> Result<Vec<(String, path::PathBuf)>> {
     s.split(',')
         .map(|s| parse_renamable_path(s.as_ref()))
         .collect::<Result<Vec<_>, _>>()
