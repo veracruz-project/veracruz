@@ -28,9 +28,10 @@ use std::{
     net::SocketAddr,
     path::PathBuf,
     collections::HashMap,
-    sync::atomic::{AtomicU32, Ordering},
+    sync::{Mutex, atomic::{AtomicU32, Ordering}},
 };
 use veracruz_utils::sha256::sha256;
+use lazy_static::lazy_static;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Miscellaneous useful functions.
@@ -41,6 +42,11 @@ use veracruz_utils::sha256::sha256;
 fn pretty_digest(buf: &[u8]) -> String {
     let digest = sha256(buf);
     HEXLOWER.encode(&digest)
+}
+
+lazy_static!{
+    /// A global buffer to hold all the programs and their hashes during the parsing.
+    static ref PROG_HASH : Mutex<Vec<FileHash>> = Mutex::new(Vec::new());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -151,12 +157,14 @@ impl Arguments {
     }
 
     /// Serializes the Veracruz policy file as a JSON value.
-    fn serialize_json(self) -> Result<Value> {
+    fn serialize_json(mut self) -> Result<Value> {
         info!("Serializing JSON policy file.");
 
         let linux_hash = self.compute_linux_enclave_hash()?;
         let nitro_hash = self.compute_nitro_enclave_hash()?;
 
+        let mut prog_hash = PROG_HASH.lock().map_err(|e| anyhow!("{e}"))?;
+        self.hash.append(&mut prog_hash);
         let policy = Policy::new(
             self.certificate,
             self.program_binary,
@@ -314,6 +322,7 @@ fn binary_parser(input: &str) -> Result<Program> {
         [path, permission] => {
             let (path, local) = parse_renamable_path(path.trim())?;
             let file_permissions = parse_permission(permission.trim())?;
+            PROG_HASH.lock().map_err(|e| anyhow!("{e}"))?.push(FileHash::new(path.clone(), compute_file_hash(&local)?));
             Ok(Program::new(path.to_string(), COUNTER.fetch_add(1, Ordering::SeqCst), file_permissions))
         }
         _ => Err(anyhow!("Error in parsing binary"))
