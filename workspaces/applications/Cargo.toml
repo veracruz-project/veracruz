@@ -17,7 +17,6 @@ members = [
   "crates/examples/rust-examples/aesctr-native",
   # "crates/examples/rust-examples/audio-event-triangulation",
   "crates/examples/rust-examples/darknet-inference-native",
-  "crates/examples/rust-examples/fd-create",
   "crates/examples/rust-examples/file-seek",
   "crates/examples/rust-examples/huffman-encoding",
   "crates/examples/rust-examples/idash2017-logistic-regression",
