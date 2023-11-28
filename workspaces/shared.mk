@@ -142,7 +142,7 @@ PGEN_COMMON_PARAMS =
 CLIENT_WRITE_PROG_CAPABILITY = "./input/:$(WRITE_RIGHT),./output/:$(READ_RIGHT),$(PROGRAM_DIR):$(WRITE_EXECUTE_RIGHT),/tmp/:$(READ_WRITE_RIGHT)"
 CLIENT_READ_PROG_CAPABILITY = "./input/:$(WRITE_RIGHT),./output/:$(READ_RIGHT),$(PROGRAM_DIR):$(OPEN_EXECUTE_RIGHT),/tmp/:$(READ_WRITE_RIGHT)"
 DEFAULT_PROGRAM_LIST = $(foreach prog_name,$(WASM_PROG_FILES),--program-binary "$(PROGRAM_DIR)$(notdir $(prog_name))=$(prog_name) => ./input/:$(READ_RIGHT),./output/:$(READ_WRITE_RIGHT),/tmp/:$(READ_WRITE_RIGHT)")
-DEFAULT_NATIVE_MODULE_LIST = --service "Postcard Service => /services/postcard_string.dat" --service "Postcard Service => /services/postcard_string.dat"
+DEFAULT_NATIVE_MODULE_LIST = --service "Postcard Service => /tmp/postcard/" --service "Echo Service => /tmp/echo/" --service "Counter mode AES Service => /tmp/aes/"
 
 MAX_MEMORY_MIB = 256
 DEFAULT_FLAGS = --proxy-attestation-server-ip 127.0.0.1:3010 \
@@ -165,6 +165,7 @@ $(OUT_DIR)/dual_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME
 		--certificate "$(PROGRAM_CRT) => $(PROGRAM_DIR):$(WRITE_EXECUTE_RIGHT)" \
 		--certificate "$(DATA_CRT) => ./input/:$(WRITE_RIGHT),./output/:$(READ_RIGHT)" \
 		$(DEFAULT_PROGRAM_LIST) \
+		$(DEFAULT_NATIVE_MODULE_LIST) \
 		--veracruz-server-ip 127.0.0.1:3012 \
 		$(DEFAULT_FLAGS) \
 		--output-policy-file $@
@@ -174,6 +175,7 @@ $(OUT_DIR)/dual_parallel_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) 
 		--certificate "$(PROGRAM_CRT) => $(PROGRAM_DIR):$(WRITE_EXECUTE_RIGHT)" \
 		--certificate "$(DATA_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
 		$(DEFAULT_PROGRAM_LIST) \
+		$(DEFAULT_NATIVE_MODULE_LIST) \
 		--veracruz-server-ip 127.0.0.1:3013 \
 		$(DEFAULT_FLAGS) \
 		--output-policy-file $@
@@ -185,6 +187,7 @@ $(OUT_DIR)/triple_policy_%.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUN
 		--certificate "$(DATA_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
 		--certificate "$(RESULT_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
 		$(DEFAULT_PROGRAM_LIST) \
+		$(DEFAULT_NATIVE_MODULE_LIST) \
 		--veracruz-server-ip 127.0.0.1:$(shell echo "3020 + $*" | bc) \
 		$(DEFAULT_FLAGS) \
 		--output-policy-file $@
@@ -196,6 +199,7 @@ $(OUT_DIR)/quadruple_policy.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RU
 		--certificate "$(NEVER_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
 		--certificate "$(RESULT_CRT) => $(CLIENT_READ_PROG_CAPABILITY)" \
 		$(DEFAULT_PROGRAM_LIST) \
+		$(DEFAULT_NATIVE_MODULE_LIST) \
 		--veracruz-server-ip 127.0.0.1:3030 \
 		$(DEFAULT_FLAGS) \
 		--output-policy-file $@
