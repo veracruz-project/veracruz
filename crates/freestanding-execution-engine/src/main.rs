@@ -23,13 +23,13 @@
 //! See the file `LICENSE.md` in the Veracruz root directory for licensing
 //! and copyright information.
 
-use clap::{ArgAction, Arg};
+use clap::Parser;
 use execution_engine::{execute, Environment};
 use log::*;
 use policy_utils::{
     parsers::parse_pipeline,
     pipeline::Expr, 
-    principal::{FilePermissions, ExecutionStrategy, NativeModule, NativeModuleType},
+    principal::{FilePermissions, ExecutionStrategy, Service, ServiceSource},
 };
 use std::{
     collections::HashMap,
@@ -38,6 +38,7 @@ use std::{
     time::Instant,
     vec::Vec,
 };
+use anyhow::{anyhow, Result};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants.
@@ -61,183 +62,46 @@ const VERSION: &str = "alpha";
 ////////////////////////////////////////////////////////////////////////////////
 
 /// A struct capturing all of the command line options passed to the program.
+#[derive(Debug, Parser)]
+#[command(name = APPLICATION_NAME, author = AUTHORS, version = VERSION, about = ABOUT, long_about = None, rename_all = "kebab-case")]
 struct CommandLineOptions {
     /// The list of file names passed as input data-sources.
-    input_sources: Vec<String>,
+    #[arg(short = 'i', long, value_name = "PATH")]
+    input_source: Vec<String>,
     /// The execution strategy to use when performing the computation.
+    #[arg(long, short = 'e', value_name = "Interpretation | JIT", default_value = "JIT")]
     execution_strategy: ExecutionStrategy,
     /// Environment variables for the program.
-    environment_variables: Vec<(String, String)>,
-    /// A list of native module names.
-    native_modules_names: Vec<String>,
-    /// A list of paths to native module entry points.
-    native_modules_entry_points: Vec<PathBuf>,
-    /// A list of paths to native module special files.
-    native_modules_special_files: Vec<PathBuf>,
-    /// The conditional pipeline of programs to execute.
+    #[arg(long, value_name = "PATH", value_parser=env_parser)]
+    env: Vec<(String, String)>,
+    #[arg(long, value_name = "SERVICE => DIR", value_parser = service_parser)]
+    service: Vec<Service>,
+    #[arg(short = 'r', long, value_name = "PATH", value_parser=pipeline_parser)]
     pipeline: Box<Expr>,
 }
 
-/// Parses the command line options, building a `CommandLineOptions` struct out
-/// of them.  If required options are not present, or if any options are
-/// malformed, this will abort the program.
-fn parse_command_line() -> Result<CommandLineOptions, Box<dyn Error>> {
-    let matches = clap::Command::new(APPLICATION_NAME)
-        .version(VERSION)
-        .author(AUTHORS)
-        .about(ABOUT)
-        .arg(
-            Arg::new("input")
-                .short('i')
-                .long("input-source")
-                .value_name("DIRECTORIES")
-                .help(
-                    "Space-separated paths to the input directories on disk. The directories are \
-                     copied into the root directory in Veracruz space. All programs are granted \
-                     with read capabilities.",
-                )
-                .num_args(0..),
-        )
-        .arg(
-            Arg::new("native-module-name")
-                .long("native-module-name")
-                .value_name("NAME")
-                .help("Specifies the name of the native module to use for the computation. \
-This must be of the form \"--native-module-name name\". Multiple --native-module-name flags may be provided.")
-                .num_args(1)
-                .action(ArgAction::Append),
-        )
-        .arg(
-            Arg::new("native-module-entry-point")
-                .long("native-module-entry-point")
-                .value_name("FILE")
-                .help("Specifies the path to the entry point of the native module to use for the computation. \
-This must be of the form \"--native-module-entry-point path\". Multiple --native-module-entry-point flags may be provided. \
-If the value is an empty string, the native module is assumed to be static, i.e. part of the Veracruz runtime, \
-and is looked up by name in the static native modules table.")
-                .num_args(1)
-                .action(ArgAction::Append),
-        )
-        .arg(
-            Arg::new("native-module-special-file")
-                .long("native-module-special-file")
-                .value_name("FILE")
-                .help("Specifies the path to the special file of the native module to use for the computation. \
-This must be of the form \"--native-module-special-file path\". Multiple --native-module-special-file flags may be provided.")
-                .num_args(1)
-                .action(ArgAction::Append),
-        )
-        .arg(
-            Arg::new("pipeline")
-                .short('r')
-                .long("pipeline")
-                .value_name("PIPELINE")
-                .help("The conditional pipeline of programs to be executed.")
-                .required(true),
-        )
-        .arg(
-            Arg::new("execution-strategy")
-                .short('x')
-                .long("execution-strategy")
-                .value_name("interp | jit")
-                .default_value("jit")
-                .help(
-                    "Selects the execution strategy to use: interpretation or JIT (defaults to \
-                     interpretation).",
-                ),
-        )
-        .arg(
-            Arg::new("env")
-                .long("env")
-                .help("Specify an environment variable and value (VAR=VAL).")
-                .value_name("VAR=VAL")
-                .num_args(1)
-                .action(ArgAction::Append),
-        )
-        .get_matches();
-
-    info!("Parsed command line.");
-
-    let execution_strategy = {
-        let strategy = matches
-            .get_one::<String>("execution-strategy")
-            .ok_or("jit")?
-            .as_str();
-
-        match strategy {
-            "interp" => {
-                info!("Selecting interpretation as the execution strategy.");
-                ExecutionStrategy::Interpretation
-            }
-            "jit" => {
-                info!("Selecting JITting as the execution strategy.");
-                ExecutionStrategy::JIT
-            }
-            _ => {
-                return Err(format!(
-                    "Expecting 'interp' or 'jit' as selectable execution strategies, but found {}",
-                    strategy
-                )
-                .into());
-            }
+fn service_parser(input: &str) -> Result<Service> {
+    match input.splitn(2,"=>").collect::<Vec<_>>().as_slice() {
+        [source, dir] => {
+            // TODO distinguish internal and provisional
+            Ok(Service::new(ServiceSource::Internal(source.trim().to_string()), PathBuf::from(dir.trim())))
         }
-    };
+        _ => Err(anyhow!("Error in parsing service"))
+    }
+}
 
-    // Read all native module names
-    let native_modules_names = matches
-        .get_many::<String>("native-module-name")
-        .map_or(Vec::new(), |p| p.map(|s| s.to_string()).collect::<Vec<_>>());
+fn env_parser(input: &str) -> Result<(String, String)> {
+    match input.splitn(2,"=").collect::<Vec<_>>().as_slice() {
+        [var, value] => {
+            // TODO distinguish internal and provisional
+            Ok((var.to_string(), value.to_string()))
+        }
+        _ => Err(anyhow!("Error in parsing environment variables"))
+    }
+}
 
-    // Read all native module entry points
-    let native_modules_entry_points = matches
-        .get_many::<String>("native-module-entry-point")
-        .map_or(Vec::new(), |p| {
-            p.map(|s| PathBuf::from(s)).collect::<Vec<_>>()
-        });
-
-    // Read all native module special files
-    let native_modules_special_files = matches
-        .get_many::<String>("native-module-special-file")
-        .map_or(Vec::new(), |p| {
-            p.map(|s| PathBuf::from(s)).collect::<Vec<_>>()
-        });
-
-    let pipeline = if let Some(pipeline_string) = matches.get_one::<String>("pipeline") {
-        parse_pipeline(pipeline_string)?
-    } else {
-        return Err("No executable pipeline provided".into());
-    };
-
-    let input_sources = if let Some(data) = matches.get_many::<String>("input") {
-        let input_sources: Vec<String> = data.map(|e| e.to_string()).collect();
-        info!(
-            "Selected {} data sources as input to computation.",
-            input_sources.len()
-        );
-        input_sources
-    } else {
-        Vec::new()
-    };
-
-    let environment_variables = match matches.get_many::<String>("env") {
-        None => Vec::new(),
-        Some(x) => x
-            .map(|e| {
-                let n = e.find('=').unwrap();
-                (e[0..n].to_string(), e[n + 1..].to_string())
-            })
-            .collect(),
-    };
-
-    Ok(CommandLineOptions {
-        input_sources,
-        execution_strategy,
-        environment_variables,
-        native_modules_names,
-        native_modules_entry_points,
-        native_modules_special_files,
-        pipeline,
-    })
+fn pipeline_parser(input: &str) -> Result<Box<Expr>> {
+    parse_pipeline(input)
 }
 
 /// Entry: reads the static configuration and the command line parameters,
@@ -245,51 +109,16 @@ This must be of the form \"--native-module-special-file path\". Multiple --nativ
 /// invoking the entry point.
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
-    let cmdline = parse_command_line()?;
+    let cmdline = CommandLineOptions::parse();
     info!("Command line read successfully.");
 
-    let permission = cmdline.input_sources.iter().map(|s| (PathBuf::from(s), FilePermissions{read: true, write: true, execute: true})).collect::<HashMap<_, _>>();
-
-    // Construct the native module table
-    info!("Serializing native modules.");
-
-    assert_eq!(
-        cmdline.native_modules_names.len(),
-        cmdline.native_modules_entry_points.len()
-    );
-    assert_eq!(
-        cmdline.native_modules_entry_points.len(),
-        cmdline.native_modules_special_files.len()
-    );
-
-    let mut native_modules = Vec::new();
-    for ((name, entry_point_path), special_file) in cmdline
-        .native_modules_names
-        .iter()
-        .zip(&cmdline.native_modules_entry_points)
-        .zip(&cmdline.native_modules_special_files)
-    {
-
-        let nm_type = if entry_point_path == &PathBuf::from("") {
-            NativeModuleType::Static {
-                special_file: PathBuf::from(special_file),
-            }
-        } else {
-            NativeModuleType::Dynamic {
-                special_file: PathBuf::from(special_file),
-                entry_point: entry_point_path.to_path_buf(),
-            }
-        };
-        native_modules.push(NativeModule::new(name.to_string(), nm_type));
-    }
-
+    let permission = cmdline.input_source.iter().map(|s| (PathBuf::from(s), FilePermissions{read: true, write: true, execute: true})).collect::<HashMap<_, _>>();
 
     info!("Data sources loaded.");
 
     // Execute the pipeline with the supplied environment
-
     let env = Environment {
-        environment_variables: cmdline.environment_variables,
+        environment_variables: cmdline.env,
         ..Default::default()
     };
 
@@ -304,6 +133,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         &cmdline.execution_strategy,
         &permission,
         &permission,
+        &cmdline.service,
         cmdline.pipeline.clone(),
         &env,
     )?;

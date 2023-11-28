@@ -27,7 +27,7 @@ use anyhow::{anyhow, Result};
 use log::info;
 use policy_utils::{
     pipeline::Expr,
-    principal::{PrincipalPermission, FilePermissions, ExecutionStrategy, check_permission},
+    principal::{PrincipalPermission, FilePermissions, ExecutionStrategy, check_permission, Service},
 };
 use std::{boxed::Box, path::Path};
 
@@ -39,15 +39,16 @@ fn is_wasm_binary(path_string: &String) -> bool {
 /// Execute `pipeline`. Program will be read with the `caller_filesystem`, who should have
 /// `FD_EXECUTE` and `FD_SEEK` permissions and executed with `pipeline_filesystem`.
 /// The function will return the error code.
-pub fn execute_pipeline(
+pub(crate) fn execute_pipeline(
     strategy: &ExecutionStrategy,
     caller_permissions: &PrincipalPermission,
     execution_permissions: &PrincipalPermission,
+    services: &[Service],
     pipeline: Box<Expr>,
     env: &Environment,
 ) -> Result<()> {
     // Iniital internal services
-    initial_service();
+    initial_service(services)?;
     use policy_utils::pipeline::Expr::*;
     match *pipeline {
         Literal(path) => {
@@ -68,17 +69,17 @@ pub fn execute_pipeline(
         Seq(vec) => {
             info!("Seq {:?}", vec);
             for expr in vec {
-                execute_pipeline(strategy, caller_permissions, execution_permissions, expr, env)?;
+                execute_pipeline(strategy, caller_permissions, execution_permissions, services, expr, env)?;
             }
             Ok(())
         }
         IfElse(cond, true_branch, false_branch) => {
             info!("IfElse {:?} true -> {:?} false -> {:?}", cond, true_branch, false_branch);
             let return_code = if Path::new(&cond).exists() {
-                execute_pipeline(strategy, caller_permissions, execution_permissions, true_branch, env)?
+                execute_pipeline(strategy, caller_permissions, execution_permissions, services, true_branch, env)?
             } else {
                 match false_branch {
-                    Some(f) => execute_pipeline(strategy, caller_permissions, execution_permissions, f, env)?,
+                    Some(f) => execute_pipeline(strategy, caller_permissions, execution_permissions, services, f, env)?,
                     None => (),
                 }
             };

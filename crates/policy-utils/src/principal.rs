@@ -217,13 +217,13 @@ impl Service {
     pub fn source(&self) -> &ServiceSource {
         &self.source
     }
-}
 
-//impl Debug for NativeModule {
-    //fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        //write!(f, "\"{}\" {:?}", self.name(), self.entry_point)
-    //}
-//}
+    /// return the dir where the service should be mounted.
+    #[inline]
+    pub fn dir(&self) -> &PathBuf {
+        &self.special_dir
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Pipeline

@@ -35,7 +35,7 @@ pub(crate) struct AesCounterModeService {
 impl Execution for AesCounterModeService {
     /// Return the name of this service
     fn name(&self) -> &str {
-        "Counter mode AES Service"
+        Self::NAME
     }
 
     /// Triggers the service. The details of the service can be found in function
@@ -58,6 +58,7 @@ impl Execution for AesCounterModeService {
 }
 
 impl AesCounterModeService {
+    pub(crate) const NAME: &'static str = "Counter mode AES Service";
     /// Create a new service, with empty internal state.
     pub fn new() -> Self {
         Self {

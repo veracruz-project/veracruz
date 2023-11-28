@@ -25,7 +25,7 @@ mod pipeline;
 mod common;
 
 
-use policy_utils::{pipeline::Expr, principal::{PrincipalPermission, ExecutionStrategy}};
+use policy_utils::{pipeline::Expr, principal::{PrincipalPermission, ExecutionStrategy, Service}};
 use std::boxed::Box;
 
 /// Runtime environment for a program.
@@ -52,8 +52,9 @@ pub fn execute(
     strategy: &ExecutionStrategy,
     caller_permissions: &PrincipalPermission,
     execution_permissions: &PrincipalPermission,
+    services: &[Service],
     pipeline: Box<Expr>,
     env: &Environment,
 ) -> anyhow::Result<()> {
-    pipeline::execute_pipeline(strategy, caller_permissions, execution_permissions, pipeline, env)
+    pipeline::execute_pipeline(strategy, caller_permissions, execution_permissions, services, pipeline, env)
 }

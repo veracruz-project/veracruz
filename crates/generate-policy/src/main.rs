@@ -349,6 +349,7 @@ fn pipeline_parser(input: &str) -> Result<Pipeline> {
 fn service_parser(input: &str) -> Result<Service> {
     match input.splitn(2,"=>").collect::<Vec<_>>().as_slice() {
         [source, dir] => {
+            // TODO distinguish internal and provisional
             Ok(Service::new(ServiceSource::Internal(source.trim().to_string()), PathBuf::from(dir.trim())))
         }
         _ => Err(anyhow!("Error in parsing service"))

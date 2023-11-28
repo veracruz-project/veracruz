@@ -36,7 +36,7 @@ pub(crate) struct AeadService {
 impl Execution for AeadService {
     /// Return the name of this service
     fn name(&self) -> &str {
-        "AEAD Service"
+        Self::NAME
     }
 
     /// Triggers the service. The details of the service can be found in function
@@ -59,6 +59,7 @@ impl Execution for AeadService {
 }
 
 impl AeadService {
+    pub(crate) const NAME: &'static str = "AEAD Service";
     /// Create a new service, with empty internal state.
     pub fn new() -> Self {
         Self {
