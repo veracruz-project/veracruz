@@ -19,7 +19,7 @@
 use crate::engines::wasmtime::WasmtimeRuntimeState;
 use crate::{
     Environment,
-    common::Execution,
+    Execution,
     service::common::initial_service,
     engines::sandbox::Sandbox,
 };
