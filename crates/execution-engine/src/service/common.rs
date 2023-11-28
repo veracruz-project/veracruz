@@ -12,9 +12,9 @@
 use anyhow::Result;
 use crate::{
     common::Execution,
-    service::{echo::EchoService, postcard::PostcardService, aes::AesCounterModeService}
+    service::{echo::EchoService, postcard::PostcardService, aes::AesCounterModeService, aead::AeadService}
 };
-use std::{fs::{create_dir_all, remove_file}, sync::Once, path::{Path, PathBuf}, thread::{spawn, JoinHandle}};
+use std::{fs::{create_dir_all, remove_file}, sync::Once, path::{Path, PathBuf}, thread::{spawn, JoinHandle}, collections::HashMap};
 use log::info;
 use nix::{unistd, sys::stat};
 
@@ -92,13 +92,36 @@ impl Services {
     }
 }
 
-pub fn initial_service() -> () {
+pub fn initial_service(services: &[policy_utils::principal::Service]) -> Result<()> {
+    let mut existing_services = HashMap::<&str, Box<dyn Execution>>::new();
+    existing_services.insert(EchoService::NAME, Box::new(EchoService::new()));
+    existing_services.insert(PostcardService::NAME, Box::new(PostcardService::new()));
+    existing_services.insert(AesCounterModeService::NAME, Box::new(AesCounterModeService::new()));
+    existing_services.insert(AeadService::NAME, Box::new(AeadService::new()));
+
+
+    // We will consume `existing_services` by using `into_iter`.
+    // It is needed for later extract the `Box<dyn Execution>`.
+    let mounted_services = existing_services.into_iter().filter_map(|(name, execution)|{
+        services.iter().find(|x| match x.source() {
+            // find the service where the `name` that match the `Internal(s)`
+            policy_utils::principal::ServiceSource::Internal(n) => n == name,
+            _ => false,
+        })
+        // if we find a matching, extract the dir information and pair with execution
+        .map(|s|{
+            (s.dir(), execution)
+        })
+    });
+
     unsafe {
         INIT_SERVICES.call_once(||{
-            SERVICES.register("/tmp/postcard/", Box::new(PostcardService::new())).unwrap();
-            SERVICES.register("/tmp/echo/", Box::new(EchoService::new())).unwrap();
-            SERVICES.register("/tmp/aes/", Box::new(AesCounterModeService::new())).unwrap();
+            mounted_services.for_each(|(dir, execution)|{
+                SERVICES.register(dir, execution).unwrap();
+            })
         });
     }
     info!("Initialised service");
+    Ok(())
 }
+

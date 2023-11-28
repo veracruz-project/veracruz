@@ -72,7 +72,7 @@ pub struct Struct3 {
 
 impl Execution for PostcardService {
     fn name(&self) -> &str {
-        "Postcard Service"
+        Self::NAME
     }
 
     fn execute(&mut self, dir: &Path) -> Result<()> {
@@ -92,6 +92,7 @@ impl Execution for PostcardService {
 }
 
 impl PostcardService {
+    pub(crate) const NAME: &'static str = "Postcard Service";
     pub(crate) fn new() -> Self {
         Self {}
     }

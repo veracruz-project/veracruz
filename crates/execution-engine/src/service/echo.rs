@@ -6,7 +6,7 @@ pub(crate) struct EchoService;
 
 impl Execution for EchoService {
     fn name(&self) -> &str {
-        "Echo Service"
+        Self::NAME
     }
 
     fn execute(&mut self, dir: &Path) -> Result<()> {
@@ -19,6 +19,7 @@ impl Execution for EchoService {
 }
 
 impl EchoService {
+    pub(crate) const NAME: &'static str = "Echo Service";
     pub(crate) fn new() -> Self {
         Self {}
     }

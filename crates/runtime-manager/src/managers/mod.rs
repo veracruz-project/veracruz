@@ -235,11 +235,13 @@ impl ProtocolState {
 
         let caller_permission = self.global_policy.get_permission(caller_principal)?;
         let execution_permission = self.global_policy.get_permission(execution_principal)?;
+        let services = self.global_policy.services();
                 
         execute(
             &execution_strategy,
             &caller_permission,
             &execution_permission,
+            services,
             pipeline,
             &env,
         )?;

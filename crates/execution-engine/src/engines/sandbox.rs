@@ -117,7 +117,7 @@ impl Execution for Sandbox {
             ])
             .output()?;
 
-        //self.teardown_fs()?;
+        self.teardown_fs()?;
 
         Ok(())
     }
