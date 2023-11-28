@@ -139,3 +139,11 @@ RUN ./build.sh --package qemu
 RUN ./build.sh --package kernel guest
 RUN ./build.sh --package ovmf
 
+WORKDIR /
+#RUN git clone https://github.com/virtee/sev-snp-measure.git
+RUN git clone https://github.com/larrydewey/sev-snp-measure.git
+WORKDIR /sev-snp-measure
+RUN git checkout debugswap
+#cd sev-snp-measure
+#./sev-snp-measure.py --help
+

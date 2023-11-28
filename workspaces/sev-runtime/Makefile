@@ -19,11 +19,14 @@ include $(WORKSPACE_DIR)/common.mk
 
 unresolved_crates_path := $(shell pwd)/crates
 
-all: initramfs_sev
+all: ./measurement initramfs_sev
 
 initramfs_sev: ./target/x86_64-unknown-linux-musl/debug/sev-runtime-manager linux-kernel
 	cp ./target/x86_64-unknown-linux-musl/debug/sev-runtime-manager ./init
 	echo -n init | cpio --null --create -V --format=newc -O ./initramfs_sev
+
+./measurement: ./target/x86_64-unknown-linux-musl/debug/sev-runtime-manager
+	/sev-snp-measure/sev-snp-measure.py --vcpus 4 --mode snp --vcpu-type EPYC-v4 --ovmf /AMDSEV/snp-release/usr/local/share/qemu/OVMF_CODE.fd --vmm-type QEMU > measurement
 
 ./target/x86_64-unknown-linux-musl/debug/sev-runtime-manager: FORCE
 	RUSTFLAGS="--remap-path-prefix $(unresolved_crates_path)=$(shell readlink -f $(unresolved_crates_path))" \

@@ -67,6 +67,7 @@ impl VeracruzServer for VeracruzServerSev {
             .arg("-m").arg("2048M,slots=5,maxmem=30G")
             .arg("-no-reboot")
             .arg("-drive").arg("if=pflash,format=raw,unit=0,file=/AMDSEV/snp-release/usr/local/share/qemu/OVMF_CODE.fd,readonly=on")
+            .arg("-drive").arg("if=pflash,format=raw,unit=1,file=/AMDSEV/snp-release/usr/local/share/qemu/OVMF_VARS.fd,readonly=on")
             .arg("-device").arg("virtio-scsi-pci,id=scsi0,disable-legacy=on,iommu_platform=true")
             .arg("-object").arg("sev-snp-guest,id=sev0,cbitpos=51,reduced-phys-bits=1,discard=none")
             .arg("-machine").arg("memory-encryption=sev0,vmport=off")
