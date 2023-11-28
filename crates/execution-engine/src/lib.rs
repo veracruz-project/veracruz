@@ -37,6 +37,14 @@ pub struct Environment {
     pub program_arguments: Vec<String>,
 }
 
+pub trait Execution: Send {
+    /// name of this execution.
+    fn name(&self) -> &str;
+
+    /// Entry point of this execution, it can be a path to a particular file or a dir
+    fn execute(&mut self, program_path: &std::path::Path) -> anyhow::Result<()>;
+}
+
 /// The top-level function executes the pipeline of programs, `pipeline`, on
 /// the `filesystem` handler, in which inputs, outputs and programs are stored,
 /// and an initial set of environment variables "shared" across the entire
