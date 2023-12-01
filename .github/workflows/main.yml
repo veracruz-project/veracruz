@@ -29,7 +29,7 @@ jobs:
             COSIGN_EXPERIMENTAL=true cosign verify \
             --certificate-identity-regexp 'https://github.com/veracruz-project/veracruz/.github/workflows/docker.yml@refs/heads/main' \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-              ghcr.io/veracruz-project/veracruz/ci@sha256:dd434df33153bd8915859eb0f280270d2cdf07d6100ef4332bcd18c5e8525068
+              ghcr.io/veracruz-project/veracruz/ci@sha256:48fbfbe4af44372b5cad15e80c7e17f523bb76cc157cf492860a48b37db4bd3f
 
   linux:
     runs-on: ubuntu-latest
@@ -37,7 +37,7 @@ jobs:
     outputs:
       output: ${{ steps.check-diff.outputs.cargo-lock }}
     container:
-      image: ghcr.io/veracruz-project/veracruz/ci@sha256:dd434df33153bd8915859eb0f280270d2cdf07d6100ef4332bcd18c5e8525068
+      image: ghcr.io/veracruz-project/veracruz/ci@sha256:48fbfbe4af44372b5cad15e80c7e17f523bb76cc157cf492860a48b37db4bd3f
       volumes:
         - ${{ github.workspace }}:/work/veracruz
     steps:
