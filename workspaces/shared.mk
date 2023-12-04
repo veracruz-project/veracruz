@@ -154,7 +154,7 @@ DEFAULT_FLAGS = --proxy-attestation-server-ip 127.0.0.1:3010 \
 $(OUT_DIR)/single_client.json: $(PGEN) $(CREDENTIALS) $(WASM_PROG_FILES) $(RUNTIME_ENCLAVE_BINARY_PATH)
 	cd $(OUT_DIR) ; $(PGEN) --certificate "$(CLIENT_CRT) => $(CLIENT_WRITE_PROG_CAPABILITY)" \
 	    $(DEFAULT_PROGRAM_LIST) \
-	    --pipeline "$(PROGRAM_DIR)random-u32-list.wasm ; if ./output/unsorted_numbers.txt { $(PROGRAM_DIR)sort-numbers.wasm ; } => ./input/:$(READ_RIGHT),./output/:$(READ_WRITE_RIGHT),./services/:$(READ_WRITE_RIGHT)" \
+	    --pipeline "$(PROGRAM_DIR)random-u32-list.wasm ; if ./output/unsorted_numbers.txt { $(PROGRAM_DIR)sort-numbers.wasm ; } => ./input/:$(READ_RIGHT),./output/:$(READ_WRITE_RIGHT),/tmp/:$(READ_WRITE_RIGHT)" \
 		$(DEFAULT_NATIVE_MODULE_LIST) \
         --veracruz-server-ip 127.0.0.1:3011 \
 		$(DEFAULT_FLAGS) \

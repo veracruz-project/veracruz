@@ -34,8 +34,8 @@ lalrpop_mod!(pipeline);
 #[cfg(feature = "std")]
 pub fn parse_renamable_path(s: &str) -> Result<(String, path::PathBuf)> {
     match s.splitn(2, '=').collect::<Vec<_>>().as_slice() {
-        [name, path] => Ok((String::from(*name), path::PathBuf::from(*path))),
-        [path] => Ok((String::from(*path), path::PathBuf::from(*path))),
+        [name, path] => Ok((String::from(name.trim()), path::PathBuf::from(path.trim()))),
+        [path] => Ok((String::from(path.trim()), path::PathBuf::from(path.trim()))),
         _ => unreachable!(),
     }
 }
