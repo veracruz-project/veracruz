@@ -27,7 +27,7 @@ jobs:
         id: cosign-verify
         run: |
             COSIGN_EXPERIMENTAL=true cosign verify \
-            --certificate-identity-regexp 'https://github.com/veracruz-project/veracruz/.github/workflows/docker.yml@refs/heads/main' \
+            --certificate-identity-regexp 'https://github.com/veracruz-project/veracruz/.github/workflows/docker.yml@refs/heads/dreemkiller_amd_sev' \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
               ghcr.io/veracruz-project/veracruz/ci@sha256:48fbfbe4af44372b5cad15e80c7e17f523bb76cc157cf492860a48b37db4bd3f
 
