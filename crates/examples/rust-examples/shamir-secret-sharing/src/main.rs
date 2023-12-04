@@ -218,6 +218,7 @@ fn main() -> anyhow::Result<()> {
     let secret = shares_reconstruct(&shares);
 
     // write our output
+    let _ = fs::create_dir_all("./output/");
     fs::write("./output/shamir.dat", &secret)?;
     Ok(())
 }
