@@ -54,9 +54,3 @@ transport-protocol = { path = "../transport-protocol" }
 veracruz-client = { path = "../veracruz-client" }
 veracruz-server = { path = "../veracruz-server" }
 veracruz-utils = { path = "../veracruz-utils" }
-
-[patch.'https://github.com/veracruz-project/nitro-enclave']
-raw-fd = { git = "https://github.com//veracruz-project/nitro-enclave", branch = "dreemkiller_expose_vsocket" }
-vsocket = { git = "https://github.com//veracruz-project/nitro-enclave", branch = "dreemkiller_expose_vsocket" }
-[patch.'https://github.com/veracruz-project/proxy-attestation-client']
-proxy-attestation-client = {  git = "https://github.com//veracruz-project/proxy-attestation-client", branch = "dreemkiller_add_sev" }

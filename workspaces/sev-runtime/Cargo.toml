@@ -27,3 +27,4 @@ resolver = "2"
 codegen-units = 1
 lto = true
 opt-level = 3
+

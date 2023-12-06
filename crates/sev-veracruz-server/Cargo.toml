@@ -14,16 +14,10 @@ env_logger = { version = "0.9.0" }
 log = "0.4.13"
 #nix = { version = "0.20.2" }
 policy-utils = { path = "../policy-utils", features = ["std"] }
-proxy-attestation-client = { git = "https://github.com/veracruz-project/proxy-attestation-client", tag = "v0.2" }
-raw-fd = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.1" }
+proxy-attestation-client = { git = "https://github.com/veracruz-project/proxy-attestation-client", tag = "v0.4" }
+raw-fd = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.3" }
 rustix = "=0.37.13"
 structopt = { version = "0.3", features = ["wrap_help"] }
 veracruz-server = { path = "../veracruz-server", features = ["sev"] }
 veracruz-utils = { path = "../veracruz-utils"}
-vsocket = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.1" }
-
-[patch.'https://github.com/veracruz-project/nitro-enclave']
-raw-fd = { git = "https://github.com//veracruz-project/nitro-enclave", branch = "dreemkiller_expose_vsocket" }
-vsocket = { git = "https://github.com//veracruz-project/nitro-enclave", branch = "dreemkiller_expose_vsocket" }
-[patch.'https://github.com/veracruz-project/proxy-attestation-client']
-proxy-attestation-client = { git = "https://github.com//veracruz-project/proxy-attestation-client", branch = "dreemkiller_add_sev" }
+vsocket = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.3" }

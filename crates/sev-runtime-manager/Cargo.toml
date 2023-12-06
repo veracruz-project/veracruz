@@ -11,8 +11,8 @@ links = "sev-guest-get-report"
 
 [dependencies]
 anyhow = "1"
-nix = { version = "0.20.2" }
-raw-fd = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.1" }
+nix = { version = "0.26.4" }
+raw-fd = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.3" }
 runtime-manager = { path = "../runtime-manager" }
 sev-snp-utils = { version = "=1.4.4", package= "lit-sev-snp-utils"}
 rustix = "=0.37.13"
