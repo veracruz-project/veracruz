@@ -182,14 +182,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fd-create"
-version = "0.3.0"
-dependencies = [
- "anyhow",
- "libveracruz",
-]
-
-[[package]]
 name = "fdeflate"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -407,10 +399,6 @@ name = "libc"
 version = "0.2.144"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b00cc1c228a6782d0f076e7b232802e0c5689d41bb5df366f2a6b6621cfdfe1"
-
-[[package]]
-name = "libveracruz"
-version = "0.3.0"
 
 [[package]]
 name = "linear-regression"
