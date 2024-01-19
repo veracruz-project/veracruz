@@ -14,3 +14,4 @@ protobuf = "3.2.0"
 
 [build-dependencies]
 protobuf-codegen = "=3.2.0"
+home = "=0.5.5"
