@@ -1,4 +1,4 @@
-VERSION = v23.12
+VERSION = v24.01
 IMAGE ?= veracruz
 CONTAINER ?= veracruz
 VERACRUZ_ROOT ?= ..
@@ -204,6 +204,6 @@ sev-run-build: sev-build
 sev-exec:
 	docker exec -u root -i -t $(CONTAINER)-sev-$(USER)-$(VERSION) /bin/bash || true
 
-sev-base: sev/Dockerfile base
+sev-base: sev/Dockerfile nitro-base
 	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) \
 		-t $(IMAGE)/sev:$(VERSION) -f $< .
