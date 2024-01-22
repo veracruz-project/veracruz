@@ -14,7 +14,7 @@
 
 ARG VERSION="latest"
 
-FROM veracruz/base:${VERSION}
+FROM veracruz/nitro:${VERSION}
 ENV DEBIAN_FRONTEND noninteractive
 
 ARG ARCH=x86_64
@@ -128,13 +128,13 @@ WORKDIR /AMDSEV
 WORKDIR /
 COPY common.patch AMDSEV/common.patch
 COPY build.patch AMDSEV/build.patch
-COPY stable-commits.patch AMDSEV/stable-commits.patch
+#COPY stable-commits.patch AMDSEV/stable-commits.patch
 COPY boot_config AMDSEV/.config
 COPY get-report.patch AMDSEV/get-report.patch
 WORKDIR AMDSEV
 RUN git apply common.patch
 RUN git apply build.patch
-RUN git apply stable-commits.patch
+#RUN git apply stable-commits.patch
 RUN ./build.sh --package qemu
 RUN ./build.sh --package kernel guest
 RUN ./build.sh --package ovmf

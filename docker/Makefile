@@ -68,7 +68,7 @@ $(HOME)/.cargo/registry:
 .PHONY: ci-base ci-run ci-exec ci-image ci-image-tag \
 	localci-run localci-exec localci-base
 
-ci-base: ci/Dockerfile.base nitro-base
+ci-base: ci/Dockerfile.base sev-base
 	$(DOCKER_BUILD_CMD) $(BUILD_ARGS) -t $(IMAGE)/ci-base:$(VERSION) -f $< .
 
 ci-run: | $(HOME)/.cargo/registry
