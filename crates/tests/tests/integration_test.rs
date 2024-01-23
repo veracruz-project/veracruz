@@ -284,6 +284,9 @@ fn server_tls_loop(policy_json: String) {
     #[cfg(feature = "nitro")]
     let platform_veracruz_server =
         nitro_veracruz_server::server::VeracruzServerNitro::new(&policy_json).unwrap();
+    #[cfg(feature = "sev")]
+    let platform_veracruz_server =
+        sev_veracruz_server::server::VeracruzServerSev::new(&policy_json).unwrap();
     veracruz_server::server::server(&policy_json, platform_veracruz_server).unwrap()
 }
 

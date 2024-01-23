@@ -105,6 +105,8 @@ struct Arguments {
     /// The filename of the Runtime Manager PRCR0 file for Nitro Enclave
     /// measurement.  This is optional.
     pcr0_file: Option<PathBuf>,
+    /// The hash of the SEV SNP image. This is optional
+    sevsnp_hash: Option<String>,
     /// The filename of the output policy file.
     output_policy_file: PathBuf,
     /// The expiry timepoint of the server certificate.  This is not optional,
@@ -222,6 +224,13 @@ impl Arguments {
                     .help("Filename of the PCR0 file for the Runtime Manager enclave for AWS Nitro Enclave measurement.")
                     .num_args(1)
                     .required(false)
+            )
+            .arg(
+                Arg::new("sevsnp-hash")
+                    .long("sevsnp-hash")
+                    .value_name("HASH")
+                    .help("Hash of the SEV SNP measurment")
+                    .required(false),
             )
             .arg(
                 Arg::new("output-policy-file")
@@ -444,9 +453,12 @@ impl Arguments {
         let pcr0_file = matches
             .get_one::<String>("pcr-file")
             .map(|fname| PathBuf::from(fname));
-        if css_file.is_none() && pcr0_file.is_none() {
+        let sevsnp_hash = matches
+            .get_one::<String>("sevsnp-hash")
+            .map(|value| value.to_string());
+        if css_file.is_none() && pcr0_file.is_none() && sevsnp_hash.is_none() {
             return Err(anyhow!(
-                "Either the CSS.bin or the PCR0 file must be provided as a \
+                "Either the CSS.bin, sevsnp_hash, or the PCR0 file must be provided as a \
     command-line parameter.",
             ));
         }
@@ -492,6 +504,7 @@ impl Arguments {
             proxy_service_cert,
             css_file,
             pcr0_file,
+            sevsnp_hash,
             output_policy_file,
             certificate_expiry,
             program_binaries,
@@ -521,6 +534,7 @@ impl Arguments {
             POLICY_CIPHERSUITE.to_string(),
             self.compute_linux_enclave_hash()?,
             self.compute_nitro_enclave_hash()?,
+            self.sevsnp_hash.clone(),
             format!("{}", self.proxy_attestation_server_ip),
             self.serialize_proxy_service_certificate()?,
             self.enclave_debug_mode,

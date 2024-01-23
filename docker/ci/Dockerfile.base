@@ -15,7 +15,7 @@
 
 ARG VERSION="latest"
 
-FROM veracruz/nitro:${VERSION} as final
+FROM veracruz/sev:${VERSION} as final
 
 RUN \
     if [ -d /work/aarch64-linux-musl-native ] ; then \

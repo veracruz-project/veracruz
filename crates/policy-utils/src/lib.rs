@@ -70,6 +70,8 @@ pub enum Platform {
     Linux,
     /// The enclave is running under AWS Nitro enclaves.
     Nitro,
+    /// The AMD SEV-SNP platform
+    SEVSNP,
     /// The mock platform for unit testing (client unit tests, at the moment).
     Mock,
 }
@@ -92,6 +94,7 @@ impl fmt::Display for Platform {
         match self {
             Platform::Linux => write!(f, "linux"),
             Platform::Nitro => write!(f, "nitro"),
+            Platform::SEVSNP => write!(f, "sevsnp"),
             Platform::Mock => write!(f, "mock"),
         }
     }

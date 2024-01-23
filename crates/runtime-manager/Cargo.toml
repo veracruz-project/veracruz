@@ -9,7 +9,6 @@ resolver = "2"
 [features]
 default = []
 linux = [
-  "bincode",
   "execution-engine/std",
   "io-utils/linux",
   "nix",
@@ -19,7 +18,6 @@ linux = [
   "veracruz-utils/linux",
 ]
 nitro = [
-  "bincode",
   "execution-engine/std",
   "execution-engine/nitro",
   "io-utils/nitro",
@@ -32,7 +30,7 @@ nitro = [
 
 [dependencies]
 anyhow = "1"
-bincode = { version = "1.2.1", default-features = false, optional = true }
+bincode = { version = "1.2.1", default-features = false }
 err-derive = "0.2"
 execution-engine = { path = "../execution-engine" }
 hex = { version = "0.4.2" }

@@ -29,6 +29,11 @@ nitro = [
   "veracruz-utils/nitro",
 ]
 
+sev = [
+  "policy-utils/std",
+  "sev-veracruz-server",
+]
+
 [dependencies]
 actix-rt = "2"
 anyhow = "1"
@@ -44,7 +49,8 @@ nix = "0.26"
 policy-utils = { path = "../policy-utils", optional = true }
 postcard = "1.0.0"
 reqwest = { version = "0.11", default-features = false, features = ["blocking", "rustls-tls"]}
+sev-veracruz-server = { path = "../sev-veracruz-server", optional = true }
 transport-protocol = { path = "../transport-protocol" }
 veracruz-client = { path = "../veracruz-client" }
 veracruz-server = { path = "../veracruz-server" }
-veracruz-utils = { path = "../veracruz-utils", optional = true }
+veracruz-utils = { path = "../veracruz-utils" }

@@ -22,4 +22,4 @@ err-derive = "0.2"
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls", default-features = false, features = ["std", "aesni", "padlock", "tls13"] }
 platform-services = { path = "../platform-services" }
 policy-utils = { path = "../policy-utils" }
-veracruz-utils = { path = "../veracruz-utils", optional = true }
+veracruz-utils = { path = "../veracruz-utils" }

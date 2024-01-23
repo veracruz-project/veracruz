@@ -1,0 +1,10 @@
+[package]
+authors = ["The Veracruz Development Team"]
+description = "A dummy package"
+edition = "2018"
+name = "sev-host"
+version = "0.3.0"
+
+[dependencies]
+tests = { path = "../../crates/tests", features = [ "sev" ] }
+veracruz-runtime = { path = "../../crates/veracruz-runtime", features = [ "sev", "cli" ] }

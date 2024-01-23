@@ -1,0 +1,22 @@
+diff --git a/stable-commits b/stable-commits
+index 9586a25..c2ad566 100644
+--- a/stable-commits
++++ b/stable-commits
+@@ -8,7 +8,9 @@ KERNEL_HOST_BRANCH="snp-host-latest"
+ KERNEL_GUEST_BRANCH="snp-host-latest"
+ 
+ # qemu commit
+-QEMU_GIT_URL="https://github.com/AMDESE/qemu.git"
++QEMU_GIT_URL="https://github.com/AMDESE/qemu.git"
++#QEMU_GIT_URL="https://git.research.arm.com/dermil01/snp-qemu.git"
++#QEMU_GIT_URL="https://dermil01:KVyMxZhV9WXnegMzvLNg@172.28.97.3/dermil01/snp-qemu.git"
+ QEMU_BRANCH="snp-latest"
+ 
+ # guest bios
+@@ -21,3 +23,6 @@ QEMU_BRANCH="snp-latest"
+ #   SNP hypervisor/host kernels.
+ OVMF_GIT_URL="https://github.com/AMDESE/ovmf.git"
+ OVMF_BRANCH="snp-latest"
++
++SEV_GUEST_GIT_URL="https://github.com/AMDESE/sev-guest.git"
++SEV_GUEST_BRANCH="main"
