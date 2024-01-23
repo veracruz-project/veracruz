@@ -14,7 +14,7 @@
 
 ARG VERSION="latest"
 
-FROM veracruz/nitro:${VERSION}
+FROM veracruz/nitro:${VERSION} as sev_foundation
 ENV DEBIAN_FRONTEND noninteractive
 
 ARG ARCH=x86_64
@@ -131,19 +131,33 @@ COPY build.patch AMDSEV/build.patch
 #COPY stable-commits.patch AMDSEV/stable-commits.patch
 COPY boot_config AMDSEV/.config
 COPY get-report.patch AMDSEV/get-report.patch
-WORKDIR AMDSEV
+WORKDIR /AMDSEV
 RUN git apply common.patch
 RUN git apply build.patch
 #RUN git apply stable-commits.patch
+
+from sev_foundation as qemu_build
+WORKDIR /AMDSEV
 RUN ./build.sh --package qemu
-#RUN ./build.sh --package kernel guest
+
+from sev_foundation as guest_kernel_build
+WORKDIR /AMDSEV
+RUN ./build.sh --package kernel guest
+
+from sev_foundation as ovmf_build
+WORKDIR /AMDSEV
 RUN ./build.sh --package ovmf
+
+
+from sev_foundation as sev_final
+WORKDIR /AMDSEV
+COPY --from=qemu_build /AMDSEV/snp-release/usr/ /AMDSEV/snp-release/
+COPY --from=guest_kernel_build /AMDSEV/snp-release/linux/ /AMDSEV/snp-release/
+COPY --from=ovmf_build /AMDSEV/snp-release/usr/local/share/qemu/OVMF_CODE.fd /AMDSEV/snp-release/usr/local/share/qemu/
+COPY --from=ovmf_build /AMDSEV/snp-release/usr/local/share/qemu/OVMF_VARS.fd /AMDSEV/snp-release/usr/local/share/qemu/
 
 WORKDIR /
 #RUN git clone https://github.com/virtee/sev-snp-measure.git
 RUN git clone https://github.com/larrydewey/sev-snp-measure.git
 WORKDIR /sev-snp-measure
 RUN git checkout debugswap
-#cd sev-snp-measure
-#./sev-snp-measure.py --help
-
