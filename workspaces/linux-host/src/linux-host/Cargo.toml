@@ -7,5 +7,5 @@ version = "0.3.0"
 
 [dependencies]
 tests = { path = "../../crates/tests", features = [ "linux" ] }
-veracruz-client = { path = "../../crates/veracruz-client", features = [ "linux", "cli" ] }
-veracruz-server = { path = "../../crates/veracruz-server", features = [ "linux", "cli" ] }
+veracruz-client = { path = "../../crates/veracruz-client", features = [ "linux" ] }
+veracruz-server = { path = "../../crates/veracruz-server", features = [ "linux" ] }

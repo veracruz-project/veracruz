@@ -19,34 +19,29 @@
 #[macro_use]
 extern crate std;
 
-#[macro_use]
-extern crate num_derive;
-
 mod engines;
-pub mod fs;
-mod native_module_manager;
-mod native_modules;
+mod service;
 mod pipeline;
-// Expose the error to the external.
-pub use engines::common::FatalEngineError;
 
-use crate::fs::FileSystem;
-use policy_utils::{pipeline::Expr, principal::ExecutionStrategy};
+
+use policy_utils::{pipeline::Expr, principal::{PrincipalPermission, ExecutionStrategy, Service}};
 use std::boxed::Box;
 
-/// Runtime options for a program.
+/// Runtime environment for a program.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Default)]
-pub struct Options {
+pub struct Environment {
     /// The environment variables currently set, and their bindings.
     pub environment_variables: Vec<(String, String)>,
     /// The program arguments of the executable being executed.
     pub program_arguments: Vec<String>,
-    /// Whether clock-related functionality is enabled for the program.  If not
-    /// enabled, clock- and time-related WASI host-calls return an unimplemented
-    /// status code.
-    pub enable_clock: bool,
-    /// Whether strace-like output is enabled.
-    pub enable_strace: bool,
+}
+
+pub trait Execution: Send {
+    /// name of this execution.
+    fn name(&self) -> &str;
+
+    /// Entry point of this execution, it can be a path to a particular file or a dir
+    fn execute(&mut self, program_path: &std::path::Path) -> anyhow::Result<()>;
 }
 
 /// The top-level function executes the pipeline of programs, `pipeline`, on
@@ -62,16 +57,11 @@ pub struct Options {
 /// such as `freestanding-execution-engine` and `runtime-manager` can rely on.
 pub fn execute(
     strategy: &ExecutionStrategy,
-    mut caller_filesystem: FileSystem,
-    pipepine_filesystem: FileSystem,
+    caller_permissions: &PrincipalPermission,
+    execution_permissions: &PrincipalPermission,
+    services: &[Service],
     pipeline: Box<Expr>,
-    options: &Options,
-) -> anyhow::Result<u32> {
-    Ok(pipeline::execute_pipeline(
-        strategy,
-        &mut caller_filesystem,
-        &pipepine_filesystem,
-        pipeline,
-        options,
-    )?)
+    env: &Environment,
+) -> anyhow::Result<()> {
+    pipeline::execute_pipeline(strategy, caller_permissions, execution_permissions, services, pipeline, env)
 }

@@ -16,7 +16,7 @@
 use anyhow;
 use std::fs;
 
-const OUTPUT_FILENAME: &'static str = "/output/number-set.txt";
+const OUTPUT_FILENAME: &'static str = "./output/number-set.txt";
 
 fn main() -> anyhow::Result<()> {
     let mut set: Vec<u32> = Vec::new();

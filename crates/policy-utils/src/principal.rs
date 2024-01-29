@@ -15,9 +15,10 @@
 use super::error::PolicyError;
 use crate::{parsers::parse_pipeline, pipeline::Expr};
 use anyhow::{anyhow, Result};
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug, path::PathBuf, string::String, vec::Vec};
-use wasi_types::Rights;
+use serde::{Deserialize, Serialize, Serializer, Deserializer};
+use std::{collections::HashMap, fmt::Debug, path::{Path, PathBuf}, string::String, str::FromStr};
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // File operation and capabilities.
@@ -40,48 +41,102 @@ pub enum Principal {
     NoCap,
 }
 
-/// The Right Table, contains the `Right`, i.e.
-/// the allowed operations of a Principal on a file
-pub type RightsTable = HashMap<Principal, HashMap<PathBuf, Rights>>;
+/// The Permission Table, i.e. the allowed operations, `rwx`, of a Principal on directories.
+pub type PrincipalPermission = HashMap<PathBuf, FilePermissions>;
+pub type PermissionTable = HashMap<Principal, PrincipalPermission>;
 
-/// Defines a file entry in the policy, containing the name and `Right`, the allowed op.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct FileRights {
-    /// The file name
-    file_name: String,
-    /// The associated right, when someone open the file
-    rights: u32,
+/// Check if the `target_path` is allowed to perform `target_permission` in the `table`.
+pub fn check_permission<T: AsRef<Path>>(
+    table: &PrincipalPermission,
+    target_path: T,
+    target_permission: &FilePermissions,
+) -> bool {
+    table
+       .iter()
+       // Find the permission corresponding to the longest prefix.
+       .fold((0, false), |(max_length, result), (path, permission)|{
+           if !target_path.as_ref().starts_with(path){
+               // prefix of target_path does not match path
+               // return the previous result
+               return (max_length, result);
+           }  
+
+           let size = path.as_os_str().len();
+
+           if size <= max_length {
+               // The matched path is shorted than previous one
+               // return the previous result
+               return (max_length, result);
+           }
+
+           // If reaching here, find a longer prefix match
+           (size, permission.allows(target_permission))
+
+       }).1
 }
 
-impl FileRights {
+/// Defines a file entry in the policy, containing the name and `Right`, the allowed op.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FilePermissions {
+    pub read: bool,
+    pub write: bool,
+    pub execute: bool,
+}
+
+impl FilePermissions {
     /// Creates a new file permission.
     #[inline]
-    pub fn new(file_name: String, rights: u32) -> Self {
-        Self { file_name, rights }
+    pub fn new(read: bool, write: bool, execute: bool) -> Self {
+        Self { read, write, execute }
     }
 
-    /// Returns the file_name.
-    #[inline]
-    pub fn file_name(&self) -> &str {
-        self.file_name.as_str()
+    /// Check if the current permission allows `request`
+    pub fn allows(&self, request: &Self) -> bool {
+        // request -> (logic imply) self
+        // This means, if `request` needs a true, 
+        // then check the permission in `self`. Otherwise, `request` 
+        // is false and the entire formulae is true.
+        //
+        // Noting that A -> B is logically equivalent to
+        // ~(A /\ ~B) where ~ means negation and /\ means logical and.
+        !(request.read & !self.read)
+        & !(request.write & !self.write)
+        & !(request.execute & !self.execute)
     }
+}
 
-    /// Returns the rights.
-    #[inline]
-    pub fn rights(&self) -> &u32 {
-        &self.rights
+/// Custom serialize and deserialize to "rwx"
+impl Serialize for FilePermissions {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut permission = String::new();
+        if self.read {
+            permission.push('r');
+        } 
+        if self.write {
+            permission.push('w');
+        }
+        if self.execute {
+            permission.push('x');
+        }
+
+        serializer.serialize_str(&permission)
     }
+}
 
-    /// Convert a vec of FileRights to a Hashmap from filenames to Rights.
-    #[inline]
-    pub fn compute_right_map(file_right_vec: &[FileRights]) -> HashMap<PathBuf, Rights> {
-        file_right_vec.iter().fold(
-            HashMap::new(),
-            |mut acc, FileRights { file_name, rights }| {
-                acc.insert(file_name.into(), Rights::from_bits_truncate(*rights as u64));
-                acc
-            },
-        )
+impl<'de> Deserialize<'de> for FilePermissions {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: &str = Deserialize::deserialize(deserializer)?;
+        Ok(Self {
+            read: s.contains('r'),
+            write: s.contains('w'),
+            execute: s.contains('x'),
+        })
     }
 }
 
@@ -96,7 +151,7 @@ pub struct Program {
     /// The program ID
     id: u32,
     /// The file permission that specifies the program's ability to read, write and execute files.
-    file_rights: Vec<FileRights>,
+    file_rights: PrincipalPermission,
 }
 
 impl Program {
@@ -105,7 +160,7 @@ impl Program {
     pub fn new<T: Into<u32>>(
         program_file_name: String,
         id: T,
-        file_rights: Vec<FileRights>,
+        file_rights: PrincipalPermission,
     ) -> Self {
         Self {
             program_file_name,
@@ -128,89 +183,45 @@ impl Program {
 
     /// Return file rights map associated to the program.
     #[inline]
-    pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
-        FileRights::compute_right_map(&self.file_rights)
+    pub fn file_rights_map(&self) -> PrincipalPermission {
+        self.file_rights.clone()
     }
-}
-
-/// Defines a native module type.
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
-pub enum NativeModuleType {
-    /// Native module that is part of the Veracruz runtime and invoked as a
-    /// function call by a WASM program via a write to the native module's
-    /// special file on the VFS.
-    /// This type does not define an entry point, it is looked up by name in the
-    /// static native modules table.
-    /// Despite its static behaviour, a static native module must be explicitly
-    /// declared in the policy file to be used in a computation. See
-    /// `generate-policy` for more details.
-    Static { special_file: PathBuf },
-    /// Native module that is a separate binary built independently from
-    /// Veracruz and residing on the kernel's filesystem.
-    /// Defines an entry point, i.e. path to the main binary relative to the
-    /// native module's root directory.
-    /// Invoked by a WASM program via a write to the native module's special
-    /// file on the VFS and executed in a sandbox environment on the kernel's
-    /// filesystem. The environment's filesystem is copied back to the VFS after
-    /// execution.
-    /// Dynamic linking is supported if the shared libraries can be found.
-    Dynamic {
-        special_file: PathBuf,
-        entry_point: PathBuf,
-    },
-    /// Native module that is provisioned to the enclave and executed just like
-    /// a regular WASM program, i.e. via a result request from a participant.
-    /// Dynamic linking is supported if the shared libraries can be found.
-    /// The execution principal corresponding to the native module should have
-    /// read access to every directory containing the execution artifacts
-    /// (binary and optional shared libraries).
-    Provisioned { entry_point: PathBuf },
 }
 
 /// Defines a native module that can be loaded directly (provisioned native
 /// module) or indirectly (static and dynamic native modules) in the execution
 /// environment.
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub struct NativeModule {
-    /// Native module's name
-    name: String,
-    /// Native's module type
-    r#type: NativeModuleType,
-    // TODO: add sandbox policy
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Service {
+    /// The source (executable) of the service
+    pub source: ServiceSource,
+    /// The root directory used by this service
+    pub special_dir: PathBuf,
 }
 
-impl NativeModule {
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ServiceSource {
+    Internal(String),
+    Provision(PathBuf),
+}
+
+impl Service {
     /// Creates a Veracruz native module.
     #[inline]
-    pub fn new(name: String, r#type: NativeModuleType) -> Self {
-        Self { name, r#type }
+    pub fn new(source: ServiceSource, special_dir: PathBuf) -> Self {
+        Self { source, special_dir }
     }
 
     /// Return the name.
     #[inline]
-    pub fn name(&self) -> &str {
-        self.name.as_str()
+    pub fn source(&self) -> &ServiceSource {
+        &self.source
     }
 
-    /// Return the type.
+    /// return the dir where the service should be mounted.
     #[inline]
-    pub fn r#type(&self) -> &NativeModuleType {
-        &self.r#type
-    }
-
-    /// Return whether the native module is static
-    #[inline]
-    pub fn is_static(&self) -> bool {
-        match self.r#type {
-            NativeModuleType::Static { .. } => true,
-            _ => false,
-        }
-    }
-}
-
-impl Debug for NativeModule {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "\"{}\" {:?}", self.name(), self.r#type)
+    pub fn dir(&self) -> &PathBuf {
+        &self.special_dir
     }
 }
 
@@ -233,7 +244,7 @@ pub struct Pipeline {
     /// The pipeline ID
     id: u32,
     /// The file permission that specifies the program's ability to read, write and execute files.
-    file_rights: Vec<FileRights>,
+    file_rights: PrincipalPermission,
 }
 
 impl Pipeline {
@@ -243,7 +254,7 @@ impl Pipeline {
         name: String,
         id: T,
         preparsed_pipeline: String,
-        file_rights: Vec<FileRights>,
+        file_rights: PrincipalPermission,
     ) -> Result<Self> {
         let parsed_pipeline = Some(parse_pipeline(&preparsed_pipeline)?);
         Ok(Self {
@@ -272,8 +283,8 @@ impl Pipeline {
 
     /// Return file rights map associated to the program.
     #[inline]
-    pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
-        FileRights::compute_right_map(&self.file_rights)
+    pub fn file_rights_map(&self) -> PrincipalPermission {
+        self.file_rights.clone()
     }
 
     /// Return the pipeline AST.
@@ -299,6 +310,20 @@ pub enum ExecutionStrategy {
     JIT,
 }
 
+
+impl FromStr for ExecutionStrategy {
+    type Err = anyhow::Error;
+
+    // Required method
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "Interpretation" => Ok(ExecutionStrategy::Interpretation),
+            "JIT" => Ok(ExecutionStrategy::JIT),
+            _otherwise => Err(anyhow!("Could not parse execution strategy argument.")),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Identities.
 ////////////////////////////////////////////////////////////////////////////////
@@ -321,14 +346,14 @@ pub struct Identity<U> {
     id: u32,
     /// The file capabilities that specifies this principal's ability to read,
     /// write and execute files.
-    file_rights: Vec<FileRights>,
+    file_rights: PrincipalPermission,
 }
 
 impl<U> Identity<U> {
     /// Creates a new identity from a certificate, and identifier.  Initially,
     /// we keep the set of roles empty.
     #[inline]
-    pub fn new<T>(certificate: U, id: T, file_rights: Vec<FileRights>) -> Self
+    pub fn new<T>(certificate: U, id: T, file_rights: PrincipalPermission) -> Self
     where
         T: Into<u32>,
     {
@@ -341,14 +366,8 @@ impl<U> Identity<U> {
 
     /// Return file rights map associated to the program.
     #[inline]
-    pub fn file_rights(&self) -> &Vec<FileRights> {
-        &self.file_rights
-    }
-
-    /// Return file rights map associated to the program.
-    #[inline]
-    pub fn file_rights_map(&self) -> HashMap<PathBuf, Rights> {
-        FileRights::compute_right_map(&self.file_rights)
+    pub fn file_rights_map(&self) -> PrincipalPermission {
+        self.file_rights.clone()
     }
 
     /// Returns the certificate associated with this identity.
@@ -359,8 +378,14 @@ impl<U> Identity<U> {
 
     /// Returns the ID associated with this identity.
     #[inline]
-    pub fn id(&self) -> &u32 {
-        &self.id
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    /// Returns the ID associated with this identity.
+    #[inline]
+    pub fn id_u64(&self) -> u64 {
+        self.id as u64
     }
 }
 

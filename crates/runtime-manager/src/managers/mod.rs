@@ -10,24 +10,25 @@
 //! information on licensing and copyright.
 
 use anyhow::{anyhow, Result};
-use execution_engine::{execute, fs::FileSystem};
+use execution_engine::execute;
 use lazy_static::lazy_static;
 use log::info;
 use policy_utils::{
-    pipeline::Expr, policy::Policy, principal::Principal, CANONICAL_STDIN_FILE_PATH,
+    pipeline::Expr, policy::Policy, principal::{Principal, FilePermissions, check_permission},
 };
 use std::{
     collections::HashMap,
-    path::PathBuf,
+    path::{Path, PathBuf},
     string::String,
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
+        atomic::AtomicU32,
         Mutex,
     },
     vec::Vec,
+    fs::{self, OpenOptions},
+    io::Write,
 };
 use veracruz_utils::sha256::sha256;
-use wasi_types::{ErrNo, Rights};
 
 pub mod error;
 pub mod execution_engine_manager;
@@ -45,7 +46,6 @@ lazy_static! {
     static ref SESSIONS: Mutex<HashMap<u32, ::session_manager::Session>> =
         Mutex::new(HashMap::new());
     static ref PROTOCOL_STATE: Mutex<Option<ProtocolState>> = Mutex::new(None);
-    static ref DEBUG_FLAG: AtomicBool = AtomicBool::new(false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -72,8 +72,6 @@ pub(crate) struct ProtocolState {
     /// The list of clients (their IDs) that can request shutdown of the
     /// Veracruz platform.
     expected_shutdown_sources: Vec<u64>,
-    /// The ref to the VFS, this is a FS handler with super user capability.
-    vfs: FileSystem,
     /// Digest table. Certain files must match the digest before writing to
     /// the filesystem.
     digest_table: HashMap<PathBuf, Vec<u8>>,
@@ -86,23 +84,13 @@ impl ProtocolState {
     pub fn new(global_policy: Policy, global_policy_hash: String) -> Result<Self> {
         let expected_shutdown_sources = global_policy.expected_shutdown_list();
 
-        let mut rights_table = global_policy.get_rights_table();
-
-        // Grant the super user read access to any file under the root. This is
-        // used internally to read the program on behalf of the executing party
-        let mut su_read_rights = HashMap::new();
-        su_read_rights.insert(PathBuf::from("/"), Rights::all());
-        rights_table.insert(Principal::InternalSuperUser, su_read_rights);
-
         let digest_table = global_policy.get_file_hash_table()?;
-        let native_modules = global_policy.native_modules();
-        let vfs = FileSystem::new(rights_table, native_modules.to_vec())?;
+        //let native_modules = global_policy.native_modules();
 
         Ok(ProtocolState {
             global_policy,
             global_policy_hash,
             expected_shutdown_sources,
-            vfs,
             digest_table,
         })
     }
@@ -118,52 +106,74 @@ impl ProtocolState {
     ////////////////////////////////////////////////////////////////////////////
 
     /// Check if a client has capability to write to a file, and then overwrite it with new `data`.
-    pub(crate) fn write_file(
+    pub(crate) fn write_file<T: AsRef<Path>>(
         &mut self,
         client_id: &Principal,
-        file_name: &str,
+        path: T,
         data: Vec<u8>,
     ) -> Result<()> {
         // Check the digest, if necessary
-        if let Some(digest) = self.digest_table.get(&PathBuf::from(file_name)) {
+        let path = path.as_ref();
+        info!("write_file to path {:?}", path);
+        if let Some(digest) = self.digest_table.get(&PathBuf::from(path)) {
             let incoming_digest = sha256(&data);
             if incoming_digest.len() != digest.len() {
-                return Err(anyhow!(RuntimeManagerError::FileSystemError(ErrNo::Access)));
+                return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError));
             }
             for (lhs, rhs) in digest.iter().zip(incoming_digest.iter()) {
                 if lhs != rhs {
-                    return Err(anyhow!(RuntimeManagerError::FileSystemError(ErrNo::Access)));
+                    return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError));
                 }
             }
         }
-
-        if file_name == CANONICAL_STDIN_FILE_PATH {
-            self.vfs.spawn(client_id)?.write_stdin(&data)?;
-        } else {
-            self.vfs
-                .spawn(client_id)?
-                .write_file_by_absolute_path(file_name, data, false)?;
+        
+        if !self.check_permission(client_id, path, FilePermissions{read: false, write: true, execute: false})? {
+            return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError))
         }
+
+        if let Some(parent_path) = path.parent() {
+            if !parent_path.try_exists()? {
+                fs::create_dir_all(parent_path)?;
+            }
+        }
+
+        info!("write_file to path {:?} after create dir", path);
+        fs::write(path, data)?;
 
         Ok(())
     }
 
     /// Check if a client has capability to write to a file, and then overwrite it with new `data`.
-    pub(crate) fn append_file(
+    pub(crate) fn append_file<T: AsRef<Path>>(
         &mut self,
         client_id: &Principal,
-        file_name: &str,
+        path: T,
         data: Vec<u8>,
     ) -> Result<()> {
         // If a file must match a digest, e.g. a program,
         // it is not permitted to append the file.
-        if self.digest_table.contains_key(&PathBuf::from(file_name)) {
-            return Err(anyhow!(RuntimeManagerError::FileSystemError(ErrNo::Access)));
+        let path = path.as_ref();
+        if self.digest_table.contains_key(&PathBuf::from(path)) {
+            return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError));
         }
-        self.vfs.spawn(client_id)?.write_file_by_absolute_path(
-            file_name, data, // set the append flag to true
-            true,
-        )?;
+
+        if !self.check_permission(client_id, path, FilePermissions{read: false, write: true, execute: false})? {
+            return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError))
+        }
+
+        if let Some(parent_path) = path.parent() {
+            if !parent_path.try_exists()? {
+                fs::create_dir_all(parent_path)?;
+            }
+        }
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)?;
+
+        file.write_all(&data)?;
+
         Ok(())
     }
 
@@ -171,14 +181,14 @@ impl ProtocolState {
     pub(crate) fn read_file(
         &self,
         client_id: &Principal,
-        file_name: &str,
+        path: &str,
     ) -> Result<Option<Vec<u8>>> {
-        let mut vfs = self.vfs.spawn(client_id)?;
-        let rst = match file_name {
-            "stderr" => vfs.read_stderr()?,
-            "stdout" => vfs.read_stdout()?,
-            _otherwise => vfs.read_file_by_absolute_path(file_name)?,
-        };
+
+        if !self.check_permission(client_id, path, FilePermissions{read: true, write: false, execute: false})? {
+            return Err(anyhow!(RuntimeManagerError::FileSystemAccessDenialError))
+        }
+
+        let rst = fs::read(path)?;
         if rst.len() == 0 {
             return Ok(None);
         }
@@ -218,21 +228,25 @@ impl ProtocolState {
             caller_principal, execution_principal
         );
         let execution_strategy = self.global_policy.execution_strategy();
-        let options = execution_engine::Options {
-            enable_clock: *self.global_policy.enable_clock(),
+        let env = execution_engine::Environment {
             environment_variables,
             ..Default::default()
         };
 
-        let return_code = execute(
+        let caller_permission = self.global_policy.get_permission(caller_principal)?;
+        let execution_permission = self.global_policy.get_permission(execution_principal)?;
+        let services = self.global_policy.services();
+                
+        execute(
             &execution_strategy,
-            self.vfs.spawn(caller_principal)?,
-            self.vfs.spawn(execution_principal)?,
+            &caller_permission,
+            &execution_permission,
+            services,
             pipeline,
-            &options,
+            &env,
         )?;
 
-        let response = Self::response_error_code_returned(return_code);
+        let response = Self::response_error_code_returned(0);
         Ok(Some(response))
     }
 
@@ -245,39 +259,20 @@ impl ProtocolState {
         )
         .unwrap_or_else(|err| panic!("{:?}", err))
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////
-// Debug printing outside of the enclave.
-////////////////////////////////////////////////////////////////////////////////
-
-/// Prints a debug message, `message`, via our debug OCALL print mechanism, if
-/// the debug configuration flat is set for the enclave.  Has no effect,
-/// otherwise.
-pub fn debug_message(message: String) {
-    if DEBUG_FLAG.load(Ordering::SeqCst) {
-        print_message(message, 0);
-    }
-}
-
-/// Prints an error message, `message`, with a fixed error code, `error_code`,
-/// via our debug OCALL print mechanism, if the debug configuration flat is set
-/// for the enclave.  Has no effect, otherwise.
-pub fn error_message(message: String, error_code: u32) {
-    print_message(message, error_code);
-}
-
-/// Base function for printing messages outside of the enclave.  Note that this
-/// should only print something to *stdout* on the host's machine if the debug
-/// configuration flag is set in the Veracruz global policy.
-fn print_message(#[allow(unused)] message: String, #[allow(unused)] code: u32) {
-    #[cfg(feature = "linux")]
-    if code == 0 {
-        eprintln!("Enclave debug message \"{}\"", message);
-    } else {
-        eprintln!(
-            "Enclave returns error code {} and message \"{}\"",
-            code, message
-        );
+    /// Manually check permission on clients
+    pub(crate) fn check_permission<T: AsRef<Path>>(
+        &self, 
+        client_id: &Principal, 
+        target_path: T,
+        target_permission: FilePermissions,
+    ) -> Result<bool> 
+    {
+        let result = match client_id {
+            Principal::InternalSuperUser => true,
+            Principal::NoCap => false,
+            other => check_permission(&self.global_policy.get_permission(other)?, target_path, &target_permission),
+        };
+        Ok(result)
     }
 }

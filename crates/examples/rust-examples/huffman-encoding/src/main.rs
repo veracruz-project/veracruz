@@ -19,8 +19,8 @@
 use anyhow::{self, Ok};
 use std::{collections::HashMap, fs};
 
-const INPUT_FILENAME: &'static str = "/input/hello-world-1.dat";
-const OUTPUT_FILENAME: &'static str = "/output/encoded_output.dat";
+const INPUT_FILENAME: &'static str = "./input/hello-world-1.dat";
+const OUTPUT_FILENAME: &'static str = "./output/encoded_output.dat";
 
 type Link = Option<Box<Node>>;
 

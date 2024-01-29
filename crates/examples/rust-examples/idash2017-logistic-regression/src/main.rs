@@ -285,7 +285,7 @@ fn true_ip(lhs: &[f64], rhs: &[f64]) -> anyhow::Result<f64> {
 /// them together into a single compound dataset, then trains a logistic regressor on this new
 /// dataset.  Input and output are assumed to be encoded in Postcard.
 fn main() -> anyhow::Result<()> {
-    for path in fs::read_dir("/input/idash2017")? {
+    for path in fs::read_dir("./input/idash2017")? {
         let path = path?.path();
         println!("path in: {:?}", path);
         let file_name = path.file_name().ok_or(anyhow!("cannot get file name"))?;
@@ -302,7 +302,8 @@ fn main() -> anyhow::Result<()> {
         )?;
         println!("result: {:?}, {:?}, {:?}", w_data, correct, auc);
         let result_encode = postcard::to_allocvec::<(Vec<f64>, f64, f64)>(&(w_data, correct, auc))?;
-        let mut output = PathBuf::from("/output/idash2017/");
+        fs::create_dir_all("./output/idash2017/")?;
+        let mut output = PathBuf::from("./output/idash2017/");
         output.push(file_name);
         println!("output {:?}", output);
         std::fs::OpenOptions::new()

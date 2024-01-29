@@ -20,8 +20,8 @@ pub enum RuntimeManagerError {
     #[cfg(feature = "linux")]
     #[error(display = "RuntimeManager: CommandLineArguments")]
     CommandLineArguments,
-    #[error(display = "RuntimeManager: FileSystem Error: {:?}.", _0)]
-    FileSystemError(#[error(source)] wasi_types::ErrNo),
+    #[error(display = "RuntimeManager: FileSystem Access Denial Error.")]
+    FileSystemAccessDenialError,
     #[error(display = "RuntimeManager: Uninitialized session in function {}.", _0)]
     UninitializedSessionError(&'static str),
     #[cfg(feature = "linux")]

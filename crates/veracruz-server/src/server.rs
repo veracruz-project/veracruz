@@ -59,8 +59,8 @@ fn handle_veracruz_server_request<T: VeracruzServer + Sync + Send>(
         }
 
         // Response this request
-        if let Some(x1) = output_data_option {
-            for x in x1 {
+        if let Some(data) = output_data_option {
+            for x in data {
                 stream.write_all(&x)?;
             }
         }

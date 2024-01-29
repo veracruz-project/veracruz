@@ -10,11 +10,11 @@
 //! See the `LICENSE.md` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::fs::{FileSystem, FileSystemResult};
-use crate::native_modules::common::StaticNativeModule;
+use anyhow::Result;
+use crate::Execution;
 use postcard::from_bytes;
 use serde::{Deserialize, Serialize};
-use wasi_types::ErrNo;
+use std::{path::Path, fs::{read, write}};
 
 pub(crate) struct PostcardService;
 
@@ -70,33 +70,29 @@ pub struct Struct3 {
     e3: Enum2,
 }
 
-impl StaticNativeModule for PostcardService {
+impl Execution for PostcardService {
     fn name(&self) -> &str {
-        "Postcard Service"
+        Self::NAME
     }
 
-    fn serve(&mut self, fs: &mut FileSystem, inputs: &[u8]) -> FileSystemResult<()> {
-        let v = from_bytes::<Vec<Struct3>>(inputs).map_err(|_| ErrNo::Inval)?;
-        fs.write_file_by_absolute_path(
-            "/services/postcard_result.dat",
-            serde_json::to_string(&v)
-                .map_err(|_| ErrNo::Inval)?
+    fn execute(&mut self, dir: &Path) -> Result<()> {
+        let input = dir.join("input");
+        let output = dir.join("output");
+        let buf = read(input)?;
+        let v = from_bytes::<Vec<Struct3>>(&buf)?;
+
+        write(
+            output,
+            serde_json::to_string(&v)?
                 .as_bytes()
                 .to_vec(),
-            false,
         )?;
         Ok(())
-    }
-
-    /// For the purpose of demonstration, we always return true. In reality,
-    /// this function may check validity of the `input`, and even buffer the result
-    /// for further uses.
-    fn try_parse(&mut self, _input: &[u8]) -> FileSystemResult<bool> {
-        Ok(true)
     }
 }
 
 impl PostcardService {
+    pub(crate) const NAME: &'static str = "Postcard Service";
     pub(crate) fn new() -> Self {
         Self {}
     }

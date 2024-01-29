@@ -13,7 +13,7 @@ use crate::error::VeracruzClientError;
 use anyhow::{anyhow, Result};
 use log::{error, info};
 use mbedtls::{alloc::List, pk::Pk, ssl::Context, x509::Certificate};
-use policy_utils::{parsers::enforce_leading_slash, policy::Policy, Platform};
+use policy_utils::{policy::Policy, Platform};
 use std::{
     io::{Read, Write},
     net::TcpStream,
@@ -149,7 +149,7 @@ impl VeracruzClient {
         Self::check_certificate_validity(&client_cert_filename, &mut client_priv_key)?;
 
         let proxy_service_cert = {
-            let mut certs_pem = policy.proxy_service_cert().clone();
+            let mut certs_pem = policy.proxy_service_cert().to_string();
             certs_pem.push('\0');
             let certs = Certificate::from_pem_multiple(certs_pem.as_bytes())?;
             certs
@@ -159,7 +159,7 @@ impl VeracruzClient {
         let mut config = Config::new(Endpoint::Client, Transport::Stream, Preset::Default);
         config.set_min_version(Version::Tls13)?;
         config.set_max_version(Version::Tls13)?;
-        let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(policy.ciphersuite().as_str())
+        let policy_ciphersuite = veracruz_utils::lookup_ciphersuite(policy.ciphersuite())
             .ok_or(anyhow!(VeracruzClientError::UnexpectedCiphersuite))?;
         let cipher_suites: Vec<i32> = vec![policy_ciphersuite.into(), 0];
         config.set_ciphersuites(Arc::new(cipher_suites));
@@ -187,11 +187,9 @@ impl VeracruzClient {
         data: &[u8],
         serialize_functor: fn(&[u8], &str) -> transport_protocol::TransportProtocolResult,
     ) -> Result<transport_protocol::RuntimeManagerResponse> {
-        let path = enforce_leading_slash(
-            path.as_ref()
+        let path = path.as_ref()
                 .to_str()
-                .ok_or(VeracruzClientError::InvalidPath)?,
-        );
+                .ok_or(VeracruzClientError::InvalidPath)?;
         let serialized_data = serialize_functor(data, &path)?;
         let response = self.send(&serialized_data)?;
 
@@ -205,6 +203,7 @@ impl VeracruzClient {
 
     /// Request to write `data` to the `path` from the beginning.
     pub fn write_file<P: AsRef<Path>>(&mut self, path: P, data: &[u8]) -> Result<()> {
+        info!("Client write file: {:?}", path.as_ref());
         self.request_functor(path, data, transport_protocol::serialize_write_file)?;
         Ok(())
     }

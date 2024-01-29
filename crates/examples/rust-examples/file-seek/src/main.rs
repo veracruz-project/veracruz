@@ -17,8 +17,8 @@
 use anyhow;
 use std::{fs::File, io::prelude::*, io::SeekFrom};
 
-const INPUT_FILENAME: &'static str = "/input/README.md";
-const OUTPUT_FILENAME: &'static str = "/output/NEW_README.md";
+const INPUT_FILENAME: &'static str = "./input/README.markdown";
+const OUTPUT_FILENAME: &'static str = "./output/NEW_README.markdown";
 
 fn main() -> anyhow::Result<()> {
     let mut f = File::open(INPUT_FILENAME)?;

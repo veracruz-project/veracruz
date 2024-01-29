@@ -9,8 +9,6 @@
 //! See the `LICENSE.md` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-pub mod common;
-pub mod strace;
-pub(crate) mod wasmi;
 #[cfg(feature = "std")]
 pub(crate) mod wasmtime;
+pub(crate) mod sandbox;

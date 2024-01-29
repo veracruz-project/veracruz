@@ -157,8 +157,8 @@ fn main() {
     };
     qprintln!(
         opt,
-        "Loaded policy {} {}",
-        opt.policy_path.to_string_lossy(),
+        "Loaded policy {:?} {}",
+        opt.policy_path,
         policy.policy_hash().unwrap_or("???")
     );
 
@@ -183,8 +183,7 @@ fn main() {
     for (program_name, program_path) in opt.program.iter().flatten() {
         qprintln!(
             opt,
-            "Submitting <enclave>/{} from {}",
-            program_name,
+            "Submitting <enclave>{program_name} from {}",
             match program_path.to_string_lossy().as_ref() {
                 "-" => "<stdout>",
                 path => path,
@@ -224,7 +223,7 @@ fn main() {
     for (data_name, data_path) in opt.data.iter().flatten() {
         qprintln!(
             opt,
-            "Submitting <enclave>/{} from {}",
+            "Submitting <enclave>{} from {}",
             data_name,
             match data_path.to_string_lossy().as_ref() {
                 "-" => "<stdout>",
@@ -263,7 +262,7 @@ fn main() {
 
     // request compute(s)?
     for compute_name in opt.compute {
-        qprintln!(opt, "Requesting compute of <enclave>/{}", compute_name);
+        qprintln!(opt, "Requesting compute of <enclave>{}", compute_name);
         did_something = true;
 
         match veracruz_client.request_compute(&compute_name) {
@@ -279,8 +278,7 @@ fn main() {
     for (output_name, output_path) in opt.output.iter().flatten() {
         qprintln!(
             opt,
-            "Reading <enclave>/{} into {}",
-            output_name,
+            "Reading <enclave>{output_name} into {}",
             match output_path.to_string_lossy().as_ref() {
                 "-" => "<stdout>",
                 path => path,
