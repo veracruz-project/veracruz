@@ -63,7 +63,7 @@ pub(crate) fn execute_pipeline(
                 execute_wasm(strategy, execution_permissions, &Path::new(&path), env)
             } else { // Sandbox
                 info!("Invoke native binary: {path}");
-                execute_native_binary(&Path::new(&path))
+                execute_native_binary(execution_permissions, &Path::new(&path))
             }
         }
         Seq(vec) => {
@@ -116,7 +116,10 @@ fn execute_wasm(
     engine.execute(program_path)
 }
 
-fn execute_native_binary(program_path: &Path) -> Result<()> {
+fn execute_native_binary(
+    execution_permissions: &PrincipalPermission,
+    program_path: &Path
+) -> Result<()> {
     let program_name = program_path.file_name().and_then(|os_str| os_str.to_str()).ok_or(anyhow!("Failed to extract program name from program path to a native binary."))?;
-    Sandbox::new(&program_name).execute(program_path)
+    Sandbox::new(execution_permissions.clone(), &program_name).execute(program_path)
 }
