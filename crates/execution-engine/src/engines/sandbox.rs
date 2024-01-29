@@ -36,11 +36,12 @@
 use anyhow::{anyhow, Result};
 use log::info;
 use std::{
-    fs::{self, File, remove_dir_all},
+    fs::{self, File, remove_dir_all, create_dir_all},
     io::{Write},
     path::{Path, PathBuf},
     process::Command
 };
+use policy_utils::principal::PrincipalPermission;
 use crate::Execution;
 #[cfg(feature = "std")]
 use nix::sys::signal;
@@ -58,8 +59,10 @@ const NATIVE_MODULE_MANAGER_SANDBOXER_PATH: &str = "/tmp/nmm/native-module-sandb
 /// the native module.
 const EXECUTION_CONFIGURATION_FILE: &str = "execution_config";
 
+/// Sandbox execution handler.
 pub struct Sandbox {
     native_module_directory: PathBuf,
+    execution_permissions: PrincipalPermission,
 }
 
 impl Execution for Sandbox {
@@ -71,9 +74,11 @@ impl Execution for Sandbox {
     /// Execute the native binary program at `program_path`.
     fn execute(&mut self, program_path: &Path) -> Result<()> {
 
+        info!("Binary path {program_path:?}");
         // Inject execution configuration into the native module's directory
         let mut config_file = File::create(self.native_module_directory.join(EXECUTION_CONFIGURATION_FILE))?;
-        // TODO: it was an input
+
+        info!("Binary configuration file {config_file:?}");
         config_file.write_all(&vec![])?;
 
         // Enable SIGCHLD handling in order to synchronously execute the
@@ -92,8 +97,14 @@ impl Execution for Sandbox {
             )?;
         }
 
-        let mount_mappings = build_mappings(&self.native_module_directory, vec!["/".into()])?;
+        let execution_permissions = self.execution_permissions.iter().map(|(path, _permission)| {
+            path.clone()
+        }).collect();
 
+        info!("Directories to mount: {execution_permissions:?}");
+
+        let mount_mappings = build_mappings(&self.native_module_directory, execution_permissions)?;
+        info!("Binary mounted mapping {mount_mappings}");
 
         let program_name = program_path.file_name().and_then(|os_str| os_str.to_str()).ok_or(anyhow!("Failed to extract program name from program path to a native binary."))?;
         let entry_point = self.native_module_directory.join(program_name);
@@ -117,6 +128,7 @@ impl Execution for Sandbox {
             ])
             .output()?;
 
+        info!("Tear down...");
         self.teardown_fs()?;
 
         Ok(())
@@ -126,10 +138,15 @@ impl Execution for Sandbox {
 impl Sandbox {
     /// Create a sandbox at the (sub-)directory `dir_name` 
     /// on the path `${NATIVE_MODULE_MANAGER_SYSROOT}`, i.e., `/tmp/nmm/`.
-    pub(crate) fn new(dir_name: &str) -> Self {
+    pub(crate) fn new(execution_permissions: PrincipalPermission, dir_name: &str) -> Self {
+        info!("Create a new sandbox {dir_name}");
         let native_module_directory = PathBuf::from(NATIVE_MODULE_MANAGER_SYSROOT).join(dir_name);
+
+        info!("Create a new sandbox from binary {dir_name}, going to be mounted at {native_module_directory:?}.");
+        let _ = create_dir_all(&native_module_directory);
         Self {
-            native_module_directory
+            native_module_directory,
+            execution_permissions,
         }
     }
 
@@ -152,29 +169,50 @@ impl Drop for Sandbox {
 /// native module's directory.
 /// Returns the mappings as a string.
 fn build_mappings(native_module_directory: &PathBuf, unprefixed_files: Vec<PathBuf>) -> Result<String> {
-    let mut mappings = String::new();
-    let native_module_directory = native_module_directory.clone();
-    for f in unprefixed_files {
-        let mapping = native_module_directory
-            .join(&f)
-            .to_str()
-            .ok_or(anyhow!("Failed to convert native_module_directory to str"))?
-            .to_owned()
-            + "=>"
-            + &f.to_str()
-            .ok_or(anyhow!("Failed to convert {:?} to str",f))?
-            .to_owned();
-        mappings = mappings + &mapping + ",";
-    }
 
-    // Add the execution configuration file
-    mappings = mappings
-               + &native_module_directory
+    info!("construct mappings from source: {unprefixed_files:?}");
+    // Convert `path` in `unprefixed_files` into a string of format of 
+    // `{target_path}=>{host_path}`, and then collect the result as a Vec, `mappings`.
+    let mut mappings = unprefixed_files.into_iter().fold(Ok(Vec::new()), |acc:Result<Vec<String>>, path|{
+        let mut acc = acc?;
+        // Remove the prefix, either relative path or abusolute path.
+        // e.g., `./foo` to `foo`, and `/foo/bar/` to `foo/bar/`.
+        // The resulting string will be `join` with 
+        // the new prefix `{native_module_directory}`.
+        let target_path_directory = if path.has_root() {
+            path.strip_prefix("/")?
+        } else if path.is_relative() {
+            path.strip_prefix("./")?
+            
+        } else { &path };
+        let mut target_path = native_module_directory.join(&target_path_directory).to_str()
+            .ok_or(anyhow!("Failed to convert native_module_directory to str"))?
+            .to_string();
+        let host_path = path.canonicalize()?;
+        let host_path = host_path.to_str()
+            .ok_or(anyhow!("Failed to convert native_module_directory to str"))?;
+
+        // Convert `target_path` and `host_path` to 
+        // a string `{target_path}=>{host_path}`.
+        target_path.push_str("=>");
+        target_path.push_str(host_path);
+        acc.push( target_path );
+        Ok(acc)
+    })?;
+
+    // Add the final `execution_config` mapping.
+    let mut execution_config = native_module_directory
                  .join(EXECUTION_CONFIGURATION_FILE)
                  .to_str()
                  .ok_or(anyhow!("Failed to convert {} to str", EXECUTION_CONFIGURATION_FILE))?
-                 .to_owned()
-               + "=>/"
-               + EXECUTION_CONFIGURATION_FILE;
-    Ok(mappings)
+                 .to_owned();
+    execution_config.push_str("=>/");
+    execution_config.push_str(EXECUTION_CONFIGURATION_FILE);
+
+    mappings.push(execution_config);
+
+    info!("sandbox mappings: {mappings:?}");
+    
+    // Convert the to the final string, where individual mapping is Concatenated by comma `,`.
+    Ok(mappings.join(","))
 }
