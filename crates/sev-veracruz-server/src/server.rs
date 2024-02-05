@@ -55,8 +55,8 @@ impl VeracruzServer for VeracruzServerSev {
             err
         })?;
 
-        let cid: u32 = 3; // TODO: Don't hard-code this
-        let port: u32 = 5005;
+        let CID: u32 = 3;
+        let PORT: u32 = 5005;
         let start = Instant::now();
         println!("VeracruzServerSev::new calling qemu");
         let mut command = Command::new("/AMDSEV/snp-release/usr/local/bin/qemu-system-x86_64"); 
@@ -100,7 +100,7 @@ impl VeracruzServer for VeracruzServerSev {
             })?;
         println!("VeracruzServerSev::new handle:{:?}", handle);
         println!("VeracruzServerSev::new calling VsockSocket::connect");
-        let socket = VsockSocket::connect(cid, port)
+        let socket = VsockSocket::connect(CID, PORT)
             .map_err(|err| {
                 println!("VsockSocket::connect failed:{:?}", err);
                 VeracruzServerError::Anyhow(anyhow!(err))

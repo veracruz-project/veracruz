@@ -123,8 +123,6 @@ RUN tar -zxvf OpenSSL_1_1_1f.tar.gz; \
 WORKDIR /
 RUN git clone --branch snp-latest https://github.com/AMDESE/AMDSEV.git
 WORKDIR /AMDSEV
-#RUN git checkout d80b494f712317493d464a55652698c4d1b7bb0f
-#RUN git checkout b04cde73313687cbd6c21c444cfd6f7ee8d28062
 WORKDIR /
 COPY common.patch AMDSEV/common.patch
 COPY build.patch AMDSEV/build.patch
@@ -140,10 +138,6 @@ RUN ./build.sh --package kernel guest
 RUN ./build.sh --package ovmf
 
 WORKDIR /
-#RUN git clone https://github.com/virtee/sev-snp-measure.git
 RUN git clone https://github.com/larrydewey/sev-snp-measure.git
 WORKDIR /sev-snp-measure
 RUN git checkout debugswap
-#cd sev-snp-measure
-#./sev-snp-measure.py --help
-
