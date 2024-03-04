@@ -901,6 +901,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
+name = "home"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5444c27eef6923071f7ebcc33e3444508466a76f7a2b93da00ed6e19f30c1ddb"
+dependencies = [
+ "windows-sys",
+]
+
+[[package]]
 name = "humantime"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1745,7 +1754,7 @@ dependencies = [
 [[package]]
 name = "raw-fd"
 version = "0.2.0"
-source = "git+https://github.com/veracruz-project/nitro-enclave?tag=v0.2#8075f6f159b8b9516bd32c16892c06635de3ff53"
+source = "git+https://github.com/veracruz-project/nitro-enclave?tag=v0.3#4b102ce29bfb5a803551e864a80cab8d9b11363b"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -2242,6 +2251,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "err-derive",
+ "home",
  "lazy_static",
  "protobuf",
  "protobuf-codegen",

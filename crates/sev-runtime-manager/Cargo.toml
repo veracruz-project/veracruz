@@ -1,0 +1,19 @@
+[package]
+name = "sev-runtime-manager"
+authors = ["The Veracruz Development Team"]
+description = "The trusted Veracruz runtime's command-and-control module for AMD SEV-SNP. Co-ordinates and directs the rest of the runtime"
+edition = "2018"
+version = "0.1.0"
+links = "sev-guest-get-report"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1"
+nix = { version = "0.26.4" }
+raw-fd = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.3" }
+runtime-manager = { path = "../runtime-manager" }
+sev-snp-utils = { version = "=1.4.4", package= "lit-sev-snp-utils"}
+rustix = "=0.37.13"
+veracruz-utils = { path = "../veracruz-utils", features = ["linux"] }

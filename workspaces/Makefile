@@ -31,6 +31,13 @@ nitro: shared
 	$(MAKE) -C nitro-host
 	$(MAKE) -C nitro-runtime
 
+sev: shared
+	cd sev-runtime && make
+	$(MAKE) -C sev-host build
+
+sev-tests:
+	$(MAKE) -C sev-host tests
+
 shared:
 	$(MAKE) -C applications
 	$(MAKE) -C host
@@ -50,6 +57,9 @@ nitro-clippy:
 	make -C nitro-runtime clippy
 	make -C nitro-host clippy
 
+sev-clippy:
+	make -C sev-host clippy
+
 linux-clean:
 	$(MAKE) -C linux-host clean
 	$(MAKE) -C linux-runtime clean
@@ -57,6 +67,10 @@ linux-clean:
 nitro-clean:
 	$(MAKE) -C nitro-host clean
 	$(MAKE) -C nitro-runtime clean
+
+sev-clean:
+	$(MAKE) -C sev-runtime clean
+	$(MAKE) -C sev-host clean
 
 shared-clean:
 	$(MAKE) -C applications clean

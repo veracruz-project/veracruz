@@ -10,7 +10,7 @@ anyhow = "1"
 log = "0.4.13"
 nix = { version = "0.26" }
 nsm_api = { package = "aws-nitro-enclaves-nsm-api", version = "0.3.0" }
-raw-fd = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.2" }
+raw-fd = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.3" }
 runtime-manager = { path = "../runtime-manager", features = ["nitro"] }
 veracruz-utils = { path = "../veracruz-utils", features = ["nitro"] }
 serde_bytes = "0.11"

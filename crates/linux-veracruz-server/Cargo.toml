@@ -13,7 +13,7 @@ lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 log = "0.4.13"
 nix = { version = "0.26" }
 policy-utils = { path = "../policy-utils", features = ["std", ] }
-proxy-attestation-client = { git = "https://github.com/veracruz-project/proxy-attestation-client", tag = "v0.2" }
+proxy-attestation-client = { git = "https://github.com/veracruz-project/proxy-attestation-client", tag = "v0.4" }
 rand = "0.8.3"
 tempfile = { version = "3.2.0" }
 veracruz-server = { path = "../veracruz-server", features = ["linux"]}

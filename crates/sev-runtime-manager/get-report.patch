@@ -1,0 +1,61 @@
+diff --git a/src/get-report.c b/src/get-report.c
+index ff9778d..43423b7 100644
+--- a/src/get-report.c
++++ b/src/get-report.c
+@@ -139,7 +139,7 @@ int parse_options(int argc, char *argv[], struct options *options)
+ out:
+ 	return rc;
+ }
+-
++#if 0
+ int hash_data_file(const char *file_name, uint8_t *buffer, size_t *size, const char *digest_name)
+ {
+ 	int rc = EXIT_FAILURE;
+@@ -162,7 +162,7 @@ int hash_data_file(const char *file_name, uint8_t *buffer, size_t *size, const c
+ 	data_file = fopen(file_name, "r");
+ 	if (!data_file) {
+ 		rc = errno;
+-		perror("fopen");
++		//perror("fopen");
+ 		goto out;
+ 	}
+ 
+@@ -170,14 +170,14 @@ int hash_data_file(const char *file_name, uint8_t *buffer, size_t *size, const c
+ 	rc = fstat(fileno(data_file), &file_stats);
+ 	if (rc != 0) {
+ 		rc = errno;
+-		perror("fstat");
++		//perror("fstat");
+ 		goto out_close;
+ 	}
+ 
+ 	file_buffer = malloc(file_stats.st_size);
+ 	if (!file_buffer) {
+ 		rc = ENOMEM;
+-		perror("malloc");
++		//perror("malloc");
+ 		goto out_close;
+ 	}
+ 
+@@ -233,7 +233,7 @@ out_close:
+ out:
+ 	return rc;
+ }
+-
++#endif
+ void print_digest(const uint8_t *digest, size_t size)
+ {
+ #define BYTES_PER_LINE	32
+@@ -487,6 +487,7 @@ out:
+ 	return rc;
+ }
+ 
++#if 0
+ int write_cert(const struct cert_table_entry *entry, const uint8_t *buffer, size_t size)
+ {
+ 	int rc = EXIT_FAILURE;
+@@ -696,3 +697,4 @@ exit:
+ 	exit(rc);
+ }
+ 
++#endif

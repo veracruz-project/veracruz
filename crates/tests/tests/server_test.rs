@@ -25,6 +25,8 @@ use log::{error, info};
 use mbedtls::{alloc::List, x509::Certificate};
 #[cfg(feature = "nitro")]
 use nitro_veracruz_server::server::VeracruzServerNitro as VeracruzServerEnclave;
+#[cfg(feature = "sev")]
+use sev_veracruz_server::server::VeracruzServerSev as VeracruzServerEnclave;
 use policy_utils::{policy::Policy, Platform};
 use std::{
     env,
@@ -933,6 +935,8 @@ impl TestExecutor {
             Platform::Linux
         } else if cfg!(feature = "nitro") {
             Platform::Nitro
+        } else if cfg!(feature = "sev") {
+            Platform::SEVSNP
         } else {
             panic!("Unknown platform.");
         };
@@ -1112,7 +1116,7 @@ fn compare_policy_hash(received: &[u8], policy: &Policy, platform: &Platform) ->
             Ok(bytes) => bytes,
         };
 
-        info!("Comparing runtime manager hash {:?} (from policy) against {:?} (received) for platform {:?}.", expected_bytes, received, platform);
+        info!("Comparing runtime manager hash {:02x?} (from policy) against {:02x?} (received) for platform {:?}.", expected_bytes, received, platform);
 
         if &received[..] != expected_bytes.as_slice() {
             info!("Runtime manager hash does not match.");

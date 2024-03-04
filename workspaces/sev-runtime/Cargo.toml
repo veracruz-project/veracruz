@@ -1,0 +1,30 @@
+# workspaces/linux-runtime/Cargo.toml:
+# Workspace for trusted SEV services
+#
+# AUTHORS
+#
+# The Veracruz Development Team.
+#
+# COPYRIGHT
+#
+# See the `LICENSE_MIT.markdown` file in the Veracruz root director for licensing
+# and copyright information.
+
+cargo-features = ["resolver"]
+
+[workspace]
+exclude = [
+  "crates/third-party/rust-mbedtls",
+  "crates/third-party/wasmi",
+  "crates/runtime-manager",
+]
+members = [
+  "crates/sev-runtime-manager",
+]
+resolver = "2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+

@@ -14,7 +14,7 @@ use nix::{
     unistd::Pid,
 };
 use reqwest;
-use std::{convert::TryInto, io::Read};
+use std::{convert::TryInto, fs::File, io::Read};
 
 static PROVISIONING_URL_BASE: &str = "127.0.0.1:8888";
 
@@ -51,18 +51,24 @@ pub fn proxy_attestation_setup(
     proxy_attestation_server_url: String,
     proxy_start_dir: &String,
 ) -> ProxyChildren {
+    let vts_log_file = File::create("/tmp/vts.log").unwrap();
+    let prov_log_file = File::create("/tmp/provisioning.log").unwrap();
+    let proxy_log_file = File::create("/tmp/proxy.log").unwrap();
     let vts_child = std::process::Command::new("/opt/veraison/vts/vts")
         .current_dir("/opt/veraison/vts")
+        .stdout(vts_log_file)//std::process::Stdio::null())
         .spawn()
         .expect("vts died");
     let provisioning_child = std::process::Command::new("/opt/veraison/provisioning/provisioning")
         .current_dir("/opt/veraison/provisioning")
+        .stdout(prov_log_file) //std::process::Stdio::null())
         .spawn()
         .expect("provision died");
     let proxy_child = std::process::Command::new("/opt/veraison/proxy_attestation_server")
         .current_dir(proxy_start_dir)
         .arg("-l")
         .arg(&proxy_attestation_server_url)
+        .stdout(proxy_log_file) //std::process::Stdio::null())
         .spawn()
         .expect("Proxy Attestation Service died");
 
@@ -75,6 +81,8 @@ pub fn proxy_attestation_setup(
     provision_file("/opt/veraison/psa_corim.cbor", "http://arm.com/psa/iot/1");
 
     provision_file("/opt/veraison/nitro_corim.cbor", "http://aws.com/nitro");
+
+    provision_file("/opt/veraison/amd_sev_snp_corim.cbor", "https://amd.com/sev-snp");
     return ProxyChildren {
         vts_child: vts_child,
         provisioning_child: provisioning_child,

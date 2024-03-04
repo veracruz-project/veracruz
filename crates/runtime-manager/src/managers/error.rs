@@ -51,4 +51,6 @@ pub enum RuntimeManagerError {
     LockSessionManager,
     #[error(display = "RuntimeManager: Failed to obtain lock on session table.")]
     LockSessionTable,
+    #[error(display = "RuntimeManager: Firmware error")]
+    FirmwareError,
 }
