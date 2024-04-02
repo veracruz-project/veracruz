@@ -25,9 +25,7 @@ nitro = [
 ]
 
 sev = [
-  "io-utils",
-  "nix",
-  "policy-utils/std",
+  "io-utils/linux",
 ]
 
 [dependencies]
