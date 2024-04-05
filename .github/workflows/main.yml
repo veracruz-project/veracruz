@@ -114,7 +114,7 @@ jobs:
       - name: Check out the VOD repository
         uses: actions/checkout@v3
         with:
-          repository: 'ShaleXIONG/video-object-detection'
+          repository: 'veracruz-project/video-object-detection'
           #ref: '20230704'
           submodules: recursive
           set-safe-directory: true
