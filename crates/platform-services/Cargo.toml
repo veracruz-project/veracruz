@@ -6,11 +6,10 @@ name = "platform-services"
 version = "0.3.0"
 
 [features]
-default = []
-nitro = ["nix", "nsm_api"]
-std = ["getrandom", "nix"]
+std = ["getrandom"]
+nitro = ["nsm_api"]
 
 [dependencies]
 getrandom = { version = "0.2", optional = true }
-nix = { version = "0.26", optional = true }
+nix = "0.26"
 nsm_api = { package = "aws-nitro-enclaves-nsm-api", version = "0.3.0", optional = true }

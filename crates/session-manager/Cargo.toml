@@ -8,11 +8,9 @@ version = "0.3.0"
 [features]
 nitro = [
   "mbedtls/monitor_getrandom",
-  "policy-utils/std",
   "veracruz-utils/nitro",
 ]
 std = [
-  "policy-utils/std",
   "veracruz-utils/std",
 ]
 
@@ -21,5 +19,5 @@ anyhow = "1"
 err-derive = "0.2"
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls", default-features = false, features = ["std", "aesni", "padlock", "tls13"] }
 platform-services = { path = "../platform-services" }
-policy-utils = { path = "../policy-utils" }
+policy-utils = { path = "../policy-utils", features = ["std"] }
 veracruz-utils = { path = "../veracruz-utils" }

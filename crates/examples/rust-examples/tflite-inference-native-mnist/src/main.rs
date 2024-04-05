@@ -49,7 +49,7 @@ const MNIST_MODEL_INPUT_SIZE: (u32, u32) = (28, 28);
 fn main() -> anyhow::Result<()> {
     // Read image of a handwritten digit. The digit must be white on a black
     // background
-    let img = image::open("/input/digit.png")?;
+    let img = image::open("./input/digit.png")?;
     // Resize image to model's input size
     let img = imageops::resize(
         &img,
@@ -68,7 +68,7 @@ fn main() -> anyhow::Result<()> {
     // Invoke service
     let tflite_inference_input = TfLiteInferenceInput {
         input_tensor_path: PathBuf::from("/program_internal/grayscale_image.bin"),
-        model_path: PathBuf::from("/input/MNISTnet_uint8_quant.tflite"),
+        model_path: PathBuf::from("./input/MNISTnet_uint8_quant.tflite"),
         output_tensor_path: PathBuf::from("/program_internal/output.dat"),
         num_threads: -1, // Let TF Lite pick how many threads it needs
     };

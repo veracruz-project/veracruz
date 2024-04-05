@@ -70,7 +70,7 @@ fn veracruz_phase1_get_random_one_client() {
         vec![
             (0, TestEvent::write_program(RANDOM_SOURCE_WASM)),
             (0, TestEvent::execute(RANDOM_SOURCE_WASM)),
-            (0, TestEvent::read_result("/output/random.dat")),
+            (0, TestEvent::read_result("./output/random.dat")),
             (0, TestEvent::ShutDown),
         ],
     )
@@ -90,7 +90,7 @@ fn veracruz_phase1_linear_regression_two_clients() {
             (0, TestEvent::write_program(LINEAR_REGRESSION_WASM)),
             (1, TestEvent::write_data(LINEAR_REGRESSION_DATA)),
             (0, TestEvent::execute(LINEAR_REGRESSION_WASM)),
-            (1, TestEvent::read_result("/output/linear-regression.dat")),
+            (1, TestEvent::read_result("./output/linear-regression.dat")),
             (0, TestEvent::ShutDown),
         ],
     )
@@ -111,8 +111,8 @@ fn veracruz_phase2_linear_regression_three_clients() {
             (0, TestEvent::write_program(LINEAR_REGRESSION_WASM)),
             (1, TestEvent::write_data(LINEAR_REGRESSION_DATA)),
             (0, TestEvent::execute(LINEAR_REGRESSION_WASM)),
-            (1, TestEvent::read_result("/output/linear-regression.dat")),
-            (2, TestEvent::read_result("/output/linear-regression.dat")),
+            (1, TestEvent::read_result("./output/linear-regression.dat")),
+            (2, TestEvent::read_result("./output/linear-regression.dat")),
             (0, TestEvent::ShutDown),
         ],
     )
@@ -146,7 +146,7 @@ fn veracruz_phase2_intersection_set_sum_three_clients() {
             ),
             (
                 2,
-                TestEvent::read_result("/output/intersection-set-sum.dat"),
+                TestEvent::read_result("./output/intersection-set-sum.dat"),
             ),
             (0, TestEvent::ShutDown),
         ],
@@ -172,7 +172,7 @@ fn veracruz_phase2_string_edit_distance_three_clients() {
             (0, TestEvent::execute(STRING_EDIT_DISTANCE_WASM)),
             (
                 2,
-                TestEvent::read_result("/output/string-edit-distance.dat"),
+                TestEvent::read_result("./output/string-edit-distance.dat"),
             ),
             (0, TestEvent::ShutDown),
         ],
@@ -199,7 +199,7 @@ fn veracruz_phase3_string_edit_distance_four_clients() {
             (0, TestEvent::execute(STRING_EDIT_DISTANCE_WASM)),
             (
                 3,
-                TestEvent::read_result("/output/string-edit-distance.dat"),
+                TestEvent::read_result("./output/string-edit-distance.dat"),
             ),
             (0, TestEvent::ShutDown),
         ],
@@ -216,7 +216,7 @@ fn veracruz_phase4_linear_regression_two_clients_parallel() {
     let policy = Policy::from_json(&policy_json).unwrap();
 
     let _children = proxy_attestation_setup(
-        policy.proxy_attestation_server_url().clone(),
+        policy.proxy_attestation_server_url().to_string(),
         &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
     );
 
@@ -234,7 +234,7 @@ fn veracruz_phase4_linear_regression_two_clients_parallel() {
         info!("### program provider read binary.");
         let program_data = read_local_file(prog_path).unwrap();
         info!("### program provider send binary.");
-        client.write_file("/program/linear-regression.wasm", &program_data)?;
+        client.write_file("./program/linear-regression.wasm", &program_data)?;
         Result::<()>::Ok(())
     });
 
@@ -252,7 +252,7 @@ fn veracruz_phase4_linear_regression_two_clients_parallel() {
         info!("### data provider read input.");
         let data = read_local_file(&data_filename).unwrap();
         info!("### data provider send input.");
-        client.write_file("/input/linear-regression.dat", &data)?;
+        client.write_file("./input/linear-regression.dat", &data)?;
         Result::<()>::Ok(())
     });
 
@@ -268,8 +268,8 @@ fn veracruz_phase4_linear_regression_two_clients_parallel() {
         )
         .unwrap();
 
-        client.request_compute("/program/linear-regression.wasm")?;
-        client.read_file("/output/linear-regression.dat")?;
+        client.request_compute("./program/linear-regression.wasm")?;
+        client.read_file("./output/linear-regression.dat")?;
         info!("### data provider request shutdown.");
         client.request_shutdown()?;
         Ok(())
@@ -327,7 +327,7 @@ impl TestExecutor {
 
         // start the proxy attestation server
         let proxy_children = proxy_attestation_setup(
-            policy.proxy_attestation_server_url().clone(),
+            policy.proxy_attestation_server_url().to_string(),
             &env::var("VERACRUZ_DATA_DIR").unwrap_or("../test-collateral".to_string()),
         );
 

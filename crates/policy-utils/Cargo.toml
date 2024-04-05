@@ -11,24 +11,21 @@ nitro = [
   "veracruz-utils/nitro",
 ]
 std = [
-  "hex/std",
-  "serde/std",
-  "serde_json/std",
   "veracruz-utils/std",
 ]
 
 [dependencies]
 anyhow = "1"
 err-derive = { version = "0.2", default-features = false }
-hex = { version = "0.4.2" }
-lalrpop-util = { version = "0.19.12", features = ["lexer"] }
+hex = "0.4.2"
+lalrpop-util = { version = "0.20.0", features = ["lexer"] }
 lexical-core = { version = "0.8.2", default-features = false }
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls", default-features = false, features = ["std", "aesni", "padlock", "tls13"] }
 regex = "1"
 serde = { version = "1.0.185", features = ["derive"] }
 serde_json = { version = "1.0", default-features = false }
 veracruz-utils = { path = "../veracruz-utils" }
-wasi-types = { path = "../third-party/wasi-types" }
+log="*"
 
 [build-dependencies]
-lalrpop = { version = "0.19.12", features = ["lexer"] }
+lalrpop = { version = "0.20.0", features = ["lexer"] }

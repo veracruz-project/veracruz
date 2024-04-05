@@ -17,19 +17,19 @@
 
 #[cfg(feature = "std")]
 use crate::engines::wasmtime::WasmtimeRuntimeState;
-use crate::Options;
 use crate::{
-    engines::{common::ExecutionEngine, wasmi::WASMIRuntimeState},
-    fs::FileSystem,
-    native_module_manager::NativeModuleManager,
+    Environment,
+    Execution,
+    service::common::initial_service,
+    engines::sandbox::Sandbox,
 };
 use anyhow::{anyhow, Result};
 use log::info;
 use policy_utils::{
     pipeline::Expr,
-    principal::{ExecutionStrategy, NativeModule, NativeModuleType},
+    principal::{PrincipalPermission, FilePermissions, ExecutionStrategy, check_permission, Service},
 };
-use std::{boxed::Box, path::PathBuf};
+use std::{boxed::Box, path::Path};
 
 /// Returns whether the given path corresponds to a WASM binary.
 fn is_wasm_binary(path_string: &String) -> bool {
@@ -39,93 +39,48 @@ fn is_wasm_binary(path_string: &String) -> bool {
 /// Execute `pipeline`. Program will be read with the `caller_filesystem`, who should have
 /// `FD_EXECUTE` and `FD_SEEK` permissions and executed with `pipeline_filesystem`.
 /// The function will return the error code.
-pub fn execute_pipeline(
+pub(crate) fn execute_pipeline(
     strategy: &ExecutionStrategy,
-    caller_filesystem: &mut FileSystem,
-    pipeline_filesystem: &FileSystem,
+    caller_permissions: &PrincipalPermission,
+    execution_permissions: &PrincipalPermission,
+    services: &[Service],
     pipeline: Box<Expr>,
-    options: &Options,
-) -> Result<u32> {
+    env: &Environment,
+) -> Result<()> {
+    // Iniital internal services
+    initial_service(services)?;
     use policy_utils::pipeline::Expr::*;
     match *pipeline {
-        Literal(mut path_string) => {
-            // Turn a relative path into an absolute path.
-            if &path_string[0..1] != "/" {
-                path_string.insert(0, '/');
+        Literal(path) => {
+            info!("Literal {:?}", path);
+            // checker permission
+            if !check_permission(&caller_permissions, path.clone(), &FilePermissions{read: false, write: false, execute: true}) {
+                return Err(anyhow!("Permission denies"));
             }
-            info!("Literal {:?}", path_string);
-            if is_wasm_binary(&path_string) {
+            if is_wasm_binary(&path) {
+                info!("Invoke wasm binary: {path}");
                 // Read and call execute_WASM program
-                let binary = caller_filesystem.read_executable_by_absolute_path(path_string)?;
-                info!("Successful to read binary");
-                let return_code =
-                    execute_program(strategy, pipeline_filesystem.clone(), binary, options)?;
-                Ok(return_code)
-            } else {
-                // Treat program as a provisioned native module
-                let native_module = NativeModule::new(
-                    path_string.clone(),
-                    NativeModuleType::Provisioned {
-                        entry_point: PathBuf::from(&path_string),
-                    },
-                );
-
-                // Invoke native module in the native module manager with no input.
-                // The execution principal (native module) should have read access
-                // to the directory containing the execution artifacts (binaries and
-                // shared libraries), or the native module manager won't be able to
-                // prepare the sandbox
-                let mut native_module_manager =
-                    NativeModuleManager::new(native_module, pipeline_filesystem.clone());
-                native_module_manager
-                    .execute(vec![])
-                    .map(|_| 0)
-                    .map_err(|err| anyhow!(err))
+                execute_wasm(strategy, execution_permissions, &Path::new(&path), env)
+            } else { // Sandbox
+                info!("Invoke native binary: {path}");
+                execute_native_binary(execution_permissions, &Path::new(&path))
             }
         }
         Seq(vec) => {
             info!("Seq {:?}", vec);
             for expr in vec {
-                let return_code = execute_pipeline(
-                    strategy,
-                    caller_filesystem,
-                    pipeline_filesystem,
-                    expr,
-                    options,
-                )?;
-
-                // An error occurs
-                if return_code != 0 {
-                    return Ok(return_code);
-                }
+                execute_pipeline(strategy, caller_permissions, execution_permissions, services, expr, env)?;
             }
-
-            // default return_code is zero.
-            Ok(0)
+            Ok(())
         }
         IfElse(cond, true_branch, false_branch) => {
-            info!(
-                "IfElse {:?} true -> {:?} false -> {:?}",
-                cond, true_branch, false_branch
-            );
-            let return_code = if caller_filesystem.file_exists(cond)? {
-                execute_pipeline(
-                    strategy,
-                    caller_filesystem,
-                    pipeline_filesystem,
-                    true_branch,
-                    options,
-                )?
+            info!("IfElse {:?} true -> {:?} false -> {:?}", cond, true_branch, false_branch);
+            let return_code = if Path::new(&cond).exists() {
+                execute_pipeline(strategy, caller_permissions, execution_permissions, services, true_branch, env)?
             } else {
                 match false_branch {
-                    Some(f) => execute_pipeline(
-                        strategy,
-                        caller_filesystem,
-                        pipeline_filesystem,
-                        f,
-                        options,
-                    )?,
-                    None => 0,
+                    Some(f) => execute_pipeline(strategy, caller_permissions, execution_permissions, services, f, env)?,
+                    None => (),
                 }
             };
             Ok(return_code)
@@ -134,25 +89,37 @@ pub fn execute_pipeline(
 }
 
 /// Execute the `program`. All I/O operations in the program are through at `filesystem`.
-fn execute_program(
+fn execute_wasm(
     strategy: &ExecutionStrategy,
-    filesystem: FileSystem,
-    program: Vec<u8>,
-    options: &Options,
-) -> Result<u32> {
-    let mut engine: Box<dyn ExecutionEngine> = match strategy {
+    execution_permissions: &PrincipalPermission,
+    program_path: &Path,
+    env: &Environment,
+) -> Result<()> {
+    info!("Execute program with permissions {:?}", execution_permissions);
+    let mut engine: Box<dyn Execution> = match strategy {
         ExecutionStrategy::Interpretation => {
-            Box::new(WASMIRuntimeState::new(filesystem, options.clone())?)
+            return Err(anyhow!("No interpretation engine."));
         }
         ExecutionStrategy::JIT => {
             cfg_if::cfg_if! {
                 if #[cfg(any(feature = "std", feature = "nitro"))] {
-                    Box::new(WasmtimeRuntimeState::new(filesystem, options.clone())?)
+                    info!("JIT engine initialising");
+                    Box::new(WasmtimeRuntimeState::new(execution_permissions.clone(), env.clone())?)
+                    
                 } else {
-                    return Err(anyhow::anyhow!(crate::engines::common::FatalEngineError::EngineIsNotReady));
+                    return Err(anyhow!("No JIT enine."));
                 }
             }
         }
     };
-    engine.invoke_entry_point(program)
+    info!("engine call");
+    engine.execute(program_path)
+}
+
+fn execute_native_binary(
+    execution_permissions: &PrincipalPermission,
+    program_path: &Path
+) -> Result<()> {
+    let program_name = program_path.file_name().and_then(|os_str| os_str.to_str()).ok_or(anyhow!("Failed to extract program name from program path to a native binary."))?;
+    Sandbox::new(execution_permissions.clone(), &program_name).execute(program_path)
 }

@@ -9,12 +9,11 @@
 //! See the `LICENSE.md` file in the Veracruz root directory for
 //! information on licensing and copyright.
 
-use crate::fs::{FileSystem, FileSystemResult};
-use crate::native_modules::common::StaticNativeModule;
+use anyhow::Result;
+use crate::Execution;
 use mbedtls::cipher::{Cipher, Decryption, Encryption, Fresh, Traditional};
 use serde::Deserialize;
-use std::path::PathBuf;
-use wasi_types::ErrNo;
+use std::{path::{Path, PathBuf}, fs::{write, read}};
 
 /// The interface between of the Counter mode AES module.
 #[derive(Deserialize, Debug)]
@@ -32,38 +31,33 @@ pub(crate) struct AesCounterModeService {
     is_encryption: bool,
 }
 
-impl StaticNativeModule for AesCounterModeService {
+impl Execution for AesCounterModeService {
     /// Return the name of this service
     fn name(&self) -> &str {
-        "Counter mode AES Service"
+        Self::NAME
     }
 
     /// Triggers the service. The details of the service can be found in function
     /// `encryption_decryption`.
     /// Here is the enter point. It also erase the state unconditionally afterwards.
-    fn serve(&mut self, fs: &mut FileSystem, _input: &[u8]) -> FileSystemResult<()> {
+    fn execute(&mut self, dir: &Path) -> Result<()> {
+        let input = dir.join("input");
+        let output = dir.join("output");
+        let buf = read(input)?;
+        let deserialized_input: AesCounterModeService = postcard::from_bytes(&buf)?;
+        *self = deserialized_input;
         // when reaching here, the `input` bytes are already parsed.
-        let result = self.encryption_decryption(fs);
+        let result = self.encryption_decryption();
         // NOTE: erase all the states.
         self.reset();
+        // Write an output to inform the callee
+        let _ = write(output, "0");
         result
-    }
-
-    /// For the purpose of demonstration, we always return true. In reality,
-    /// this function may check validity of the `input`, and even buffer the result
-    /// for further uses.
-    fn try_parse(&mut self, input: &[u8]) -> FileSystemResult<bool> {
-        let deserialized_input: AesCounterModeService =
-            match postcard::from_bytes(&input).map_err(|_| ErrNo::Canceled) {
-                Ok(o) => o,
-                Err(_) => return Ok(false),
-            };
-        *self = deserialized_input;
-        Ok(true)
     }
 }
 
 impl AesCounterModeService {
+    pub(crate) const NAME: &'static str = "Counter mode AES Service";
     /// Create a new service, with empty internal state.
     pub fn new() -> Self {
         Self {
@@ -77,7 +71,7 @@ impl AesCounterModeService {
 
     /// The core service. It encrypts or decrypts, depending on the flag `is_encryption`, the input read
     /// from the path `input_path` using the `key` and `iv`, and writes the result to the file at `output_path`.
-    fn encryption_decryption(&mut self, fs: &mut FileSystem) -> FileSystemResult<()> {
+    fn encryption_decryption(&mut self) -> Result<()> {
         let AesCounterModeService {
             key,
             iv,
@@ -87,7 +81,7 @@ impl AesCounterModeService {
         } = self;
 
         // Read the input. The service must have the permission.
-        let input = fs.read_file_by_absolute_path(&input_path)?;
+        let input = read(&input_path)?;
 
         let mut output = Vec::new();
 
@@ -96,8 +90,7 @@ impl AesCounterModeService {
                 mbedtls::cipher::raw::CipherId::Aes,
                 mbedtls::cipher::raw::CipherMode::CTR,
                 key.len() as u32 * 8,
-            )
-            .map_err(|_| ErrNo::Canceled)?;
+            )?;
 
             let block_size = cypher.block_size();
             // Mbed TLS requires the output buffer to be at least `ilen + block_size` long.
@@ -106,17 +99,14 @@ impl AesCounterModeService {
             output.resize(padded_size, 0);
 
             cypher
-                .set_key_iv(&key[..], &iv[..])
-                .map_err(|_| ErrNo::Canceled)?
-                .encrypt(&input, &mut output)
-                .map_err(|_| ErrNo::Canceled)?;
+                .set_key_iv(&key[..], &iv[..])?
+                .encrypt(&input, &mut output)?;
         } else {
             let cypher: Cipher<Decryption, Traditional, Fresh> = mbedtls::cipher::Cipher::new(
                 mbedtls::cipher::raw::CipherId::Aes,
                 mbedtls::cipher::raw::CipherMode::CTR,
                 key.len() as u32 * 8,
-            )
-            .map_err(|_| ErrNo::Canceled)?;
+            )?;
 
             let block_size = cypher.block_size();
             // Mbed TLS requires the output buffer to be at least `ilen + block_size` long.
@@ -125,15 +115,14 @@ impl AesCounterModeService {
             output.resize(padded_size, 0);
 
             cypher
-                .set_key_iv(&key[..], &iv[..])
-                .map_err(|_| ErrNo::Canceled)?
-                .decrypt(&input, &mut output)
-                .map_err(|_| ErrNo::Canceled)?;
+                .set_key_iv(&key[..], &iv[..])?
+                .decrypt(&input, &mut output)?;
         }
 
         // We only need as many bytes from the output as the input:
         output.resize(input.len(), 0);
-        fs.write_file_by_absolute_path(&output_path, output, true)
+        write(&output_path, output)?;
+        Ok(())
     }
 
     /// Reset the state, and erase the sensitive information.

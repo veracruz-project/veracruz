@@ -162,13 +162,14 @@ fn dec_approx(data: &[f64], norm: f64) -> Vec<f64> {
 /// Entry point: reads the vector of floats, processes them, and writes back a new vector of
 /// floats as output.
 fn main() -> anyhow::Result<()> {
-    for path in fs::read_dir("/input/macd/")? {
+    for path in fs::read_dir("./input/macd/")? {
         let path = path?.path();
         let dataset = read_inputs(&path)?;
         let (_wma12, _wma26, _wma_diff, _wma9, _macd_wma, _decision_wma, decisions_wma_approx) =
             computation(dataset.as_slice());
         let result_encode = postcard::to_allocvec::<Vec<f64>>(&decisions_wma_approx)?;
-        let mut output = PathBuf::from("/output/macd/");
+        fs::create_dir_all("./output/macd/")?;
+        let mut output = PathBuf::from("./output/macd/");
         output.push(path.file_name().ok_or(anyhow!("cannot get file name"))?);
         fs::write(output, result_encode)?;
     }

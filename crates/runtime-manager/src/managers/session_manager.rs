@@ -16,6 +16,7 @@ use session_manager::SessionContext;
 use std::{sync::atomic::Ordering, vec::Vec};
 use veracruz_utils::csr;
 use veracruz_utils::sha256::sha256;
+use log::info;
 
 pub fn init_session_manager() -> Result<()> {
     let new_session_manager = SessionContext::new()?;
@@ -28,12 +29,9 @@ pub fn init_session_manager() -> Result<()> {
 }
 
 pub fn load_policy(policy_json: &str) -> Result<()> {
+    info!("Load policy: {:?}", policy_json);
     let policy_hash = sha256(&policy_json.as_bytes());
     let policy = Policy::from_json(policy_json)?;
-
-    if *policy.debug() {
-        super::DEBUG_FLAG.store(true, Ordering::SeqCst);
-    }
 
     let state = ProtocolState::new(policy.clone(), hex::encode(policy_hash))?;
     *super::PROTOCOL_STATE

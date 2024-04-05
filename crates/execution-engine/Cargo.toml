@@ -10,39 +10,27 @@ default = []
 nitro = [
   "mbedtls/monitor_getrandom",
   "platform-services/nitro",
-  "policy-utils/std",
-  "wasmtime",
 ]
 std = [
   "nix",
   "platform-services/std",
-  "policy-utils/std",
-  "wasmtime",
 ]
 
 [dependencies]
 log = "0.4.13"
 anyhow = "1"
-byteorder = "1.4.3"
 cfg-if = "1"
-err-derive = "0.2"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 mbedtls = { path = "../third-party/rust-mbedtls/mbedtls", default-features = false, features = ["std", "aesni", "padlock", "tls13"] }
-nix = { version = "0.26", optional = true }
-num = { version = "0.4", default-features = false }
-num-derive = { version = "0.3", default-features = false }
-num-traits = { version = "0.2", default-features = false }
+nix = { version = "0.26", optional = true, features=["fs"] }
 postcard = { version = "1.0.0", features = [ "alloc", "use-std" ] }
 platform-services = { path = "../platform-services" }
-policy-utils = { path = "../policy-utils" }
+policy-utils = { path = "../policy-utils", features = ["std"] }
 serde = { version = "1.0.185", features = ["derive"] }
 serde_json = "1.0"
-strum = "0.24"
-strum_macros = "0.24"
-typetag = "0.1.8"
 wasi-types = { path = "../third-party/wasi-types" }
-wasmi = { path = "../third-party/wasmi" }
-wasmtime = { version = "10.0.1", optional = true }
+wasmtime = "11"
+wasmtime-wasi = "11"
 
 [lib]
 name = "execution_engine"

@@ -12,57 +12,41 @@ path = "src/lib.rs"
 [features]
 # a feature to enable CLI-only dependencies
 # https://stackoverflow.com/questions/35711044/how-can-i-specify-binary-only-dependencies
-cli = [
-  "clap",
-  "env_logger",
-  "policy-utils/std",
-]
 debug = []
 linux = [
-  "data-encoding",
   "io-utils/linux",
-  "nix",
-  "policy-utils/std",
   "tempfile",
   "veracruz-utils/linux",
 ]
 nitro = [
   "io-utils/nitro",
   "nitro-enclave",
-  "nix",
-  "policy-utils/std",
   "veracruz-utils/nitro",
 ]
 
 sev = [
-  "io-utils",
-  "nix",
-  "policy-utils/std",
+  "io-utils/linux",
 ]
 
 [dependencies]
 anyhow = "1"
 base64 = "0.13.0"
 bincode = { version = "1.2.1", default-features = false }
-clap = { version = "4", features = ["derive"], optional = true}
-data-encoding = { version = "2.3.2", optional = true }
-env_logger = { version = "0.10.0", optional = true }
 err-derive = "0.2"
 hex = "0.4.2"
-io-utils = { path = "../io-utils", optional = true }
+io-utils = { path = "../io-utils" }
 lazy_static = "1.4"
 log = "0.4.13"
 nitro-enclave = { git = "https://github.com/veracruz-project/nitro-enclave", tag = "v0.3", optional = true }
-nix = { version = "0.26", optional = true }
+nix = "0.26"
 postcard = "1.0.0"
-policy-utils = { path = "../policy-utils" }
+policy-utils = { path = "../policy-utils", features = ["std"] }
 proxy-attestation-client = { git = "https://github.com/veracruz-project/proxy-attestation-client", tag = "v0.4" }
 psa-attestation = { path = "../psa-attestation", optional = true }
 rand = "0.8.3"
 reqwest = { version = "0.11", default-features = false, features = ["blocking", "multipart", "rustls-tls"] }
 serde = { version = "1.0.185", default-features = false, features = ["derive"] }
 serde_json = "1.0"
-signal-hook = { version = "0.3.13", optional = true }
 tempfile = { version = "3.2.0", optional = true }
 transport-protocol = { path = "../transport-protocol" }
 uuid = { version = "1.1.2", features = ["serde"] }

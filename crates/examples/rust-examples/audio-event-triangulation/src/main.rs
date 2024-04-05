@@ -147,7 +147,7 @@ fn main() -> anyhow::Result<()> {
     // an input errors
     let mut raw_events = Vec::new();
     for i in 0.. {
-        let filename = format!("/input-{}", i);
+        let filename = format!("./input-{}", i);
         let event = match fs::read(filename) {
             Ok(event) => event,
             Err(err) => match err.kind() {
@@ -172,6 +172,6 @@ fn main() -> anyhow::Result<()> {
     let raw_location = encode_location(location);
 
     // write our output through libveracruz
-    fs::write("/output", &raw_location)?;
+    fs::write("./output", &raw_location)?;
     Ok(())
 }

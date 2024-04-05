@@ -63,6 +63,7 @@ Veracruz supports the direct execution of non-WebAssembly native code via the
 compile the example to WebAssembly, which Rust makes very easy for us:
 
 ``` bash
+$ rustup target add wasm32-wasi
 $ cargo build \
     --manifest-path=workspaces/applications/Cargo.toml \
     --target wasm32-wasi \
@@ -178,18 +179,12 @@ $ vc-pgen \
     --veracruz-server-ip 127.0.0.1:3017 \
     --certificate-expiry "$(date --rfc-2822 -d 'now + 100 days')" \
     --css-file workspaces/linux-runtime/target/debug/linux-runtime-manager \
-    --certificate example/example-program-cert.pem \
-    --capability "/program/:w" \
-    --certificate example/example-data0-cert.pem \
-    --capability "/input/:w" \
-    --certificate example/example-data1-cert.pem \
-    --capability "/input/:w" \
-    --certificate example/example-data2-cert.pem \
-    --capability "/input/:w" \
-    --certificate example/example-result-cert.pem \
-    --capability "/program/:x,/output/:r" \
-    --program-binary /program/example-binary.wasm=example/example-binary.wasm \
-    --capability "/input/:r,/output/:w" \
+    --certificate "example/example-program-cert.pem => ./program/:w" \
+    --certificate "example/example-data0-cert.pem => ./input/:w" \
+    --certificate "example/example-data1-cert.pem => ./input/:w" \
+    --certificate "example/example-data2-cert.pem => ./input/:w" \
+    --certificate "example/example-result-cert.pem => ./program/:x,./output/:r" \
+    --program-binary "./program/example-binary.wasm=example/example-binary.wasm => .:rw" \
     --output-policy-file example/example-policy.json \
     --max-memory-mib 256
 ```
@@ -235,7 +230,7 @@ Server in the background:
 ``` bash
 $ vc-server example/example-policy.json &
 Veracruz Server running on 127.0.0.1:3017
-$ sleep 10
+$ sleep 30
 ```
 
 ## Running the Veracruz Client
@@ -252,7 +247,7 @@ identity with the "ProgramProvider" role:
 $ vc-client example/example-policy.json \
     --identity example/example-program-cert.pem \
     --key example/example-program-key.pem \
-    --program /program/example-binary.wasm=example/example-binary.wasm
+    --program ./program/example-binary.wasm=example/example-binary.wasm
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
 Submitting <enclave>/example-binary.wasm from example/example-binary.wasm
@@ -267,7 +262,7 @@ different devices:
 $ vc-client example/example-policy.json \
     --identity example/example-data0-cert.pem \
     --key example/example-data0-key.pem \
-    --data /input/shamir-0.dat=<(echo "01dc061a7bdaf77616dd5915f3b4" | xxd -r -p)
+    --data ./input/shamir-0.dat=<(echo "01dc061a7bdaf77616dd5915f3b4" | xxd -r -p)
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
 Submitting <enclave>/input/shamir-0.dat from /dev/fd/63
@@ -275,7 +270,7 @@ Submitting <enclave>/input/shamir-0.dat from /dev/fd/63
 $ vc-client example/example-policy.json \
     --identity example/example-data1-cert.pem \
     --key example/example-data1-key.pem \
-    --data /input/shamir-1.dat=<(echo "027f38e27b5a02a288d064965364" | xxd -r -p)
+    --data ./input/shamir-1.dat=<(echo "027f38e27b5a02a288d064965364" | xxd -r -p)
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
 Submitting <enclave>/input/shamir-1.dat from /dev/fd/63
@@ -283,7 +278,7 @@ Submitting <enclave>/input/shamir-1.dat from /dev/fd/63
 $ vc-client example/example-policy.json \
     --identity example/example-data2-cert.pem \
     --key example/example-data2-key.pem \
-    --data /input/shamir-2.dat=<(echo "03eb5b946cefd583f17f51e781da" | xxd -r -p)
+    --data ./input/shamir-2.dat=<(echo "03eb5b946cefd583f17f51e781da" | xxd -r -p)
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
 Submitting <enclave>/input/shamir-2.dat from /dev/fd/63
@@ -296,8 +291,8 @@ with the "RequestResult" role:
 $ vc-client example/example-policy.json \
     --identity example/example-result-cert.pem \
     --key example/example-result-key.pem \
-    --compute /program/example-binary.wasm \
-    --result /output/shamir.dat=-
+    --compute ./program/example-binary.wasm \
+    --result ./output/shamir.dat=-
 Loaded policy example/example-policy.json 645ae94ea86eaf15cfc04c07a17bd9b6a3b3b6c3558fae6fb93d8ee4c3e71241
 Connecting to 127.0.0.1:3017
 Requesting compute of <enclave>/example-binary.wasm

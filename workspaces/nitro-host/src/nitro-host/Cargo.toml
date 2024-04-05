@@ -7,5 +7,5 @@ version = "0.3.0"
 
 [dependencies]
 tests = { path = "../../crates/tests", features = [ "nitro" ] }
-veracruz-client = { path = "../../crates/veracruz-client", features = [ "nitro", "cli" ] }
-veracruz-server = { path = "../../crates/veracruz-server", features = [ "nitro", "cli" ] }
+veracruz-client = { path = "../../crates/veracruz-client", features = [ "nitro" ] }
+veracruz-server = { path = "../../crates/veracruz-server", features = [ "nitro" ] }
