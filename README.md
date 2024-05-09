@@ -1,6 +1,7 @@
 # Veracruz: privacy-preserving collaborative compute
 
 ![CI build status](https://github.com/veracruz-project/veracruz/actions/workflows/main.yml/badge.svg)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8918/badge)](https://www.bestpractices.dev/projects/8918)
 
 <img src = "https://confidentialcomputing.io/wp-content/uploads/sites/10/2022/07/cc_consortium-color.svg" width=192>
 
