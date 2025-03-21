@@ -1,3 +1,5 @@
+This project is currently transitioning to Emeritus stage of the CCC project policy <link to GitHub>. If you are interested in taking over maintaining this project, please reach out to the TAC at tac@confidentialcomputing.io
+
 # Veracruz: privacy-preserving collaborative compute
 
 ![CI build status](https://github.com/veracruz-project/veracruz/actions/workflows/main.yml/badge.svg)
