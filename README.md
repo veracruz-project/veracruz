@@ -1,4 +1,4 @@
-This project is currently transitioning to Emeritus stage of the CCC project policy <link to GitHub>. If you are interested in taking over maintaining this project, please reach out to the TAC at tac@confidentialcomputing.io
+This project is currently transitioning to Emeritus stage of the CCC project policy <https://github.com/confidential-computing/governance/blob/main/project-progression-policy.md>. If you are interested in taking over maintaining this project, please reach out to the TAC at  tac@lists.confidentialcomputing.io
 
 # Veracruz: privacy-preserving collaborative compute
 
